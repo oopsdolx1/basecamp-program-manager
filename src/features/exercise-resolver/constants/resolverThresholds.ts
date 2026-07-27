@@ -1,0 +1,15 @@
+export const RESOLVER_CONFIDENCE = {
+  EXACT: 100,
+  ALIAS_EXACT: 95,
+  NORMALIZED: 90,
+  SIMILARITY_MAX: 80,
+  UNKNOWN: 0,
+} as const;
+
+export const RESOLVER_THRESHOLDS = {
+  AUTO_RESOLVE: 90,
+  AMBIGUOUS_MIN: 70,
+  UNKNOWN_MAX: 69,
+} as const;
+
+export const RESOLVER_CANDIDATE_LIMIT = 5;

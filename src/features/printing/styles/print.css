@@ -1,0 +1,267 @@
+@media screen {
+  .print-preview-shell {
+    background: #ecece7;
+    min-height: calc(100vh - 64px);
+    padding: 24px;
+  }
+
+  .a5-workout-document {
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16);
+    margin: 0 auto;
+  }
+}
+
+@page {
+  size: A5 portrait;
+  margin: 0;
+}
+
+@media print {
+  html,
+  body {
+    background: #fff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .print-only-root,
+  .print-only-root * {
+    visibility: visible;
+  }
+
+  .print-only-root {
+    left: 0;
+    position: absolute;
+    top: 0;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .a5-workout-document {
+    box-shadow: none;
+    margin: 0;
+    transform: none;
+  }
+}
+
+.a5-workout-document {
+  background: #fff;
+  box-sizing: border-box;
+  color: #111;
+  display: flex;
+  flex-direction: column;
+  font-family: "Noto Sans KR", Arial, sans-serif;
+  height: 210mm;
+  overflow: hidden;
+  padding: 7mm;
+  page-break-after: avoid;
+  page-break-before: avoid;
+  page-break-inside: avoid;
+  break-after: avoid;
+  break-before: avoid;
+  break-inside: avoid;
+  width: 148mm;
+}
+
+.print-header {
+  align-items: flex-start;
+  border-bottom: 0.45mm solid #111;
+  display: flex;
+  justify-content: space-between;
+  padding-bottom: 2.5mm;
+}
+
+.print-logo {
+  font-size: 18pt;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.print-subtitle {
+  font-size: 7pt;
+  margin-top: 1mm;
+  max-width: 78mm;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.print-meta {
+  font-size: 8pt;
+  line-height: 1.7;
+  text-align: right;
+}
+
+.print-section {
+  border-bottom: 0.25mm solid #c8c8c8;
+  padding: 2mm 0;
+}
+
+.print-section-title {
+  font-size: 8pt;
+  font-weight: 800;
+  margin-bottom: 1.4mm;
+}
+
+.print-info-grid {
+  display: grid;
+  font-size: 8pt;
+  gap: 1.4mm 4mm;
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.blank-line {
+  border-bottom: 0.25mm solid #111;
+  display: inline-block;
+  height: 4mm;
+  min-width: 22mm;
+  vertical-align: bottom;
+}
+
+.body-part-grid {
+  display: grid;
+  font-size: 7.4pt;
+  gap: 1mm 2.5mm;
+  grid-template-columns: repeat(6, 1fr);
+}
+
+.print-checkbox {
+  border: 0.35mm solid #111;
+  display: inline-block;
+  height: 3.1mm;
+  margin-right: 1mm;
+  position: relative;
+  vertical-align: middle;
+  width: 3.1mm;
+}
+
+.print-checkbox.checked::after {
+  content: "";
+  border-bottom: 0.45mm solid #111;
+  border-right: 0.45mm solid #111;
+  height: 2.5mm;
+  left: 0.85mm;
+  position: absolute;
+  top: -0.25mm;
+  transform: rotate(42deg);
+  width: 1.2mm;
+}
+
+.exercise-print-table {
+  border-collapse: collapse;
+  font-size: 6.4pt;
+  page-break-inside: avoid;
+  break-inside: avoid;
+  table-layout: fixed;
+  width: 100%;
+}
+
+.exercise-print-table th,
+.exercise-print-table td {
+  border: 0.2mm solid #999;
+}
+
+.exercise-print-table th {
+  background: #efefec;
+  font-weight: 800;
+  height: 6mm;
+}
+
+.exercise-name-cell {
+  padding: 1.2mm;
+  vertical-align: top;
+  width: 31mm;
+}
+
+.exercise-row {
+  height: 13.4mm;
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
+.exercise-row:nth-child(even) {
+  background: #f7f7f4;
+}
+
+.exercise-title {
+  display: -webkit-box;
+  font-size: 7pt;
+  font-weight: 800;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  line-height: 1.15;
+  max-height: 3.2mm;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.exercise-memo {
+  color: #555;
+  display: -webkit-box;
+  font-size: 5.8pt;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  line-height: 1.2;
+  margin-top: 0.8mm;
+  max-height: 2.4mm;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.set-cell {
+  padding: 0.7mm;
+  vertical-align: top;
+}
+
+.set-cell.inactive {
+  background: #eeeeea;
+}
+
+.handwrite-grid {
+  display: grid;
+  gap: 0.4mm;
+  grid-template-rows: repeat(3, 1fr);
+  height: 10.6mm;
+}
+
+.handwrite-line {
+  align-items: center;
+  border-bottom: 0.2mm solid #777;
+  color: #777;
+  display: flex;
+  font-size: 5.2pt;
+  justify-content: space-between;
+}
+
+.print-memo {
+  border: 0.25mm solid #bbb;
+  flex: 1;
+  font-size: 7pt;
+  line-height: 1.35;
+  margin-top: 2mm;
+  max-height: 15mm;
+  min-height: 12mm;
+  overflow: hidden;
+  padding: 1.8mm;
+}
+
+.print-memo-section {
+  border-bottom: 0;
+  flex: 1;
+  min-height: 18mm;
+  overflow: hidden;
+}
+
+.print-footer {
+  align-items: center;
+  display: flex;
+  font-size: 6.4pt;
+  justify-content: space-between;
+  margin-top: 2mm;
+}

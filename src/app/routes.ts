@@ -1,6 +1,8 @@
 export const routes = {
   home: "/",
+  print: "/program-manager/print",
   quickPrint: "/program-manager/quick-print",
+  master: "/program-manager/master",
   programs: "/program-manager/programs",
   exerciseCatalog: "/program-manager/exercise-catalog",
   newProgram: "/program-manager/programs/new",

@@ -26,7 +26,7 @@ export const PrintPreviewPage = (): JSX.Element => {
   });
   const printRequest = useCreatePrintRequest(conditionLabAppId);
 
-  const goQuickPrint = () => navigate(routeBuilder.quickPrint());
+  const goPrint = () => navigate(routeBuilder.print());
 
   const requestPrint = async () => {
     if (state.status !== "ready" || printRequest.saving) return;
@@ -51,10 +51,10 @@ export const PrintPreviewPage = (): JSX.Element => {
         <Stack spacing={2}>
           <Alert severity="error">{state.message}</Alert>
           <Stack direction="row" spacing={1}>
-            <Button startIcon={<ArrowBackIcon />} onClick={goQuickPrint}>
-              Quick Print로 돌아가기
+            <Button startIcon={<ArrowBackIcon />} onClick={goPrint}>
+              Print로 돌아가기
             </Button>
-            <Button onClick={() => navigate(routeBuilder.programs())}>프로그램 관리</Button>
+            <Button onClick={() => navigate(routeBuilder.master("programs"))}>Master</Button>
           </Stack>
         </Stack>
       </PageContainer>
@@ -72,7 +72,7 @@ export const PrintPreviewPage = (): JSX.Element => {
               <Typography color="text.secondary">A5 한 페이지 운동 기록지입니다.</Typography>
             </Box>
             <Stack direction="row" spacing={1}>
-              <Button disabled={printRequest.saving} startIcon={<ArrowBackIcon />} onClick={goQuickPrint}>
+              <Button disabled={printRequest.saving} startIcon={<ArrowBackIcon />} onClick={goPrint}>
                 돌아가기
               </Button>
               <Button

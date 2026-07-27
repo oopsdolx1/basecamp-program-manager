@@ -2,12 +2,12 @@ import FitnessCenterIcon from "@mui/icons-material/FitnessCenter";
 import { AppBar, Box, Button, Toolbar, Typography } from "@mui/material";
 import { Link as RouterLink, useLocation } from "react-router-dom";
 import { routeBuilder } from "../../../app/routeBuilder";
+import { routes } from "../../../app/routes";
 
 const navItems = [
-  { label: "Quick Print", to: routeBuilder.quickPrint() },
-  { label: "Programs", to: routeBuilder.programs() },
-  { label: "Exercise Catalog", to: routeBuilder.exerciseCatalog() },
-  { label: "Print History", to: routeBuilder.printHistory() },
+  { label: "Print", to: routeBuilder.print(), matches: [routeBuilder.print(), routeBuilder.quickPrint()] },
+  { label: "Exercise Catalog", to: routeBuilder.exerciseCatalog(), matches: [routeBuilder.exerciseCatalog()] },
+  { label: "Master", to: routeBuilder.master(), matches: [routeBuilder.master(), routes.programs, routes.printHistory] },
 ];
 
 export const AppHeader = (): JSX.Element => {
@@ -58,7 +58,9 @@ export const AppHeader = (): JSX.Element => {
 
         <Box sx={{ display: { md: "flex", xs: "none" }, gap: 1 }}>
           {navItems.map((item) => {
-            const active = location.pathname === item.to || location.pathname.startsWith(`${item.to}/`);
+            const active = item.matches.some(
+              (match) => location.pathname === match || location.pathname.startsWith(`${match}/`),
+            );
             return (
               <Button
                 component={RouterLink}

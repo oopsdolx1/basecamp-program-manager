@@ -4,11 +4,10 @@ import { EmptyState } from "../../../../components/common/EmptyState";
 import { ErrorState } from "../../../../components/common/ErrorState";
 import { LoadingState } from "../../../../components/common/LoadingState";
 import type { Loadable } from "../../../../types/common.types";
-import { ProgramCard } from "../ProgramCard/ProgramCard";
 import type { Program } from "../../types/program.types";
-import type { ProgramListItem } from "../../types/programViewModel.types";
+import type { ProgramFilters as ProgramFiltersValue, ProgramListItem } from "../../types/programViewModel.types";
+import { ProgramCard } from "../ProgramCard/ProgramCard";
 import { ProgramFilters } from "../ProgramFilters/ProgramFilters";
-import type { ProgramFilters as ProgramFiltersValue } from "../../types/programViewModel.types";
 
 interface ProgramListProps {
   state: Loadable<Program[]>;
@@ -36,9 +35,9 @@ export const ProgramList = ({
   onToggleFavorite,
 }: ProgramListProps): JSX.Element => (
   <Stack spacing={3}>
-    <Stack alignItems="center" direction="row" justifyContent="space-between">
+    <Stack alignItems="center" direction={{ md: "row", xs: "column" }} justifyContent="space-between" spacing={2}>
       <Stack spacing={0.5}>
-        <Typography variant="h1">프로그램 관리</Typography>
+        <Typography variant="h1">Program Management</Typography>
         <Typography color="text.secondary">재사용 가능한 운동 프로그램을 만들고 관리합니다.</Typography>
       </Stack>
       <Button startIcon={<AddIcon />} variant="contained" onClick={onCreate}>
@@ -46,7 +45,7 @@ export const ProgramList = ({
       </Button>
     </Stack>
     <ProgramFilters filters={filters} onChange={onFiltersChange} />
-    {state.status === "loading" ? <LoadingState /> : null}
+    {state.status === "loading" ? <LoadingState message="프로그램 목록을 불러오는 중입니다." /> : null}
     {state.status === "error" ? <ErrorState message={state.message} /> : null}
     {state.status === "ready" && programs.length === 0 ? (
       <EmptyState title="프로그램이 없습니다." description="새 프로그램을 만들어 운동 구성을 저장해 보세요." />

@@ -11,7 +11,19 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { Alert, Button, Card, CardContent, FormControlLabel, MenuItem, Stack, Switch, TextField, Typography } from "@mui/material";
+import {
+  Alert,
+  Button,
+  Card,
+  CardContent,
+  FormControlLabel,
+  LinearProgress,
+  MenuItem,
+  Stack,
+  Switch,
+  TextField,
+  Typography,
+} from "@mui/material";
 import type { AppId } from "../../../../types/brandedIds";
 import { useExerciseCatalog } from "../../../exercise-catalog";
 import { useExerciseResolver } from "../../../exercise-resolver";
@@ -62,8 +74,21 @@ export const ProgramEditor = ({
         <Typography variant="h1">{program ? "프로그램 수정" : "새 프로그램"}</Typography>
         <Typography color="text.secondary">kg, 횟수, 수축, 휴식시간은 저장하지 않습니다.</Typography>
       </Stack>
+      {catalogState.status === "loading" ? (
+        <Alert severity="info" variant="outlined">
+          운동 카탈로그를 불러오는 중입니다. 직접 입력은 바로 사용할 수 있습니다.
+          <LinearProgress sx={{ mt: 1.5 }} />
+        </Alert>
+      ) : null}
       {catalogState.status === "error" ? (
-        <Alert severity="warning">운동 카탈로그를 불러오지 못해 직접 입력 모드로 동작합니다. {catalogState.message}</Alert>
+        <Alert severity="warning">
+          운동 카탈로그를 불러오지 못해 직접 입력 모드로 동작합니다. {catalogState.message}
+        </Alert>
+      ) : null}
+      {catalogState.status === "ready" && catalogOptions.length === 0 ? (
+        <Alert severity="info" variant="outlined">
+          등록된 운동 카탈로그가 없습니다. 직접 입력으로 프로그램을 작성할 수 있습니다.
+        </Alert>
       ) : null}
       {!form.validation.valid ? <Alert severity="info">{form.validation.errors[0]}</Alert> : null}
       <Card>
@@ -128,7 +153,12 @@ export const ProgramEditor = ({
         <CardContent>
           <Stack spacing={2}>
             <Stack alignItems="center" direction="row" justifyContent="space-between">
-              <Typography variant="h2">Exercise List</Typography>
+              <Stack spacing={0.25}>
+                <Typography variant="h2">Exercise List</Typography>
+                <Typography color="text.secondary" variant="body2">
+                  카탈로그 운동을 선택하거나 직접 입력할 수 있습니다.
+                </Typography>
+              </Stack>
               <Button disabled={!canAddExercise} startIcon={<AddIcon />} onClick={form.addExercise}>
                 운동 추가
               </Button>

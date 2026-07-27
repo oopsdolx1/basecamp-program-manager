@@ -4,12 +4,12 @@ import { ErrorState } from "../../../components/common/ErrorState";
 import { LoadingState } from "../../../components/common/LoadingState";
 import { PageContainer } from "../../../components/layout/PageContainer";
 import { toAppId } from "../../../types/brandedIds";
+import { normalizeText } from "../../../utils/normalizeText";
 import { ExerciseCatalogFilters } from "../components/ExerciseCatalogFilters";
 import { ExerciseCatalogList } from "../components/ExerciseCatalogList";
 import { initialExerciseCatalogSeed } from "../constants/initialExerciseCatalogSeed";
 import { useExerciseCatalog } from "../hooks/useExerciseCatalog";
 import { exerciseCatalogRepository } from "../repositories/exerciseCatalogRepository";
-import { normalizeText } from "../../../utils/normalizeText";
 
 const conditionLabAppId = toAppId(import.meta.env.VITE_CONDITION_LAB_APP_ID ?? "");
 

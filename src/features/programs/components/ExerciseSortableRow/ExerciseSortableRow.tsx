@@ -2,7 +2,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Autocomplete, Box, Chip, Grid, IconButton, TextField, Tooltip } from "@mui/material";
+import { Autocomplete, Box, Chip, Grid, IconButton, TextField, Tooltip, Typography } from "@mui/material";
 import type { ExerciseCatalogOption } from "../../../exercise-catalog";
 import type { ResolveResult } from "../../../exercise-resolver";
 import type { ProgramFormExercise } from "../../types/program.types";
@@ -21,6 +21,11 @@ const findSelectedOption = (
   options: ExerciseCatalogOption[],
 ): ExerciseCatalogOption | string =>
   options.find((option) => option.id === exercise.catalogExerciseId) ?? exercise.displayName ?? exercise.name;
+
+const normalizeOptionSearch = (value: string): string => value.trim().replace(/\s+/g, " ").toLocaleLowerCase("ko-KR");
+
+const catalogOptionSearchText = (option: ExerciseCatalogOption): string =>
+  normalizeOptionSearch([option.name, option.displayName, option.englishName ?? "", ...option.aliases].join(" "));
 
 export const ExerciseSortableRow = ({
   exercise,
@@ -67,10 +72,13 @@ export const ExerciseSortableRow = ({
             freeSolo
             options={catalogOptions}
             value={findSelectedOption(exercise, catalogOptions)}
+            filterOptions={(options, state) => {
+              const query = normalizeOptionSearch(state.inputValue);
+              if (!query) return options;
+              return options.filter((option) => catalogOptionSearchText(option).includes(query));
+            }}
             getOptionLabel={(option) => (typeof option === "string" ? option : option.displayName)}
-            isOptionEqualToValue={(option, value) =>
-              typeof value !== "string" && option.id === value.id
-            }
+            isOptionEqualToValue={(option, value) => typeof value !== "string" && option.id === value.id}
             onChange={(_, value) => {
               if (typeof value === "string") {
                 onChange({ name: value, displayName: value, catalogExerciseId: undefined });
@@ -88,11 +96,14 @@ export const ExerciseSortableRow = ({
             renderOption={(props, option) => (
               <Box component="li" {...props} key={option.id}>
                 <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
-                  <Box>{option.displayName}</Box>
-                  <Box sx={{ display: "flex", gap: 0.5 }}>
+                  <Typography fontWeight={900}>{option.displayName}</Typography>
+                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                    {option.englishName ? <Chip label={option.englishName} size="small" variant="outlined" /> : null}
                     <Chip label={option.categoryLabel} size="small" />
                     <Chip label={option.equipmentLabel} size="small" variant="outlined" />
-                    {option.englishName ? <Chip label={option.englishName} size="small" variant="outlined" /> : null}
+                    {option.aliases.slice(0, 2).map((alias) => (
+                      <Chip key={alias} label={alias} size="small" variant="outlined" />
+                    ))}
                   </Box>
                 </Box>
               </Box>

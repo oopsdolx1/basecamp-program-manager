@@ -13,9 +13,10 @@ export const filterMembers = (
   }
 
   return members.filter((member) => {
+    const nameMatch = normalizedQuery ? normalizeText(member.displayName).includes(normalizedQuery) : false;
     const textMatch = normalizedQuery ? member.searchText.includes(normalizedQuery) : false;
     const phoneMatch = digitQuery ? normalizeDigits(member.phone ?? "").includes(digitQuery) : false;
-    return textMatch || phoneMatch;
+    return nameMatch || textMatch || phoneMatch;
   });
 };
 

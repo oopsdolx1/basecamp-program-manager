@@ -1,5 +1,6 @@
 import SearchIcon from "@mui/icons-material/Search";
-import { InputAdornment, TextField } from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
+import { IconButton, InputAdornment, TextField } from "@mui/material";
 
 interface SearchFieldProps {
   label: string;
@@ -19,6 +20,13 @@ export const SearchField = ({ label, value, onChange }: SearchFieldProps): JSX.E
           <SearchIcon fontSize="small" />
         </InputAdornment>
       ),
+      endAdornment: value ? (
+        <InputAdornment position="end">
+          <IconButton aria-label={`${label} 지우기`} edge="end" size="small" onClick={() => onChange("")}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </InputAdornment>
+      ) : null,
     }}
   />
 );

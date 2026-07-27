@@ -1,32 +1,88 @@
 import FitnessCenterIcon from "@mui/icons-material/FitnessCenter";
 import { AppBar, Box, Button, Toolbar, Typography } from "@mui/material";
-import { Link as RouterLink } from "react-router-dom";
+import { Link as RouterLink, useLocation } from "react-router-dom";
 import { routeBuilder } from "../../../app/routeBuilder";
 
-export const AppHeader = (): JSX.Element => (
-  <AppBar color="inherit" position="static">
-    <Toolbar sx={{ borderBottom: 1, borderColor: "divider", gap: 1.5 }}>
-      <FitnessCenterIcon color="primary" />
-      <Box sx={{ flexGrow: 1 }}>
-        <Typography variant="h3">BaseCamp Program Manager</Typography>
-        <Typography color="text.secondary" variant="body2">
-          Quick Print Foundation
-        </Typography>
-      </Box>
-      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-        <Button component={RouterLink} to={routeBuilder.quickPrint()}>
-          Quick Print
-        </Button>
-        <Button component={RouterLink} to={routeBuilder.programs()}>
-          프로그램 관리
-        </Button>
-        <Button component={RouterLink} to={routeBuilder.exerciseCatalog()}>
-          운동 카탈로그
-        </Button>
-        <Button component={RouterLink} to={routeBuilder.printHistory()}>
-          인쇄 요청 기록
-        </Button>
-      </Box>
-    </Toolbar>
-  </AppBar>
-);
+const navItems = [
+  { label: "Quick Print", to: routeBuilder.quickPrint() },
+  { label: "Programs", to: routeBuilder.programs() },
+  { label: "Exercise Catalog", to: routeBuilder.exerciseCatalog() },
+  { label: "Print History", to: routeBuilder.printHistory() },
+];
+
+export const AppHeader = (): JSX.Element => {
+  const location = useLocation();
+
+  return (
+    <AppBar
+      position="sticky"
+      sx={{
+        bgcolor: "rgba(17, 17, 17, 0.8)",
+        backdropFilter: "blur(12px)",
+        borderBottom: 1,
+        borderColor: "divider",
+        color: "text.primary",
+        flex: "none",
+        zIndex: 50,
+      }}
+    >
+      <Toolbar sx={{ gap: 2, height: 64, maxWidth: 1152, mx: "auto", px: 2, width: "100%" }}>
+        <Box sx={{ alignItems: "center", cursor: "pointer", display: "flex", gap: 1.5, userSelect: "none" }}>
+          <Box
+            sx={{
+              alignItems: "center",
+              bgcolor: "primary.main",
+              borderRadius: 2.5,
+              color: "primary.contrastText",
+              display: "flex",
+              height: 42,
+              justifyContent: "center",
+              transition: "transform 150ms ease",
+              width: 42,
+              "&:hover": { transform: "scale(1.04)" },
+            }}
+          >
+            <FitnessCenterIcon />
+          </Box>
+          <Box sx={{ display: { sm: "flex", xs: "none" }, flexDirection: "column", lineHeight: 1 }}>
+            <Typography fontSize={22} fontWeight={950} letterSpacing="-0.03em">
+              BASECAMP
+            </Typography>
+            <Typography color="primary.main" fontSize={11} fontWeight={800} letterSpacing="0.28em" mt={0.5}>
+              PROGRAM MANAGER
+            </Typography>
+          </Box>
+        </Box>
+
+        <Box sx={{ flexGrow: 1 }} />
+
+        <Box sx={{ display: { md: "flex", xs: "none" }, gap: 1 }}>
+          {navItems.map((item) => {
+            const active = location.pathname === item.to || location.pathname.startsWith(`${item.to}/`);
+            return (
+              <Button
+                component={RouterLink}
+                key={item.to}
+                size="small"
+                to={item.to}
+                variant={active ? "contained" : "text"}
+                sx={{
+                  bgcolor: active ? "primary.main" : "transparent",
+                  color: active ? "primary.contrastText" : "text.secondary",
+                  fontSize: 14,
+                  px: 2,
+                  "&:hover": {
+                    bgcolor: active ? "primary.main" : "rgba(30, 41, 59, 0.75)",
+                    color: active ? "primary.contrastText" : "text.primary",
+                  },
+                }}
+              >
+                {item.label}
+              </Button>
+            );
+          })}
+        </Box>
+      </Toolbar>
+    </AppBar>
+  );
+};

@@ -5,13 +5,17 @@ import { typography } from "./typography";
 
 export const basecampTheme = createTheme({
   palette: {
-    mode: "light",
+    mode: "dark",
     primary: {
       main: basecampPalette.primaryGold,
       contrastText: basecampPalette.black,
     },
+    secondary: {
+      main: basecampPalette.slate800,
+      contrastText: basecampPalette.white,
+    },
     text: {
-      primary: basecampPalette.dark,
+      primary: basecampPalette.white,
       secondary: basecampPalette.mutedText,
     },
     background: {
@@ -19,6 +23,10 @@ export const basecampTheme = createTheme({
       paper: basecampPalette.paper,
     },
     divider: basecampPalette.border,
+    error: { main: basecampPalette.danger },
+    warning: { main: basecampPalette.warning },
+    success: { main: basecampPalette.success },
+    info: { main: basecampPalette.info },
   },
   typography,
   components: componentOverrides,

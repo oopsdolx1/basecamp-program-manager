@@ -1,8 +1,14 @@
 import { Box, CircularProgress, Typography } from "@mui/material";
 
-export const LoadingState = (): JSX.Element => (
-  <Box sx={{ alignItems: "center", display: "flex", gap: 1.5, py: 4 }}>
+interface LoadingStateProps {
+  message?: string;
+}
+
+export const LoadingState = ({ message = "정보를 불러오는 중입니다." }: LoadingStateProps): JSX.Element => (
+  <Box sx={{ alignItems: "center", display: "flex", gap: 1.5, py: 3 }}>
     <CircularProgress size={22} />
-    <Typography color="text.secondary">회원 목록을 불러오는 중입니다.</Typography>
+    <Typography color="text.secondary" variant="body2">
+      {message}
+    </Typography>
   </Box>
 );

@@ -11,7 +11,8 @@ const initialFilters: ExerciseCatalogFilters = {
   category: "ALL",
   equipmentType: "ALL",
   primaryMuscle: "ALL",
-  includeArchived: false,
+  status: "ACTIVE",
+  quality: "ALL",
 };
 
 export const useExerciseCatalog = (appId: AppId) => {

@@ -99,7 +99,8 @@ export interface ExerciseCatalogFilters {
   category: ExerciseCategory | "ALL";
   equipmentType: EquipmentType | "ALL";
   primaryMuscle: PrimaryMuscle | "ALL";
-  includeArchived: boolean;
+  status: "ACTIVE" | "ARCHIVED" | "ALL";
+  quality: "ALL" | "NO_ALIAS" | "NO_ENGLISH_NAME" | "NO_MEMO";
 }
 
 export interface ExerciseCatalogOption {

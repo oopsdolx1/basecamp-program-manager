@@ -1,0 +1,119 @@
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import DeleteIcon from "@mui/icons-material/Delete";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
+import { Autocomplete, Box, Button, Card, CardContent, Chip, Grid, IconButton, Stack, TextField, Typography } from "@mui/material";
+import { memo } from "react";
+import type { ExerciseCatalogOption } from "../../../exercise-catalog";
+import { normalizeText } from "../../../../utils/normalizeText";
+import type { SnapshotBuilderExercise } from "../../services/snapshotBuilderService";
+
+interface SnapshotExerciseBuilderRowProps {
+  exercise: SnapshotBuilderExercise;
+  index: number;
+  total: number;
+  catalogOptions: ExerciseCatalogOption[];
+  onPatch: (patch: Partial<SnapshotBuilderExercise>) => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  onDuplicate: () => void;
+  onDelete: () => void;
+  onPreset: (preset: string) => void;
+}
+
+const presetButtons = [
+  { key: "plus_set", label: "+1 Set" },
+  { key: "minus_set", label: "-1 Set" },
+  { key: "reps_8_10", label: "8~10회" },
+  { key: "reps_10_12", label: "10~12회" },
+  { key: "reps_12_15", label: "12~15회" },
+  { key: "reps_15_20", label: "15~20회" },
+  { key: "failure", label: "Failure" },
+  { key: "drop_set", label: "Drop Set" },
+  { key: "super_set", label: "Super Set" },
+  { key: "tempo", label: "Tempo" },
+  { key: "rest_pause", label: "Rest Pause" },
+];
+
+const searchText = (option: ExerciseCatalogOption): string =>
+  normalizeText([option.name, option.displayName, option.englishName ?? "", ...option.aliases].join(" "));
+
+export const SnapshotExerciseBuilderRow = memo(function SnapshotExerciseBuilderRow({
+  exercise,
+  index,
+  total,
+  catalogOptions,
+  onPatch,
+  onMoveUp,
+  onMoveDown,
+  onDuplicate,
+  onDelete,
+  onPreset,
+}: SnapshotExerciseBuilderRowProps): JSX.Element {
+  const selectedOption = catalogOptions.find((option) => option.id === exercise.catalogExerciseId) ?? exercise.displayName ?? exercise.name;
+
+  return (
+    <Card sx={{ bgcolor: "rgba(2, 6, 23, 0.45)", border: 1, borderColor: "divider" }}>
+      <CardContent>
+        <Stack spacing={2}>
+          <Stack direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1}>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Typography variant="h2">운동 {exercise.order}</Typography>
+              <Chip label={index + 1 === total ? "Last" : `#${index + 1}`} size="small" variant="outlined" />
+            </Stack>
+            <Stack direction="row" spacing={0.5}>
+              <IconButton aria-label="move up" disabled={index === 0} onClick={onMoveUp}><KeyboardArrowUpIcon /></IconButton>
+              <IconButton aria-label="move down" disabled={index === total - 1} onClick={onMoveDown}><KeyboardArrowDownIcon /></IconButton>
+              <IconButton aria-label="duplicate" onClick={onDuplicate}><ContentCopyIcon /></IconButton>
+              <IconButton aria-label="delete" disabled={total <= 1} onClick={onDelete}><DeleteIcon /></IconButton>
+            </Stack>
+          </Stack>
+
+          <Autocomplete
+            freeSolo
+            options={catalogOptions}
+            value={selectedOption}
+            filterOptions={(options, state) => {
+              const query = normalizeText(state.inputValue);
+              if (!query) return options;
+              return options.filter((option) => searchText(option).includes(query));
+            }}
+            getOptionLabel={(option) => (typeof option === "string" ? option : option.displayName)}
+            isOptionEqualToValue={(option, value) => typeof value !== "string" && option.id === value.id}
+            onChange={(_, value) => {
+              if (typeof value === "string") {
+                onPatch({ name: value, displayName: value, catalogExerciseId: undefined });
+                return;
+              }
+              if (value) {
+                onPatch({ name: value.name, displayName: value.displayName, catalogExerciseId: value.id });
+              }
+            }}
+            onInputChange={(_, value, reason) => {
+              if (reason === "input") {
+                onPatch({ name: value, displayName: value, catalogExerciseId: undefined });
+              }
+            }}
+            renderInput={(params) => <TextField {...params} label="Exercise Replace" />}
+          />
+
+          <Grid container spacing={1.5}>
+            <Grid item md={2.4} sm={4} xs={6}><TextField fullWidth label="세트" type="number" inputProps={{ min: 1 }} value={exercise.sets} onChange={(event) => onPatch({ sets: Number(event.target.value) })} /></Grid>
+            <Grid item md={2.4} sm={4} xs={6}><TextField fullWidth label="횟수" value={exercise.reps} onChange={(event) => onPatch({ reps: event.target.value })} /></Grid>
+            <Grid item md={2.4} sm={4} xs={6}><TextField fullWidth label="무게" value={exercise.weight} onChange={(event) => onPatch({ weight: event.target.value })} /></Grid>
+            <Grid item md={2.4} sm={6} xs={6}><TextField fullWidth label="휴식(초)" type="number" inputProps={{ min: 0 }} value={exercise.restSeconds} onChange={(event) => onPatch({ restSeconds: Number(event.target.value) })} /></Grid>
+            <Grid item md={2.4} sm={6} xs={12}><TextField fullWidth label="메모" value={exercise.memo} onChange={(event) => onPatch({ memo: event.target.value })} /></Grid>
+          </Grid>
+
+          <Stack direction="row" flexWrap="wrap" gap={1}>
+            {presetButtons.map((preset) => (
+              <Button key={preset.key} size="small" variant="outlined" onClick={() => onPreset(preset.key)}>
+                {preset.label}
+              </Button>
+            ))}
+          </Stack>
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+});

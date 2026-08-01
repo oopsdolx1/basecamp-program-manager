@@ -3,9 +3,11 @@ import { ensureFirebaseAuth } from "../../../firebase/firebaseAuth";
 import type { AppId, ProfileId, ProgramId } from "../../../types/brandedIds";
 import { getMemberById } from "../../members/repositories/profileRepository";
 import type { MemberSelectionItem } from "../../members/types/memberViewModel.types";
+import { sanitizeProgramForm } from "../../programs/services/programService";
 import { programRepository } from "../../programs/repositories/programRepository";
 import type { Program } from "../../programs/types/program.types";
 import { createWorkoutPrintDocument, PrintMapperError } from "../mappers/workoutPrintMapper";
+import { isSnapshotProgramId, loadPrintSnapshot } from "../services/printSnapshotSession";
 import type { WorkoutPrintDocument } from "../types/print.types";
 
 type PreviewState =
@@ -27,12 +29,12 @@ export const usePrintPreview = ({ appId, memberId, programId }: UsePrintPreviewP
 
     const load = async () => {
       if (!memberId) {
-        setState({ status: "error", message: "memberIdê°€ ì—†ìŠµë‹ˆë‹¤." });
+        setState({ status: "error", message: "memberId°¡ ¾ø½À´Ï´Ù." });
         return;
       }
 
       if (!programId) {
-        setState({ status: "error", message: "programIdê°€ ì—†ìŠµë‹ˆë‹¤." });
+        setState({ status: "error", message: "programId°¡ ¾ø½À´Ï´Ù." });
         return;
       }
 
@@ -42,7 +44,9 @@ export const usePrintPreview = ({ appId, memberId, programId }: UsePrintPreviewP
         await ensureFirebaseAuth();
         const [member, program] = await Promise.all([
           getMemberById(appId, memberId),
-          programRepository.getProgram(appId, programId),
+          isSnapshotProgramId(programId)
+            ? Promise.resolve(createSnapshotProgram(programId))
+            : programRepository.getProgram(appId, programId),
         ]);
 
         if (!active) return;
@@ -54,7 +58,7 @@ export const usePrintPreview = ({ appId, memberId, programId }: UsePrintPreviewP
         const message =
           caught instanceof PrintMapperError || caught instanceof Error
             ? caught.message
-            : "ì¶œë ¥ ë¬¸ì„œë¥¼ ë§Œë“¤ì§€ ëª»í–ˆìŠµë‹ˆë‹¤.";
+            : "Ãâ·Â ¹®¼­¸¦ ¸¸µéÁö ¸øÇß½À´Ï´Ù.";
         setState({ status: "error", message });
       }
     };
@@ -67,4 +71,36 @@ export const usePrintPreview = ({ appId, memberId, programId }: UsePrintPreviewP
   }, [appId, memberId, programId]);
 
   return state;
+};
+
+const createSnapshotProgram = (programId: ProgramId): Program => {
+  const snapshot = loadPrintSnapshot();
+  if (!snapshot) {
+    throw new PrintMapperError("ÀúÀåµÈ SnapshotÀÌ ¾ø½À´Ï´Ù. ÃßÃµ È­¸é¿¡¼­ ´Ù½Ã ÁøÇàÇØ ÁÖ¼¼¿ä.");
+  }
+
+  const values = sanitizeProgramForm(snapshot.formValues);
+
+  return {
+    id: programId,
+    schemaVersion: 1,
+    category: values.category,
+    title: values.title,
+    difficulty: values.difficulty,
+    memo: values.memo,
+    exercises: values.exercises.map((exercise, index) => ({
+      id: exercise.id,
+      name: exercise.name,
+      sets: exercise.sets,
+      memo: exercise.memo,
+      order: index + 1,
+      catalogExerciseId: exercise.catalogExerciseId,
+      displayName: exercise.displayName,
+    })),
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    usageCount: 0,
+    favorite: values.favorite,
+    isArchived: false,
+  };
 };

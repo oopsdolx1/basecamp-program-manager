@@ -1,0 +1,81 @@
+[
+  {
+    "memberId": "member-001",
+    "programId": "program-back-1",
+    "programTitle": "등 집중 A",
+    "category": "BACK",
+    "workoutDate": "2026-07-29T09:00:00.000Z",
+    "durationMinutes": 55,
+    "completion": true,
+    "exercises": [
+      { "name": "랫풀다운", "sets": 4, "reps": "12", "weight": 45 },
+      { "name": "시티드로우", "sets": 4, "reps": "12", "weight": 40 },
+      { "name": "페이스풀", "sets": 3, "reps": "15", "weight": 15 }
+    ]
+  },
+  {
+    "memberId": "member-001",
+    "programId": "program-back-1",
+    "programTitle": "등 집중 A",
+    "category": "BACK",
+    "workoutDate": "2026-07-27T09:00:00.000Z",
+    "durationMinutes": 52,
+    "completion": true,
+    "exercises": [
+      { "name": "랫풀다운", "sets": 4, "reps": "12", "weight": 45 },
+      { "name": "시티드로우", "sets": 4, "reps": "12", "weight": 40 }
+    ]
+  },
+  {
+    "memberId": "member-001",
+    "programId": "program-leg-1",
+    "programTitle": "하체 밸런스",
+    "category": "LOWER_BODY",
+    "workoutDate": "2026-07-24T09:00:00.000Z",
+    "durationMinutes": 60,
+    "completion": true,
+    "exercises": [
+      { "name": "레그프레스", "sets": 4, "reps": "12", "weight": 100 },
+      { "name": "런지", "sets": 3, "reps": "10", "weight": 20 }
+    ]
+  },
+  {
+    "memberId": "member-001",
+    "programId": "program-back-2",
+    "programTitle": "등 집중 B",
+    "category": "BACK",
+    "workoutDate": "2026-07-22T09:00:00.000Z",
+    "durationMinutes": 50,
+    "completion": true,
+    "exercises": [
+      { "name": "암풀다운", "sets": 4, "reps": "15", "weight": 20 },
+      { "name": "원암로우", "sets": 3, "reps": "12", "weight": 22 }
+    ]
+  },
+  {
+    "memberId": "member-002",
+    "programId": "program-leg-2",
+    "programTitle": "하체 안정화",
+    "category": "LOWER_BODY",
+    "workoutDate": "2026-07-28T08:00:00.000Z",
+    "durationMinutes": 48,
+    "completion": true,
+    "exercises": [
+      { "name": "고블릿 스쿼트", "sets": 4, "reps": "10", "weight": 18 },
+      { "name": "힙쓰러스트", "sets": 4, "reps": "12", "weight": 50 }
+    ]
+  },
+  {
+    "memberId": "member-002",
+    "programId": "program-shoulder-1",
+    "programTitle": "어깨 컨트롤",
+    "category": "SHOULDER",
+    "workoutDate": "2026-07-25T08:00:00.000Z",
+    "durationMinutes": 40,
+    "completion": true,
+    "exercises": [
+      { "name": "사이드 레터럴 레이즈", "sets": 3, "reps": "15", "weight": 6 },
+      { "name": "리어 델트 플라이", "sets": 3, "reps": "15", "weight": 5 }
+    ]
+  }
+]

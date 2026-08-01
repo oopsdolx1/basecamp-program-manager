@@ -1,4 +1,4 @@
-﻿import type { ProgramFormValues } from "../../programs/types/program.types";
+import type { ProgramFormValues } from "../../programs/types/program.types";
 import type {
   AiRecommendationResult,
   ConditionInput,
@@ -6,6 +6,7 @@ import type {
   MemberIntelligenceSummary,
   PeriodizationSummary,
   ProgramSnapshotPayload,
+  RecommendationTrace,
   RecentWorkoutSummary,
 } from "../types/condition.types";
 
@@ -24,6 +25,7 @@ export const savePrintSnapshot = (input: {
   intelligence: MemberIntelligenceSummary | null;
   metadata: MemberIntelligenceMetadata | null;
   periodization: PeriodizationSummary | null;
+  recommendationTrace: RecommendationTrace | null;
   condition: ConditionInput;
   recentWorkout: RecentWorkoutSummary | null;
   formValues: ProgramFormValues;
@@ -36,6 +38,7 @@ export const savePrintSnapshot = (input: {
     intelligence: input.intelligence,
     metadata: input.metadata,
     periodization: input.periodization,
+    recommendationTrace: input.recommendationTrace,
     condition: input.condition,
     recentWorkout: input.recentWorkout,
     formValues: input.formValues,
@@ -50,8 +53,15 @@ export const loadPrintSnapshot = (): ProgramSnapshotPayload | null => {
   if (!raw) return null;
 
   try {
-    return JSON.parse(raw) as ProgramSnapshotPayload;
+    const payload = JSON.parse(raw) as ProgramSnapshotPayload;
+    return {
+      ...payload,
+      recommendationTrace: payload.recommendationTrace ?? null,
+    };
   } catch {
     return null;
   }
 };
+
+
+

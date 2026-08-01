@@ -1,4 +1,4 @@
-﻿import type { Program, ProgramCategory, ProgramFormValues } from "../../programs/types/program.types";
+import type { Program, ProgramCategory, ProgramFormValues } from "../../programs/types/program.types";
 
 export type ConditionStatus = "GOOD" | "NORMAL" | "BAD";
 export type SleepQuality = "ENOUGH" | "NORMAL" | "LACK";
@@ -82,10 +82,59 @@ export interface PeriodizationSummary {
   engineVersion: "1";
 }
 
+export type RecommendationTraceFactorKey =
+  | "condition"
+  | "recentWorkout"
+  | "recovery"
+  | "risk"
+  | "programRepeat"
+  | "bias"
+  | "history"
+  | "periodization"
+  | "plateau"
+  | "weeklyFrequency"
+  | "favorite"
+  | "usageCount";
+
+export interface RecommendationTraceFactor {
+  key: RecommendationTraceFactorKey;
+  label: string;
+  score: number;
+  reason: string;
+}
+
+export interface RecommendationTraceCandidate {
+  programId: string;
+  title: string;
+  score: number;
+  factors: RecommendationTraceFactor[];
+}
+
+export interface RecommendationTraceScore {
+  programId: string;
+  title: string;
+  score: number;
+}
+
+export interface RecommendationTrace {
+  candidatePrograms: RecommendationTraceCandidate[];
+  selectedProgram: {
+    programId: string;
+    title: string;
+    score: number;
+    reason: string;
+  };
+  decisionFactors: RecommendationTraceFactor[];
+  scores: RecommendationTraceScore[];
+  engineVersion: "1";
+  generatedAt: string;
+}
+
 export interface RecommendationResult {
   program: Program;
   score: number;
   reasons: string[];
+  trace: RecommendationTrace;
 }
 
 export interface AiRecommendationChange {
@@ -112,7 +161,9 @@ export interface ProgramSnapshotPayload {
   intelligence: MemberIntelligenceSummary | null;
   metadata: MemberIntelligenceMetadata | null;
   periodization: PeriodizationSummary | null;
+  recommendationTrace?: RecommendationTrace | null;
   condition: ConditionInput;
   recentWorkout: RecentWorkoutSummary | null;
   formValues: ProgramFormValues;
 }
+

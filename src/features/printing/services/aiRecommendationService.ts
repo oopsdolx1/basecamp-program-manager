@@ -1,9 +1,9 @@
-ï»¿import type { MemberSelectionItem } from "../../members";
+import type { MemberSelectionItem } from "../../members";
 import { reorderExercises, sanitizeProgramForm } from "../../programs/services/programService";
 import type { Program, ProgramFormValues } from "../../programs/types/program.types";
 import { buildRecommendationPrompt } from "../prompts/recommendationPrompt";
 import { recommendationSystemPrompt } from "../prompts/systemPrompt";
-import type { AiRecommendationChange, AiRecommendationResult, ConditionInput, MemberIntelligenceSummary, PeriodizationSummary, RecentWorkoutSummary } from "../types/condition.types";
+import type { AiRecommendationChange, AiRecommendationResult, ConditionInput, MemberIntelligenceSummary, PeriodizationSummary, RecommendationTrace, RecentWorkoutSummary } from "../types/condition.types";
 
 interface RequestAiRecommendationParams {
   member: MemberSelectionItem;
@@ -14,6 +14,7 @@ interface RequestAiRecommendationParams {
   recommendedProgram: Program;
   snapshot: ProgramFormValues;
   ruleReason: string;
+  recommendationTrace: RecommendationTrace | null;
 }
 
 interface GeminiResponse {
@@ -89,7 +90,7 @@ export const requestAiRecommendation = async (params: RequestAiRecommendationPar
 const appendMemo = (currentMemo: string, patchMemo?: string, reps?: string): string => {
   const segments = [currentMemo.trim()];
   if (patchMemo) segments.push(patchMemo);
-  if (reps) segments.push(`AI ê¶Œìž¥ ë°˜ë³µ ${reps}`);
+  if (reps) segments.push(`AI ±ÇÀå ¹Ýº¹ ${reps}`);
   return segments.filter(Boolean).join(" | ");
 };
 
@@ -122,5 +123,8 @@ export const applyAiRecommendationToSnapshot = (snapshot: ProgramFormValues, aiR
     exercises: reorderExercises(nextExercises),
   });
 };
+
+
+
 
 

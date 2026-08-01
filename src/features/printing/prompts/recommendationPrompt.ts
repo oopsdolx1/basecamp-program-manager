@@ -1,7 +1,12 @@
-﻿import type { MemberSelectionItem } from "../../members";
-import type { Program } from "../../programs/types/program.types";
-import type { ProgramFormValues } from "../../programs/types/program.types";
-import type { ConditionInput, MemberIntelligenceSummary, PeriodizationSummary, RecentWorkoutSummary } from "../types/condition.types";
+import type { MemberSelectionItem } from "../../members";
+import type { Program, ProgramFormValues } from "../../programs/types/program.types";
+import type {
+  ConditionInput,
+  MemberIntelligenceSummary,
+  PeriodizationSummary,
+  RecommendationTrace,
+  RecentWorkoutSummary,
+} from "../types/condition.types";
 
 interface BuildRecommendationPromptParams {
   member: MemberSelectionItem;
@@ -12,6 +17,7 @@ interface BuildRecommendationPromptParams {
   recommendedProgram: Program;
   snapshot: ProgramFormValues;
   ruleReason: string;
+  recommendationTrace: RecommendationTrace | null;
 }
 
 export const buildRecommendationPrompt = ({
@@ -23,6 +29,7 @@ export const buildRecommendationPrompt = ({
   recommendedProgram,
   snapshot,
   ruleReason,
+  recommendationTrace,
 }: BuildRecommendationPromptParams): string =>
   JSON.stringify(
     {
@@ -37,6 +44,23 @@ export const buildRecommendationPrompt = ({
       recentWorkout,
       memberIntelligence: intelligence,
       periodization,
+      recommendationTrace: recommendationTrace
+        ? {
+            selectedProgram: recommendationTrace.selectedProgram,
+            finalScore: recommendationTrace.selectedProgram.score,
+            decisionFactors: recommendationTrace.decisionFactors.map((factor) => ({
+              label: factor.label,
+              score: factor.score,
+              reason: factor.reason,
+            })),
+            candidatePrograms: recommendationTrace.candidatePrograms.map((candidate) => ({
+              title: candidate.title,
+              score: candidate.score,
+              selected: candidate.programId === recommendationTrace.selectedProgram.programId,
+            })),
+            engineVersion: recommendationTrace.engineVersion,
+          }
+        : null,
       ruleRecommendation: {
         title: recommendedProgram.title,
         category: recommendedProgram.category,
@@ -66,8 +90,10 @@ export const buildRecommendationPrompt = ({
         "No new program creation",
         "Do not modify repository",
         "Adjust snapshot only",
-        "Periodization is context for explanation only",
-        "AI explains and coaches but does not override rule ownership",
+        "Periodization and recommendation trace are explanation-only context",
+        "Rule recommendation is the final decision",
+        "AI must not replace or override the selected program",
+        "AI may only explain the recommendation and adjust the editable snapshot within existing constraints",
       ],
     },
     null,

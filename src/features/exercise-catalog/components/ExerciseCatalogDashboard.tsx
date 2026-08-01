@@ -1,4 +1,5 @@
-import { Card, CardContent, Grid, Stack, Typography } from "@mui/material";
+﻿import { Card, CardContent, Grid, Stack, Typography } from "@mui/material";
+import { palette } from "../../../theme/palette";
 import type { ExerciseCatalogItem } from "../domain/exerciseCatalog.types";
 
 interface ExerciseCatalogDashboardProps {
@@ -15,21 +16,21 @@ export const ExerciseCatalogDashboard = ({ items }: ExerciseCatalogDashboardProp
     { label: "Alias 없음", value: items.filter((item) => item.aliases.length === 0).length },
     { label: "English Name 없음", value: items.filter((item) => emptyValue(item.englishName)).length },
     { label: "Memo 없음", value: items.filter((item) => emptyValue(item.memo)).length },
-    { label: "Category 누락", value: items.filter((item) => item.category === "other").length },
-    { label: "Primary Muscle 누락", value: items.filter((item) => item.primaryMuscle === "other").length },
+    { label: "Category 기타", value: items.filter((item) => item.category === "other").length },
+    { label: "Primary Muscle 기타", value: items.filter((item) => item.primaryMuscle === "other").length },
   ];
 
   return (
     <Grid container spacing={1.5}>
       {stats.map((stat) => (
         <Grid item key={stat.label} lg={1.5} md={3} sm={4} xs={6}>
-          <Card sx={{ bgcolor: "rgba(2, 6, 23, 0.68)", height: "100%" }}>
+          <Card sx={{ bgcolor: palette.surfaceSection, borderColor: "divider", boxShadow: palette.shadowCard, height: "100%" }}>
             <CardContent>
-              <Stack spacing={0.5}>
+              <Stack spacing={0.75}>
                 <Typography color="text.secondary" fontSize={12} fontWeight={900}>
                   {stat.label}
                 </Typography>
-                <Typography color="primary.main" fontSize={30} fontWeight={950}>
+                <Typography color="primary.main" fontSize={30} fontWeight={900}>
                   {stat.value}
                 </Typography>
               </Stack>

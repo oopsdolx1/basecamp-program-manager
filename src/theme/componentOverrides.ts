@@ -2,18 +2,60 @@ import type { ThemeOptions } from "@mui/material/styles";
 import { palette } from "./palette";
 
 export const componentOverrides: ThemeOptions["components"] = {
+  MuiCssBaseline: {
+    styleOverrides: {
+      body: {
+        backgroundColor: palette.appBackground,
+        color: palette.textPrimary,
+        overflowX: "hidden",
+      },
+    },
+  },
   MuiButton: {
     styleOverrides: {
       root: {
-        borderRadius: 12,
+        borderRadius: palette.radiusSm,
         boxShadow: "none",
         textTransform: "none",
-        fontWeight: 700,
-        minHeight: 40,
-        transition: "background-color 150ms ease, border-color 150ms ease, color 150ms ease",
+        fontWeight: 900,
+        minHeight: palette.controlHeight,
+        paddingInline: 20,
+        transition: "background-color 150ms ease, border-color 150ms ease, color 150ms ease, transform 150ms ease, box-shadow 150ms ease",
         "&:focus-visible": {
           outline: "none",
-          boxShadow: `0 0 0 2px ${palette.primaryGold}`,
+          boxShadow: palette.shadowAccent,
+        },
+      },
+      containedPrimary: {
+        backgroundColor: palette.primaryGold,
+        color: palette.black,
+        boxShadow: palette.shadowAccent,
+        "&:hover": {
+          backgroundColor: palette.primaryGoldHover,
+          boxShadow: palette.shadowAccentStrong,
+          transform: "translateY(-1px)",
+        },
+        "&.Mui-disabled": {
+          backgroundColor: palette.surface,
+          color: palette.textMuted,
+          boxShadow: "none",
+        },
+      },
+      outlined: {
+        borderColor: palette.borderDefault,
+        color: palette.textSecondary,
+        backgroundColor: "transparent",
+        "&:hover": {
+          borderColor: palette.borderAccent,
+          backgroundColor: "rgba(17, 17, 17, 0.88)",
+          color: palette.textPrimary,
+        },
+      },
+      text: {
+        color: palette.textSecondary,
+        "&:hover": {
+          backgroundColor: "rgba(17, 17, 17, 0.88)",
+          color: palette.textPrimary,
         },
       },
     },
@@ -21,24 +63,92 @@ export const componentOverrides: ThemeOptions["components"] = {
   MuiCard: {
     styleOverrides: {
       root: {
-        backgroundColor: "rgba(15, 23, 42, 0.72)",
-        borderRadius: 24,
-        border: `1px solid ${palette.border}`,
-        boxShadow: "0 18px 42px rgba(0, 0, 0, 0.22)",
+        backgroundColor: palette.surfaceSection,
+        borderRadius: palette.radiusMd,
+        border: `1px solid ${palette.borderDefault}`,
+        boxShadow: palette.shadowCard,
+        backdropFilter: "blur(12px)",
         transition: "box-shadow 150ms ease, transform 150ms ease, border-color 150ms ease, background-color 150ms ease",
+      },
+    },
+  },
+  MuiCardContent: {
+    styleOverrides: {
+      root: {
+        padding: palette.cardPadding,
+        "&:last-child": {
+          paddingBottom: palette.cardPadding,
+        },
       },
     },
   },
   MuiTextField: {
     defaultProps: {
-      size: "small",
+      size: "medium",
+      variant: "outlined",
     },
+  },
+  MuiOutlinedInput: {
     styleOverrides: {
       root: {
-        "& .MuiOutlinedInput-root": {
-          borderRadius: 12,
-          backgroundColor: "rgba(2, 6, 23, 0.6)",
-          fontWeight: 800,
+        borderRadius: palette.radiusSm,
+        backgroundColor: palette.inputBackground,
+        minHeight: palette.controlHeight,
+        fontWeight: 700,
+        color: palette.textPrimary,
+        transition: "border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease",
+        "& .MuiOutlinedInput-notchedOutline": {
+          borderColor: palette.borderDefault,
+        },
+        "&:hover .MuiOutlinedInput-notchedOutline": {
+          borderColor: palette.borderAccent,
+        },
+        "&.Mui-focused": {
+          boxShadow: palette.shadowAccent,
+        },
+        "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+          borderColor: palette.primaryGold,
+        },
+        "&.Mui-disabled": {
+          backgroundColor: "rgba(17, 17, 17, 0.55)",
+          color: palette.textMuted,
+        },
+      },
+      input: {
+        color: palette.textPrimary,
+        fontWeight: 700,
+        paddingBlock: 12,
+        "&::placeholder": {
+          color: palette.textMuted,
+          opacity: 1,
+        },
+      },
+    },
+  },
+  MuiInputLabel: {
+    styleOverrides: {
+      root: {
+        color: palette.textMuted,
+        fontWeight: 700,
+        "&.Mui-focused": {
+          color: palette.primaryGold,
+        },
+      },
+    },
+  },
+  MuiAutocomplete: {
+    styleOverrides: {
+      paper: {
+        borderRadius: palette.radiusMd,
+        border: `1px solid ${palette.borderDefault}`,
+        backgroundColor: palette.surface,
+        boxShadow: palette.shadowPanel,
+      },
+      option: {
+        color: palette.textPrimary,
+        "&[aria-selected='true']": {
+          backgroundColor: palette.primaryGoldMuted,
+          color: palette.textPrimary,
         },
       },
     },
@@ -46,15 +156,38 @@ export const componentOverrides: ThemeOptions["components"] = {
   MuiDialog: {
     styleOverrides: {
       paper: {
-        borderRadius: 18,
+        borderRadius: palette.radiusLg,
+        border: `1px solid ${palette.borderDefault}`,
+        backgroundColor: palette.surfaceRaised,
+        boxShadow: palette.shadowPanel,
+        backdropFilter: "blur(12px)",
+      },
+    },
+  },
+  MuiDialogTitle: {
+    styleOverrides: {
+      root: {
+        fontWeight: 900,
+        letterSpacing: "-0.02em",
+        borderBottom: `1px solid ${palette.borderDefault}`,
+      },
+    },
+  },
+  MuiDialogActions: {
+    styleOverrides: {
+      root: {
+        padding: 16,
+        borderTop: `1px solid ${palette.borderDefault}`,
       },
     },
   },
   MuiAppBar: {
     styleOverrides: {
       root: {
+        backgroundColor: palette.surfaceRaised,
         backgroundImage: "none",
-        boxShadow: "none",
+        boxShadow: `0 10px 30px rgba(0, 0, 0, 0.45)`,
+        backdropFilter: "blur(12px)",
       },
     },
   },
@@ -63,6 +196,23 @@ export const componentOverrides: ThemeOptions["components"] = {
       root: {
         borderRadius: 999,
         fontWeight: 900,
+      },
+      outlined: {
+        borderColor: palette.borderDefault,
+        color: palette.textSecondary,
+        backgroundColor: "rgba(0, 0, 0, 0.3)",
+      },
+      filledPrimary: {
+        backgroundColor: palette.primaryGoldMuted,
+        color: palette.primaryGold,
+        border: `1px solid ${palette.borderAccent}`,
+      },
+    },
+  },
+  MuiList: {
+    styleOverrides: {
+      root: {
+        backgroundColor: "transparent",
       },
     },
   },

@@ -3,6 +3,7 @@ import { AppBar, Box, Button, Toolbar, Typography } from "@mui/material";
 import { Link as RouterLink, useLocation } from "react-router-dom";
 import { routeBuilder } from "../../../app/routeBuilder";
 import { routes } from "../../../app/routes";
+import { palette } from "../../../theme/palette";
 
 const navItems = [
   { label: "Print", to: routeBuilder.print(), matches: [routeBuilder.print(), routeBuilder.quickPrint()] },
@@ -17,10 +18,9 @@ export const AppHeader = (): JSX.Element => {
     <AppBar
       position="sticky"
       sx={{
-        bgcolor: "rgba(17, 17, 17, 0.8)",
+        bgcolor: palette.surfaceRaised,
         backdropFilter: "blur(12px)",
-        borderBottom: 1,
-        borderColor: "divider",
+        borderBottom: `1px solid ${palette.borderStrong}`,
         color: "text.primary",
         flex: "none",
         zIndex: 50,
@@ -31,24 +31,25 @@ export const AppHeader = (): JSX.Element => {
           <Box
             sx={{
               alignItems: "center",
-              bgcolor: "primary.main",
-              borderRadius: 2.5,
+              background: `linear-gradient(135deg, ${palette.primaryGold} 0%, ${palette.primaryGoldHover} 100%)`,
+              borderRadius: 3,
+              boxShadow: palette.shadowAccent,
               color: "primary.contrastText",
               display: "flex",
-              height: 42,
+              height: 44,
               justifyContent: "center",
-              transition: "transform 150ms ease",
-              width: 42,
-              "&:hover": { transform: "scale(1.04)" },
+              transition: "transform 150ms ease, box-shadow 150ms ease",
+              width: 44,
+              "&:hover": { transform: "scale(1.04)", boxShadow: palette.shadowAccentStrong },
             }}
           >
             <FitnessCenterIcon />
           </Box>
           <Box sx={{ display: { sm: "flex", xs: "none" }, flexDirection: "column", lineHeight: 1 }}>
-            <Typography fontSize={22} fontWeight={950} letterSpacing="-0.03em">
+            <Typography fontSize={22} fontWeight={900} letterSpacing="-0.03em">
               BASECAMP
             </Typography>
-            <Typography color="primary.main" fontSize={11} fontWeight={800} letterSpacing="0.28em" mt={0.5}>
+            <Typography color="primary.main" fontSize={11} fontWeight={700} letterSpacing="0.28em" mt={0.75} textTransform="uppercase">
               PROGRAM MANAGER
             </Typography>
           </Box>
@@ -70,11 +71,13 @@ export const AppHeader = (): JSX.Element => {
                 variant={active ? "contained" : "text"}
                 sx={{
                   bgcolor: active ? "primary.main" : "transparent",
+                  border: active ? `1px solid ${palette.borderAccent}` : "1px solid transparent",
                   color: active ? "primary.contrastText" : "text.secondary",
                   fontSize: 14,
+                  minHeight: 40,
                   px: 2,
                   "&:hover": {
-                    bgcolor: active ? "primary.main" : "rgba(30, 41, 59, 0.75)",
+                    bgcolor: active ? "primary.main" : palette.surface,
                     color: active ? "primary.contrastText" : "text.primary",
                   },
                 }}

@@ -1,4 +1,5 @@
-import { List } from "@mui/material";
+﻿import { List } from "@mui/material";
+import { palette } from "../../../../theme/palette";
 import { EmptyState } from "../../../../components/common/EmptyState";
 import type { MemberSelectionItem } from "../../types/memberViewModel.types";
 import { MemberListItem } from "../MemberListItem";
@@ -15,7 +16,17 @@ export const MemberList = ({ members, selectedMemberId, onSelect }: MemberListPr
   }
 
   return (
-    <List disablePadding sx={{ border: 1, borderColor: "divider", borderRadius: 2, overflow: "hidden" }}>
+    <List
+      disablePadding
+      sx={{
+        border: 1,
+        borderColor: "divider",
+        borderRadius: `${palette.radiusMd}px`,
+        overflow: "hidden",
+        bgcolor: palette.surfaceSection,
+        boxShadow: palette.shadowCard,
+      }}
+    >
       {members.map((member) => (
         <MemberListItem
           key={member.memberId}

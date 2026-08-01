@@ -1,9 +1,10 @@
-import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+Ôªøimport ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import DeleteIcon from "@mui/icons-material/Delete";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
-import { Autocomplete, Box, Button, Card, CardContent, Chip, Grid, IconButton, Stack, TextField, Typography } from "@mui/material";
+import { Autocomplete, Button, Card, CardContent, Chip, Grid, IconButton, Stack, TextField, Typography } from "@mui/material";
 import { memo } from "react";
+import { palette } from "../../../../theme/palette";
 import type { ExerciseCatalogOption } from "../../../exercise-catalog";
 import { normalizeText } from "../../../../utils/normalizeText";
 import type { SnapshotBuilderExercise } from "../../services/snapshotBuilderService";
@@ -24,10 +25,10 @@ interface SnapshotExerciseBuilderRowProps {
 const presetButtons = [
   { key: "plus_set", label: "+1 Set" },
   { key: "minus_set", label: "-1 Set" },
-  { key: "reps_8_10", label: "8~10»∏" },
-  { key: "reps_10_12", label: "10~12»∏" },
-  { key: "reps_12_15", label: "12~15»∏" },
-  { key: "reps_15_20", label: "15~20»∏" },
+  { key: "reps_8_10", label: "8~10Ìöå" },
+  { key: "reps_10_12", label: "10~12Ìöå" },
+  { key: "reps_12_15", label: "12~15Ìöå" },
+  { key: "reps_15_20", label: "15~20Ìöå" },
   { key: "failure", label: "Failure" },
   { key: "drop_set", label: "Drop Set" },
   { key: "super_set", label: "Super Set" },
@@ -53,12 +54,12 @@ export const SnapshotExerciseBuilderRow = memo(function SnapshotExerciseBuilderR
   const selectedOption = catalogOptions.find((option) => option.id === exercise.catalogExerciseId) ?? exercise.displayName ?? exercise.name;
 
   return (
-    <Card sx={{ bgcolor: "rgba(2, 6, 23, 0.45)", border: 1, borderColor: "divider" }}>
+    <Card sx={{ bgcolor: palette.surfaceInteractive, border: 1, borderColor: "divider", boxShadow: "none" }}>
       <CardContent>
         <Stack spacing={2}>
-          <Stack direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1}>
-            <Stack direction="row" spacing={1} alignItems="center">
-              <Typography variant="h2">øÓµø {exercise.order}</Typography>
+          <Stack alignItems={{ sm: "center", xs: "flex-start" }} direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1}>
+            <Stack alignItems="center" direction="row" spacing={1}>
+              <Typography variant="h2">Ïö¥Îèô {exercise.order}</Typography>
               <Chip label={index + 1 === total ? "Last" : `#${index + 1}`} size="small" variant="outlined" />
             </Stack>
             <Stack direction="row" spacing={0.5}>
@@ -98,11 +99,11 @@ export const SnapshotExerciseBuilderRow = memo(function SnapshotExerciseBuilderR
           />
 
           <Grid container spacing={1.5}>
-            <Grid item md={2.4} sm={4} xs={6}><TextField fullWidth label="ºº∆Æ" type="number" inputProps={{ min: 1 }} value={exercise.sets} onChange={(event) => onPatch({ sets: Number(event.target.value) })} /></Grid>
-            <Grid item md={2.4} sm={4} xs={6}><TextField fullWidth label="»Ωºˆ" value={exercise.reps} onChange={(event) => onPatch({ reps: event.target.value })} /></Grid>
-            <Grid item md={2.4} sm={4} xs={6}><TextField fullWidth label="π´∞‘" value={exercise.weight} onChange={(event) => onPatch({ weight: event.target.value })} /></Grid>
-            <Grid item md={2.4} sm={6} xs={6}><TextField fullWidth label="»ﬁΩƒ(√ )" type="number" inputProps={{ min: 0 }} value={exercise.restSeconds} onChange={(event) => onPatch({ restSeconds: Number(event.target.value) })} /></Grid>
-            <Grid item md={2.4} sm={6} xs={12}><TextField fullWidth label="∏ﬁ∏" value={exercise.memo} onChange={(event) => onPatch({ memo: event.target.value })} /></Grid>
+            <Grid item md={2.4} sm={4} xs={6}><TextField fullWidth label="ÏÑ∏Ìä∏" type="number" inputProps={{ min: 1 }} value={exercise.sets} onChange={(event) => onPatch({ sets: Number(event.target.value) })} /></Grid>
+            <Grid item md={2.4} sm={4} xs={6}><TextField fullWidth label="ÌöüÏàò" value={exercise.reps} onChange={(event) => onPatch({ reps: event.target.value })} /></Grid>
+            <Grid item md={2.4} sm={4} xs={6}><TextField fullWidth label="Î¨¥Í≤å" value={exercise.weight} onChange={(event) => onPatch({ weight: event.target.value })} /></Grid>
+            <Grid item md={2.4} sm={6} xs={6}><TextField fullWidth label="Ìú¥Ïãù(Ï¥à)" type="number" inputProps={{ min: 0 }} value={exercise.restSeconds} onChange={(event) => onPatch({ restSeconds: Number(event.target.value) })} /></Grid>
+            <Grid item md={2.4} sm={6} xs={12}><TextField fullWidth label="Î©îÎ™®" value={exercise.memo} onChange={(event) => onPatch({ memo: event.target.value })} /></Grid>
           </Grid>
 
           <Stack direction="row" flexWrap="wrap" gap={1}>

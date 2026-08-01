@@ -4,29 +4,35 @@ import { palette as basecampPalette } from "./palette";
 import { typography } from "./typography";
 
 export const basecampTheme = createTheme({
+  spacing: 4,
   palette: {
     mode: "dark",
     primary: {
       main: basecampPalette.primaryGold,
+      dark: basecampPalette.primaryGoldHover,
+      light: basecampPalette.primaryGoldLight,
       contrastText: basecampPalette.black,
     },
     secondary: {
-      main: basecampPalette.slate800,
+      main: basecampPalette.surface,
       contrastText: basecampPalette.white,
     },
     text: {
-      primary: basecampPalette.white,
-      secondary: basecampPalette.mutedText,
+      primary: basecampPalette.textPrimary,
+      secondary: basecampPalette.textSecondary,
     },
     background: {
-      default: basecampPalette.lightBackground,
-      paper: basecampPalette.paper,
+      default: basecampPalette.appBackground,
+      paper: basecampPalette.surface,
     },
-    divider: basecampPalette.border,
-    error: { main: basecampPalette.danger },
+    divider: basecampPalette.borderDefault,
+    error: { main: basecampPalette.error },
     warning: { main: basecampPalette.warning },
     success: { main: basecampPalette.success },
     info: { main: basecampPalette.info },
+  },
+  shape: {
+    borderRadius: basecampPalette.radiusSm,
   },
   typography,
   components: componentOverrides,

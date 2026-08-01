@@ -1,4 +1,5 @@
 import { Box, Button } from "@mui/material";
+import { palette } from "../../../theme/palette";
 
 export type MasterTab = "programs" | "history";
 
@@ -15,13 +16,13 @@ const tabs: Array<{ value: MasterTab; label: string }> = [
 export const MasterTabs = ({ value, onChange }: MasterTabsProps): JSX.Element => (
   <Box
     sx={{
-      bgcolor: "rgba(2, 6, 23, 0.72)",
-      border: 1,
-      borderColor: "divider",
-      borderRadius: 3,
+      bgcolor: palette.surfaceSection,
+      border: `1px solid ${palette.borderDefault}`,
+      borderRadius: 4,
       display: "inline-flex",
       gap: 0.75,
       p: 0.75,
+      boxShadow: palette.shadowCard,
     }}
   >
     {tabs.map((tab) => (

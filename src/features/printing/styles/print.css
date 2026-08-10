@@ -214,6 +214,17 @@
   text-overflow: ellipsis;
 }
 
+.exercise-why {
+  color: #333;
+  display: -webkit-box;
+  font-size: 5.2pt;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.15;
+  margin-top: 0.5mm;
+  overflow: hidden;
+}
+
 .set-cell {
   padding: 0.7mm;
   vertical-align: top;

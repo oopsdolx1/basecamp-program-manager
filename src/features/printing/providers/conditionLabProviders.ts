@@ -63,13 +63,13 @@ const mapHistoryRecord = (memberId: ProfileId, data: DocumentData, id: string): 
   return {
     memberId,
     programId: typeof snapshot.programId === "string" && snapshot.programId ? snapshot.programId : String(data.programId ?? id),
-    programTitle: typeof snapshot.title === "string" && snapshot.title ? snapshot.title : "Á¦¸ñ ¾øÀ½",
+    programTitle: typeof snapshot.title === "string" && snapshot.title ? snapshot.title : "ì œëª© ì—†ìŒ",
     category: typeof snapshot.category === "string" ? snapshot.category as WorkoutHistoryRecord["category"] : null,
     workoutDate: requestedAt,
     durationMinutes: asNumber(data.durationMinutes ?? data.duration ?? data.totalMinutes),
     completion: typeof data.completion === "boolean" ? data.completion : true,
     exercises: exercises.map((exercise) => ({
-      name: typeof exercise?.name === "string" ? exercise.name : "¿îµ¿ ¾øÀ½",
+      name: typeof exercise?.name === "string" ? exercise.name : "ìš´ë™ ì—†ìŒ",
       sets: typeof exercise?.configuredSets === "number" ? exercise.configuredSets : asNumber(exercise?.sets) ?? null,
       reps: asText(exercise?.reps),
       weight: asNumber(exercise?.weight),

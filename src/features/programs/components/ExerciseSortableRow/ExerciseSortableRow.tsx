@@ -100,7 +100,7 @@ export const ExerciseSortableRow = ({
                   <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
                     {option.englishName ? <Chip label={option.englishName} size="small" variant="outlined" /> : null}
                     <Chip label={option.categoryLabel} size="small" />
-                    <Chip label={option.equipmentLabel} size="small" variant="outlined" />
+                    <Chip label={option.equipment || option.equipmentLabel} size="small" variant="outlined" />
                     {option.aliases.slice(0, 2).map((alias) => (
                       <Chip key={alias} label={alias} size="small" variant="outlined" />
                     ))}

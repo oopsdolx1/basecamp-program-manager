@@ -8,6 +8,7 @@ import {
   PRINT_TEMPLATE_VERSION,
 } from "../constants/print.constants";
 import type { PrintExerciseRow, WorkoutPrintDocument } from "../types/print.types";
+import { resolveProgramExerciseKnowledge } from "../../../shared-knowledge/resolveProgramExercises";
 
 export class PrintMapperError extends Error {
   constructor(message: string) {
@@ -30,11 +31,13 @@ const toRows = (program: Program): PrintExerciseRow[] => {
     throw new PrintMapperError("운동은 최대 8개까지만 출력할 수 있습니다.");
   }
 
+  const resolved = resolveProgramExerciseKnowledge(program);
   const rows: PrintExerciseRow[] = program.exercises
     .map((exercise) => ({
       order: exercise.order,
-      exerciseName: truncateText(exercise.name, 34),
+      exerciseName: truncateText(resolved.get(exercise.id)?.name ?? exercise.name, 34),
       exerciseMemo: truncateText(exercise.memo ?? "", 28),
+      memberWhy: truncateText(resolved.get(exercise.id)?.memberWhy ?? "", 72),
       configuredSets: exercise.sets,
       isBlank: false,
     }))
@@ -49,6 +52,7 @@ const toRows = (program: Program): PrintExerciseRow[] => {
       order: rows.length + 1,
       exerciseName: "",
       exerciseMemo: "",
+      memberWhy: "",
       configuredSets: null,
       isBlank: true,
     });
@@ -75,6 +79,7 @@ export const createWorkoutPrintDocument = ({
   }
 
   const rows = toRows(program);
+  const resolved = resolveProgramExerciseKnowledge(program);
 
   return {
     templateKey: PRINT_TEMPLATE_KEY,
@@ -95,8 +100,9 @@ export const createWorkoutPrintDocument = ({
       exercises: program.exercises
         .map((exercise) => ({
           id: exercise.id,
-          name: truncateText(exercise.name, 34),
+          name: truncateText(resolved.get(exercise.id)?.name ?? exercise.name, 34),
           memo: truncateText(exercise.memo ?? "", 28),
+          memberWhy: truncateText(resolved.get(exercise.id)?.memberWhy ?? "", 72),
           order: exercise.order,
           configuredSets: exercise.sets,
         }))

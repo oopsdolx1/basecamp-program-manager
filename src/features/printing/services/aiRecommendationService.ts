@@ -90,7 +90,7 @@ export const requestAiRecommendation = async (params: RequestAiRecommendationPar
 const appendMemo = (currentMemo: string, patchMemo?: string, reps?: string): string => {
   const segments = [currentMemo.trim()];
   if (patchMemo) segments.push(patchMemo);
-  if (reps) segments.push(`AI ±ÇÀå ¹Ýº¹ ${reps}`);
+  if (reps) segments.push(`AI ê¶Œìž¥ ë°˜ë³µ ${reps}`);
   return segments.filter(Boolean).join(" | ");
 };
 

@@ -65,6 +65,8 @@ export interface ExerciseCatalogItem {
   name: string;
   englishName: string | null;
   aliases: string[];
+  bodyPart?: string;
+  equipment?: string;
   category: ExerciseCategory;
   primaryMuscle: PrimaryMuscle;
   secondaryMuscles: PrimaryMuscle[];
@@ -97,6 +99,8 @@ export interface ExerciseCatalogFormValues {
 export interface ExerciseCatalogFilters {
   search: string;
   category: ExerciseCategory | "ALL";
+  bodyPart: string;
+  equipment: string;
   equipmentType: EquipmentType | "ALL";
   primaryMuscle: PrimaryMuscle | "ALL";
   status: "ACTIVE" | "ARCHIVED" | "ALL";
@@ -112,5 +116,7 @@ export interface ExerciseCatalogOption {
   categoryLabel: string;
   equipmentType: EquipmentType;
   equipmentLabel: string;
+  bodyPart: string;
+  equipment: string;
   aliases: string[];
 }

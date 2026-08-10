@@ -17,8 +17,6 @@ export const programsCollectionPath = (appId: AppId): string =>
 export const printHistoryCollectionPath = (appId: AppId): string =>
   `artifacts/${requireAppId(appId)}/public/data/printHistory`;
 
-export const exerciseCatalogCollectionPath = (appId: AppId): string =>
-  `artifacts/${requireAppId(appId)}/public/data/exerciseCatalog`;
 
 export const programManagerSettingsPath = (appId: AppId): string =>
   `artifacts/${requireAppId(appId)}/public/data/settings/programManager`;

@@ -12,6 +12,7 @@ export interface PrintProgramExerciseSnapshot {
   memo: string;
   order: number;
   configuredSets: number | null;
+  memberWhy: string;
 }
 
 export interface PrintProgramSnapshot {
@@ -29,6 +30,7 @@ export interface PrintExerciseRow {
   order: number;
   exerciseName: string;
   exerciseMemo: string;
+  memberWhy: string;
   configuredSets: number | null;
   isBlank: boolean;
 }

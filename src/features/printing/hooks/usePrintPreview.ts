@@ -9,6 +9,7 @@ import type { Program } from "../../programs/types/program.types";
 import { createWorkoutPrintDocument, PrintMapperError } from "../mappers/workoutPrintMapper";
 import { isSnapshotProgramId, loadPrintSnapshot } from "../services/printSnapshotSession";
 import type { WorkoutPrintDocument } from "../types/print.types";
+import { programManagerRuntime } from "../../../shared-knowledge/programManagerRuntime";
 
 type PreviewState =
   | { status: "loading" }
@@ -23,18 +24,21 @@ interface UsePrintPreviewParams {
 
 export const usePrintPreview = ({ appId, memberId, programId }: UsePrintPreviewParams): PreviewState => {
   const [state, setState] = useState<PreviewState>({ status: "loading" });
+  const [runtimeRevision, setRuntimeRevision] = useState(() => programManagerRuntime.getRevision());
+
+  useEffect(() => programManagerRuntime.subscribe(() => setRuntimeRevision(programManagerRuntime.getRevision())), []);
 
   useEffect(() => {
     let active = true;
 
     const load = async () => {
       if (!memberId) {
-        setState({ status: "error", message: "memberId°¡ ¾ø½À´Ï´Ù." });
+        setState({ status: "error", message: "memberIdê°€ ì—†ìŠµë‹ˆë‹¤." });
         return;
       }
 
       if (!programId) {
-        setState({ status: "error", message: "programId°¡ ¾ø½À´Ï´Ù." });
+        setState({ status: "error", message: "programIdê°€ ì—†ìŠµë‹ˆë‹¤." });
         return;
       }
 
@@ -58,7 +62,7 @@ export const usePrintPreview = ({ appId, memberId, programId }: UsePrintPreviewP
         const message =
           caught instanceof PrintMapperError || caught instanceof Error
             ? caught.message
-            : "Ãâ·Â ¹®¼­¸¦ ¸¸µéÁö ¸øÇß½À´Ï´Ù.";
+            : "ì¶œë ¥ ë¬¸ì„œë¥¼ ë§Œë“¤ì§€ ëª»í–ˆìŠµë‹ˆë‹¤.";
         setState({ status: "error", message });
       }
     };
@@ -68,7 +72,7 @@ export const usePrintPreview = ({ appId, memberId, programId }: UsePrintPreviewP
     return () => {
       active = false;
     };
-  }, [appId, memberId, programId]);
+  }, [appId, memberId, programId, runtimeRevision]);
 
   return state;
 };
@@ -76,7 +80,7 @@ export const usePrintPreview = ({ appId, memberId, programId }: UsePrintPreviewP
 const createSnapshotProgram = (programId: ProgramId): Program => {
   const snapshot = loadPrintSnapshot();
   if (!snapshot) {
-    throw new PrintMapperError("ÀúÀåµÈ SnapshotÀÌ ¾ø½À´Ï´Ù. ÃßÃµ È­¸é¿¡¼­ ´Ù½Ã ÁøÇàÇØ ÁÖ¼¼¿ä.");
+    throw new PrintMapperError("ì €ì¥ëœ Snapshotì´ ì—†ìŠµë‹ˆë‹¤. ì¶”ì²œ í™”ë©´ì—ì„œ ë‹¤ì‹œ ì§„í–‰í•´ ì£¼ì„¸ìš”.");
   }
 
   const values = sanitizeProgramForm(snapshot.formValues);

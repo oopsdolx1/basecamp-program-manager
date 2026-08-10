@@ -48,15 +48,15 @@ const createFactor = ({ key, label, score, reason }: ScoreFactorInput): Recommen
 const areaLabel = (area: FatigueArea): string => {
   switch (area) {
     case "CHEST":
-      return "°¡½¿";
+      return "ê°€ìŠ´";
     case "BACK":
-      return "µî";
+      return "ë“±";
     case "SHOULDER":
-      return "¾î±ú";
+      return "ì–´ê¹¨";
     case "ARMS":
-      return "ÆÈ";
+      return "íŒ”";
     case "LOWER_BODY":
-      return "ÇÏÃ¼";
+      return "í•˜ì²´";
   }
 };
 
@@ -68,13 +68,13 @@ const scoreCondition = (condition: ConditionInput, program: Program): ScoreResul
   if (condition.condition === "BAD") {
     if (program.difficulty === "ADVANCED") {
       score -= 28;
-      const reason = "¿À´Ã ÄÁµğ¼ÇÀÌ ÁÁÁö ¾Ê¾Æ °í°­µµ ÇÁ·Î±×·¥ ¿ì¼±¼øÀ§¸¦ ³·Ãè½À´Ï´Ù.";
+      const reason = "ì˜¤ëŠ˜ ì»¨ë””ì…˜ì´ ì¢‹ì§€ ì•Šì•„ ê³ ê°•ë„ í”„ë¡œê·¸ë¨ ìš°ì„ ìˆœìœ„ë¥¼ ë‚®ì·„ìŠµë‹ˆë‹¤.";
       reasons.push(reason);
       factors.push(createFactor({ key: "condition", label: "Today's Condition", score: -28, reason }));
     }
     if (program.category === "RECOVERY") {
       score += 26;
-      const reason = "¿À´Ã ÄÁµğ¼ÇÀÌ ÁÁÁö ¾Ê¾Æ È¸º¹ ÇÁ·Î±×·¥ ¿ì¼±¼øÀ§¸¦ ³ô¿´½À´Ï´Ù.";
+      const reason = "ì˜¤ëŠ˜ ì»¨ë””ì…˜ì´ ì¢‹ì§€ ì•Šì•„ íšŒë³µ í”„ë¡œê·¸ë¨ ìš°ì„ ìˆœìœ„ë¥¼ ë†’ì˜€ìŠµë‹ˆë‹¤.";
       reasons.push(reason);
       factors.push(createFactor({ key: "condition", label: "Today's Condition", score: 26, reason }));
     }
@@ -84,7 +84,7 @@ const scoreCondition = (condition: ConditionInput, program: Program): ScoreResul
     const delta = difficultyWeight[program.difficulty ?? "GENERAL"];
     score += delta;
     if (delta !== 0) {
-      const reason = "¿À´Ã ÄÁµğ¼ÇÀÌ ÁÁ¾Æ ³­ÀÌµµ °¡ÁßÄ¡¸¦ ¹İ¿µÇß½À´Ï´Ù.";
+      const reason = "ì˜¤ëŠ˜ ì»¨ë””ì…˜ì´ ì¢‹ì•„ ë‚œì´ë„ ê°€ì¤‘ì¹˜ë¥¼ ë°˜ì˜í–ˆìŠµë‹ˆë‹¤.";
       reasons.push(reason);
       factors.push(createFactor({ key: "condition", label: "Today's Condition", score: delta, reason }));
     }
@@ -95,7 +95,7 @@ const scoreCondition = (condition: ConditionInput, program: Program): ScoreResul
     if (program.difficulty === "ADVANCED") delta -= 18;
     if (program.category === "RECOVERY") delta += 14;
     score += delta;
-    const reason = "¼ö¸éÀÌ ºÎÁ·ÇØ º¼·ı°ú °­µµ°¡ ³·Àº ±¸¼ºÀ» ¿ì¼±Çß½À´Ï´Ù.";
+    const reason = "ìˆ˜ë©´ì´ ë¶€ì¡±í•´ ë³¼ë¥¨ê³¼ ê°•ë„ê°€ ë‚®ì€ êµ¬ì„±ì„ ìš°ì„ í–ˆìŠµë‹ˆë‹¤.";
     reasons.push(reason);
     if (delta !== 0) factors.push(createFactor({ key: "condition", label: "Today's Condition", score: delta, reason }));
   }
@@ -105,7 +105,7 @@ const scoreCondition = (condition: ConditionInput, program: Program): ScoreResul
     if (program.category === "RECOVERY") delta += 22;
     if (program.difficulty === "ADVANCED") delta -= 16;
     score += delta;
-    const reason = "½ºÆ®·¹½º°¡ ³ô¾Æ È¸º¹ Áß½É ÇÁ·Î±×·¥ ¿ì¼±¼øÀ§¸¦ ³ô¿´½À´Ï´Ù.";
+    const reason = "ìŠ¤íŠ¸ë ˆìŠ¤ê°€ ë†’ì•„ íšŒë³µ ì¤‘ì‹¬ í”„ë¡œê·¸ë¨ ìš°ì„ ìˆœìœ„ë¥¼ ë†’ì˜€ìŠµë‹ˆë‹¤.";
     reasons.push(reason);
     if (delta !== 0) factors.push(createFactor({ key: "condition", label: "Today's Condition", score: delta, reason }));
   } else if (condition.stress >= 4) {
@@ -114,7 +114,7 @@ const scoreCondition = (condition: ConditionInput, program: Program): ScoreResul
     delta -= 4;
     score += delta;
     if (delta !== 0) {
-      const reason = "½ºÆ®·¹½º ¼öÁØÀ» ¹İ¿µÇØ °­µµ¸¦ º¸¼öÀûÀ¸·Î Á¶Á¤Çß½À´Ï´Ù.";
+      const reason = "ìŠ¤íŠ¸ë ˆìŠ¤ ìˆ˜ì¤€ì„ ë°˜ì˜í•´ ê°•ë„ë¥¼ ë³´ìˆ˜ì ìœ¼ë¡œ ì¡°ì •í–ˆìŠµë‹ˆë‹¤.";
       reasons.push(reason);
       factors.push(createFactor({ key: "condition", label: "Today's Condition", score: delta, reason }));
     }
@@ -125,7 +125,7 @@ const scoreCondition = (condition: ConditionInput, program: Program): ScoreResul
     if (program.category === "RECOVERY") delta += 18;
     if (program.difficulty === "ADVANCED") delta -= 18;
     score += delta;
-    const reason = "À½ÁÖ ¿©ºÎ¸¦ ¹İ¿µÇØ Àú°­µµ ¶Ç´Â È¸º¹ ¼º°İÀÇ ÇÁ·Î±×·¥À» ¿ì¼±Çß½À´Ï´Ù.";
+    const reason = "ìŒì£¼ ì—¬ë¶€ë¥¼ ë°˜ì˜í•´ ì €ê°•ë„ ë˜ëŠ” íšŒë³µ ì„±ê²©ì˜ í”„ë¡œê·¸ë¨ì„ ìš°ì„ í–ˆìŠµë‹ˆë‹¤.";
     reasons.push(reason);
     if (delta !== 0) factors.push(createFactor({ key: "condition", label: "Today's Condition", score: delta, reason }));
   }
@@ -138,7 +138,7 @@ const scoreCondition = (condition: ConditionInput, program: Program): ScoreResul
 
   if (blockedFatigueCategories.has(program.category)) {
     score -= 32;
-    const reason = `${getCategoryLabel(program.category)} ÇÇ·Î°¡ ÀÖ¾î ÇØ´ç ºÎÀ§ ÇÁ·Î±×·¥ ¿ì¼±¼øÀ§¸¦ ³·Ãè½À´Ï´Ù.`;
+    const reason = `${getCategoryLabel(program.category)} í”¼ë¡œê°€ ìˆì–´ í•´ë‹¹ ë¶€ìœ„ í”„ë¡œê·¸ë¨ ìš°ì„ ìˆœìœ„ë¥¼ ë‚®ì·„ìŠµë‹ˆë‹¤.`;
     reasons.push(reason);
     factors.push(createFactor({ key: "condition", label: "Today's Condition", score: -32, reason }));
   }
@@ -153,7 +153,7 @@ const scoreRecentWorkout = (recentWorkout: RecentWorkoutSummary | null, program:
 
   if (recentWorkout.category === program.category) {
     const delta = recentWorkout.daysAgo !== null && recentWorkout.daysAgo <= 2 ? -16 : -8;
-    const reason = `ÃÖ±Ù ${getCategoryLabel(recentWorkout.category)} ¿îµ¿ ÀÌ·ÂÀÌ ÀÖ¾î °°Àº ºÎÀ§ ¿ì¼±¼øÀ§¸¦ Á¶Á¤Çß½À´Ï´Ù.`;
+    const reason = `ìµœê·¼ ${getCategoryLabel(recentWorkout.category)} ìš´ë™ ì´ë ¥ì´ ìˆì–´ ê°™ì€ ë¶€ìœ„ ìš°ì„ ìˆœìœ„ë¥¼ ì¡°ì •í–ˆìŠµë‹ˆë‹¤.`;
     return {
       score: delta,
       reasons: [reason],
@@ -161,7 +161,7 @@ const scoreRecentWorkout = (recentWorkout: RecentWorkoutSummary | null, program:
     };
   }
 
-  const reason = `ÃÖ±Ù ${getCategoryLabel(recentWorkout.category)} ¿îµ¿ ÀÌÈÄ ´Ù¸¥ ºÎÀ§¸¦ ¼øÈ¯ÇÏµµ·Ï °í·ÁÇß½À´Ï´Ù.`;
+  const reason = `ìµœê·¼ ${getCategoryLabel(recentWorkout.category)} ìš´ë™ ì´í›„ ë‹¤ë¥¸ ë¶€ìœ„ë¥¼ ìˆœí™˜í•˜ë„ë¡ ê³ ë ¤í–ˆìŠµë‹ˆë‹¤.`;
   return {
     score: 8,
     reasons: [reason],
@@ -186,12 +186,12 @@ const scoreIntelligence = (
     if (program.category === "RECOVERY") delta += 32;
     if (program.difficulty === "ADVANCED") delta -= 24;
     score += delta;
-    const reason = `È¸º¹ Á¡¼ö ${intelligence.recoveryScore}Á¡À¸·Î ³·¾Æ Recovery ¿ì¼±¼øÀ§¸¦ ³ô¿´½À´Ï´Ù.`;
+    const reason = `íšŒë³µ ì ìˆ˜ ${intelligence.recoveryScore}ì ìœ¼ë¡œ ë‚®ì•„ Recovery ìš°ì„ ìˆœìœ„ë¥¼ ë†’ì˜€ìŠµë‹ˆë‹¤.`;
     reasons.push(reason);
     if (delta !== 0) factors.push(createFactor({ key: "recovery", label: "Recovery", score: delta, reason }));
   } else if (intelligence.recoveryScore >= 75 && program.difficulty === "BEGINNER") {
     score -= 4;
-    const reason = `È¸º¹ Á¡¼ö ${intelligence.recoveryScore}Á¡À¸·Î ³ô¾Æ Beginner °­µµ °¡ÁßÄ¡¸¦ ÀÏºÎ ³·Ãè½À´Ï´Ù.`;
+    const reason = `íšŒë³µ ì ìˆ˜ ${intelligence.recoveryScore}ì ìœ¼ë¡œ ë†’ì•„ Beginner ê°•ë„ ê°€ì¤‘ì¹˜ë¥¼ ì¼ë¶€ ë‚®ì·„ìŠµë‹ˆë‹¤.`;
     reasons.push(reason);
     factors.push(createFactor({ key: "recovery", label: "Recovery", score: -4, reason }));
   }
@@ -200,7 +200,7 @@ const scoreIntelligence = (
     const dominantBias = intelligence.bodyPartBias[0]?.category;
     if (dominantBias && dominantBias === program.category) {
       score -= 30;
-      const reason = `À§Çè Á¡¼ö ${intelligence.riskScore}Á¡À¸·Î ³ô¾Æ ÆíÁßµÈ ${getCategoryLabel(program.category)} ºÎÀ§¸¦ Á¦¿Ü ¹æÇâÀ¸·Î Á¶Á¤Çß½À´Ï´Ù.`;
+      const reason = `ìœ„í—˜ ì ìˆ˜ ${intelligence.riskScore}ì ìœ¼ë¡œ ë†’ì•„ í¸ì¤‘ëœ ${getCategoryLabel(program.category)} ë¶€ìœ„ë¥¼ ì œì™¸ ë°©í–¥ìœ¼ë¡œ ì¡°ì •í–ˆìŠµë‹ˆë‹¤.`;
       reasons.push(reason);
       factors.push(createFactor({ key: "risk", label: "Risk", score: -30, reason }));
     }
@@ -208,7 +208,7 @@ const scoreIntelligence = (
 
   if (intelligence.repeatedProgramCount > 3) {
     score -= 18;
-    const reason = `ÃÖ±Ù µ¿ÀÏ Program ¹İº¹ÀÌ ${intelligence.repeatedProgramCount}È¸ ÀÖ¾î ´Ù¸¥ Program ¿ì¼±¼øÀ§¸¦ ³ô¿´½À´Ï´Ù.`;
+    const reason = `ìµœê·¼ ë™ì¼ Program ë°˜ë³µì´ ${intelligence.repeatedProgramCount}íšŒ ìˆì–´ ë‹¤ë¥¸ Program ìš°ì„ ìˆœìœ„ë¥¼ ë†’ì˜€ìŠµë‹ˆë‹¤.`;
     reasons.push(reason);
     factors.push(createFactor({ key: "programRepeat", label: "Program Repeat", score: -18, reason }));
   }
@@ -216,7 +216,7 @@ const scoreIntelligence = (
   const dominantBias = intelligence.bodyPartBias[0];
   if (dominantBias && dominantBias.category === program.category && dominantBias.ratio >= 0.4) {
     score -= 14;
-    const reason = `${getCategoryLabel(program.category)} ºñÁßÀÌ ${Math.round(dominantBias.ratio * 100)}%·Î ³ô¾Æ ÆíÁß ¿ÏÈ­¸¦ °í·ÁÇß½À´Ï´Ù.`;
+    const reason = `${getCategoryLabel(program.category)} ë¹„ì¤‘ì´ ${Math.round(dominantBias.ratio * 100)}%ë¡œ ë†’ì•„ í¸ì¤‘ ì™„í™”ë¥¼ ê³ ë ¤í–ˆìŠµë‹ˆë‹¤.`;
     reasons.push(reason);
     factors.push(createFactor({ key: "bias", label: "Bias", score: -14, reason }));
   }
@@ -226,7 +226,7 @@ const scoreIntelligence = (
     if (program.difficulty === "ADVANCED") delta -= 16;
     if (program.category === "RECOVERY") delta += 12;
     score += delta;
-    const reason = `¿îµ¿ °ø¹éÀÌ ${intelligence.gapDays}ÀÏ ÀÖ¾î ÀçÀûÀÀ¿¡ À¯¸®ÇÑ ±¸¼ºÀ» ¿ì¼±Çß½À´Ï´Ù.`;
+    const reason = `ìš´ë™ ê³µë°±ì´ ${intelligence.gapDays}ì¼ ìˆì–´ ì¬ì ì‘ì— ìœ ë¦¬í•œ êµ¬ì„±ì„ ìš°ì„ í–ˆìŠµë‹ˆë‹¤.`;
     reasons.push(reason);
     if (delta !== 0) factors.push(createFactor({ key: "history", label: "History", score: delta, reason }));
   }
@@ -249,12 +249,12 @@ const scorePeriodization = (periodization: PeriodizationSummary | null, program:
     const sameRecentProgram = periodization.recentProgramSequence[0]?.trim().toLowerCase() === normalizedTitle;
     if (sameRecentProgram) {
       score -= 28;
-      const reason = "Plateau ½ÅÈ£°¡ ÀÖ¾î °°Àº Program ¹İº¹ Á¡¼ö¸¦ ³·Ãè½À´Ï´Ù.";
+      const reason = "Plateau ì‹ í˜¸ê°€ ìˆì–´ ê°™ì€ Program ë°˜ë³µ ì ìˆ˜ë¥¼ ë‚®ì·„ìŠµë‹ˆë‹¤.";
       reasons.push(reason);
       factors.push(createFactor({ key: "plateau", label: "Plateau", score: -28, reason }));
     } else {
       score += 10;
-      const reason = "Plateau ¿ÏÈ­¸¦ À§ÇØ º¯Çü °¡´ÉÇÑ ´Ù¸¥ Program ¿ì¼±¼øÀ§¸¦ ³ô¿´½À´Ï´Ù.";
+      const reason = "Plateau ì™„í™”ë¥¼ ìœ„í•´ ë³€í˜• ê°€ëŠ¥í•œ ë‹¤ë¥¸ Program ìš°ì„ ìˆœìœ„ë¥¼ ë†’ì˜€ìŠµë‹ˆë‹¤.";
       reasons.push(reason);
       factors.push(createFactor({ key: "plateau", label: "Plateau", score: 10, reason }));
     }
@@ -265,7 +265,7 @@ const scorePeriodization = (periodization: PeriodizationSummary | null, program:
     if (program.category === "RECOVERY") delta += 30;
     if (program.difficulty === "ADVANCED") delta -= 14;
     score += delta;
-    const reason = "È¸º¹ Ãß¼¼¸¦ ¹İ¿µÇØ Recovery ¼º°İÀÇ ProgramÀ» ¿ì¼±Çß½À´Ï´Ù.";
+    const reason = "íšŒë³µ ì¶”ì„¸ë¥¼ ë°˜ì˜í•´ Recovery ì„±ê²©ì˜ Programì„ ìš°ì„ í–ˆìŠµë‹ˆë‹¤.";
     reasons.push(reason);
     if (delta !== 0) factors.push(createFactor({ key: "periodization", label: "Periodization", score: delta, reason }));
   }
@@ -276,7 +276,7 @@ const scorePeriodization = (periodization: PeriodizationSummary | null, program:
     if (program.difficulty === "BEGINNER" || program.difficulty === "GENERAL") delta += 12;
     if (program.difficulty === "ADVANCED") delta -= 22;
     score += delta;
-    const reason = "Deload ±¸°£À¸·Î ÆÇ´ÜÇØ Àú°­µµ Program °¡ÁßÄ¡¸¦ ³ô¿´½À´Ï´Ù.";
+    const reason = "Deload êµ¬ê°„ìœ¼ë¡œ íŒë‹¨í•´ ì €ê°•ë„ Program ê°€ì¤‘ì¹˜ë¥¼ ë†’ì˜€ìŠµë‹ˆë‹¤.";
     reasons.push(reason);
     if (delta !== 0) factors.push(createFactor({ key: "periodization", label: "Periodization", score: delta, reason }));
   }
@@ -287,7 +287,7 @@ const scorePeriodization = (periodization: PeriodizationSummary | null, program:
     if (program.category === "RECOVERY") delta += 12;
     if (program.difficulty === "ADVANCED") delta -= 20;
     score += delta;
-    const reason = "¿îµ¿ Àç½ÃÀÛ ±¸°£À¸·Î ÆÇ´ÜÇØ ÀçÀûÀÀÇü ProgramÀ» ¿ì¼±Çß½À´Ï´Ù.";
+    const reason = "ìš´ë™ ì¬ì‹œì‘ êµ¬ê°„ìœ¼ë¡œ íŒë‹¨í•´ ì¬ì ì‘í˜• Programì„ ìš°ì„ í–ˆìŠµë‹ˆë‹¤.";
     reasons.push(reason);
     if (delta !== 0) factors.push(createFactor({ key: "periodization", label: "Periodization", score: delta, reason }));
   }
@@ -295,14 +295,14 @@ const scorePeriodization = (periodization: PeriodizationSummary | null, program:
   if (periodization.recommendedMode === "VARIATION") {
     const delta = periodization.recentProgramSequence.some((title) => title.trim().toLowerCase() === normalizedTitle) ? -14 : 12;
     score += delta;
-    const reason = "ÃÖ±Ù ¹İº¹ Èå¸§À» ¿ÏÈ­ÇÏ±â À§ÇØ Variation ¿ì¼±¼øÀ§¸¦ ¹İ¿µÇß½À´Ï´Ù.";
+    const reason = "ìµœê·¼ ë°˜ë³µ íë¦„ì„ ì™„í™”í•˜ê¸° ìœ„í•´ Variation ìš°ì„ ìˆœìœ„ë¥¼ ë°˜ì˜í–ˆìŠµë‹ˆë‹¤.";
     reasons.push(reason);
     factors.push(createFactor({ key: "periodization", label: "Periodization", score: delta, reason }));
   }
 
   if (nextHint && normalizedTitle.includes(nextHint)) {
     score += 12;
-    const reason = `´ÙÀ½ ¿îµ¿ Èå¸§À¸·Î ${periodization.nextProgramHint} ¼øÈ¯À» ¿ì¼±Çß½À´Ï´Ù.`;
+    const reason = `ë‹¤ìŒ ìš´ë™ íë¦„ìœ¼ë¡œ ${periodization.nextProgramHint} ìˆœí™˜ì„ ìš°ì„ í–ˆìŠµë‹ˆë‹¤.`;
     reasons.push(reason);
     factors.push(createFactor({ key: "weeklyFrequency", label: "Weekly Frequency", score: 12, reason }));
   }
@@ -343,13 +343,13 @@ const scoreProgram = (
 
   if (program.favorite) {
     score += 4;
-    factors.push(createFactor({ key: "favorite", label: "Favorite", score: 4, reason: "Áñ°ÜÃ£±â ProgramÀÌ¶ó ¿ì¼±¼øÀ§¸¦ ¼ÒÆø ³ô¿´½À´Ï´Ù." }));
+    factors.push(createFactor({ key: "favorite", label: "Favorite", score: 4, reason: "ì¦ê²¨ì°¾ê¸° Programì´ë¼ ìš°ì„ ìˆœìœ„ë¥¼ ì†Œí­ ë†’ì˜€ìŠµë‹ˆë‹¤." }));
   }
   if (program.isArchived) score -= 999;
   const usageBonus = Math.min(program.usageCount, 12);
   score += usageBonus;
   if (usageBonus !== 0) {
-    factors.push(createFactor({ key: "usageCount", label: "Usage", score: usageBonus, reason: `´©Àû »ç¿ë ${program.usageCount}È¸¸¦ ¹İ¿µÇØ ¾ÈÁ¤ÀûÀÎ Program Á¡¼ö¸¦ º¸Á¤Çß½À´Ï´Ù.` }));
+    factors.push(createFactor({ key: "usageCount", label: "Usage", score: usageBonus, reason: `ëˆ„ì  ì‚¬ìš© ${program.usageCount}íšŒë¥¼ ë°˜ì˜í•´ ì•ˆì •ì ì¸ Program ì ìˆ˜ë¥¼ ë³´ì •í–ˆìŠµë‹ˆë‹¤.` }));
   }
 
   const trace: RecommendationTrace = {
@@ -443,22 +443,22 @@ export const buildRecommendationReason = (
   const summary: string[] = [];
 
   if (recentWorkout?.category) {
-    summary.push(`ÃÖ±Ù ${getCategoryLabel(recentWorkout.category)} ¿îµ¿À» ÁøÇàÇß°í`);
+    summary.push(`ìµœê·¼ ${getCategoryLabel(recentWorkout.category)} ìš´ë™ì„ ì§„í–‰í–ˆê³ `);
   }
 
   if (condition.fatigueAreas.length > 0) {
-    summary.push(`¿À´Ã ${condition.fatigueAreas.map((area) => areaLabel(area)).join(", ")} ÇÇ·Î¸¦ ¼±ÅÃÇØ`);
+    summary.push(`ì˜¤ëŠ˜ ${condition.fatigueAreas.map((area) => areaLabel(area)).join(", ")} í”¼ë¡œë¥¼ ì„ íƒí•´`);
   }
 
   if (intelligence) {
-    summary.push(`È¸º¹ Á¡¼ö ${intelligence.recoveryScore}Á¡, À§Çè Á¡¼ö ${intelligence.riskScore}Á¡À» ¹İ¿µÇØ`);
+    summary.push(`íšŒë³µ ì ìˆ˜ ${intelligence.recoveryScore}ì , ìœ„í—˜ ì ìˆ˜ ${intelligence.riskScore}ì ì„ ë°˜ì˜í•´`);
   }
 
   if (periodization) {
-    summary.push(`ÁÖ±â ºĞ¼® °á°ú ${periodization.recommendedMode} ¸ğµå¿Í ${periodization.currentCycle} Èå¸§À» °í·ÁÇØ`);
+    summary.push(`ì£¼ê¸° ë¶„ì„ ê²°ê³¼ ${periodization.recommendedMode} ëª¨ë“œì™€ ${periodization.currentCycle} íë¦„ì„ ê³ ë ¤í•´`);
   }
 
-  summary.push(`${getCategoryLabel(result.program.category)} ÇÁ·Î±×·¥À» ÃßÃµÇß½À´Ï´Ù.`);
+  summary.push(`${getCategoryLabel(result.program.category)} í”„ë¡œê·¸ë¨ì„ ì¶”ì²œí–ˆìŠµë‹ˆë‹¤.`);
 
   return [...summary, ...result.reasons.slice(0, 4)].join(" ");
 };

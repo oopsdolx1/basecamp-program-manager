@@ -101,6 +101,8 @@ export const searchExerciseCatalog = (
       return filters.status === "ARCHIVED" ? item.isArchived : !item.isArchived;
     })
     .filter((item) => (filters.category === "ALL" ? true : item.category === filters.category))
+    .filter((item) => (filters.bodyPart === "ALL" ? true : (item.bodyPart ?? item.category) === filters.bodyPart))
+    .filter((item) => (filters.equipment === "ALL" ? true : (item.equipment ?? item.equipmentType) === filters.equipment))
     .filter((item) => (filters.equipmentType === "ALL" ? true : item.equipmentType === filters.equipmentType))
     .filter((item) => (filters.primaryMuscle === "ALL" ? true : item.primaryMuscle === filters.primaryMuscle))
     .filter((item) => {
@@ -121,6 +123,8 @@ export const toCatalogOptions = (items: ExerciseCatalogItem[]): ExerciseCatalogO
   searchExerciseCatalog(items, {
     search: "",
     category: "ALL",
+    bodyPart: "ALL",
+    equipment: "ALL",
     equipmentType: "ALL",
     primaryMuscle: "ALL",
     status: "ACTIVE",

@@ -68,6 +68,7 @@ export const WorkoutPrintTemplateV1 = ({ document }: WorkoutPrintTemplateV1Props
               <td className="exercise-name-cell">
                 <div className="exercise-title">{row.isBlank ? "" : `${row.order}. ${row.exerciseName}`}</div>
                 {row.exerciseMemo ? <div className="exercise-memo">{row.exerciseMemo}</div> : null}
+                {row.memberWhy ? <div className="exercise-why">WHY: {row.memberWhy}</div> : null}
               </td>
               {setColumns.map((setNumber) => {
                 const inactive = row.configuredSets !== null && setNumber > row.configuredSets;

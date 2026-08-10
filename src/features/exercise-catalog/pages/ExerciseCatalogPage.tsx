@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { Stack, Typography } from "@mui/material";
 import { ErrorState } from "../../../components/common/ErrorState";
 import { LoadingState } from "../../../components/common/LoadingState";
@@ -25,6 +25,15 @@ export const ExerciseCatalogPage = (): JSX.Element => {
   }, {}), [programs]);
   const bodyParts = useMemo(() => [...new Set(items.map((item) => item.bodyPart).filter((value): value is string => Boolean(value)))].sort(), [items]);
   const equipment = useMemo(() => [...new Set(items.map((item) => item.equipment).filter((value): value is string => Boolean(value)))].sort(), [items]);
+
+  useEffect(() => {
+    console.debug("[ProgramManagerRuntime] catalog render", {
+      runtimeCatalogCount: items.length,
+      renderedCount: filteredItems.length,
+      renderedIds: filteredItems.map(({ id }) => id),
+      filters,
+    });
+  }, [filteredItems, filters, items.length]);
 
   return (
     <PageContainer>

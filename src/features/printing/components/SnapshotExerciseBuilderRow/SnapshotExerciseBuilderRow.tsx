@@ -51,7 +51,8 @@ export const SnapshotExerciseBuilderRow = memo(function SnapshotExerciseBuilderR
   onDelete,
   onPreset,
 }: SnapshotExerciseBuilderRowProps): JSX.Element {
-  const selectedOption = catalogOptions.find((option) => option.id === exercise.catalogExerciseId) ?? exercise.displayName ?? exercise.name;
+  const selectedOption = catalogOptions.find((option) => option.id === exercise.catalogExerciseId) ?? null;
+  const unavailableName = !selectedOption && exercise.name ? exercise.name : "";
 
   return (
     <Card sx={{ bgcolor: palette.surfaceInteractive, border: 1, borderColor: "divider", boxShadow: "none" }}>
@@ -71,7 +72,6 @@ export const SnapshotExerciseBuilderRow = memo(function SnapshotExerciseBuilderR
           </Stack>
 
           <Autocomplete
-            freeSolo
             options={catalogOptions}
             value={selectedOption}
             filterOptions={(options, state) => {
@@ -79,23 +79,14 @@ export const SnapshotExerciseBuilderRow = memo(function SnapshotExerciseBuilderR
               if (!query) return options;
               return options.filter((option) => searchText(option).includes(query));
             }}
-            getOptionLabel={(option) => (typeof option === "string" ? option : option.displayName)}
-            isOptionEqualToValue={(option, value) => typeof value !== "string" && option.id === value.id}
+            getOptionLabel={(option) => option.displayName}
+            isOptionEqualToValue={(option, value) => option.id === value.id}
             onChange={(_, value) => {
-              if (typeof value === "string") {
-                onPatch({ name: value, displayName: value, catalogExerciseId: undefined });
-                return;
-              }
               if (value) {
                 onPatch({ name: value.name, displayName: value.displayName, catalogExerciseId: value.id });
               }
             }}
-            onInputChange={(_, value, reason) => {
-              if (reason === "input") {
-                onPatch({ name: value, displayName: value, catalogExerciseId: undefined });
-              }
-            }}
-            renderInput={(params) => <TextField {...params} label="Exercise Replace" />}
+            renderInput={(params) => <TextField {...params} helperText={unavailableName ? `현재 저장값: ${unavailableName} (Shared Runtime에 없음)` : undefined} label="Exercise Replace" />}
           />
 
           <Grid container spacing={1.5}>

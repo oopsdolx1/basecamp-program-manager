@@ -25,6 +25,7 @@ import {
   Typography,
 } from "@mui/material";
 import type { AppId } from "../../../../types/brandedIds";
+import { useEffect } from "react";
 import { useExerciseCatalog } from "../../../exercise-catalog";
 import { useExerciseResolver } from "../../../exercise-resolver";
 import { programCategories, programDifficulties } from "../../config/programOptions";
@@ -60,6 +61,17 @@ export const ProgramEditor = ({
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   const canAddExercise = form.values.exercises.length < PROGRAM_EXERCISE_LIMIT;
 
+  useEffect(() => {
+    const runtimeIds = new Set(catalogItems.map(({ id }) => id));
+    const candidateIds = catalogOptions.map(({ id }) => id);
+    console.debug("[ProgramManagerRuntime] builder candidates", {
+      runtimeCount: runtimeIds.size,
+      builderSearchableCount: candidateIds.length,
+      candidateIds,
+      candidatesAreRuntimeOnly: candidateIds.every((id) => runtimeIds.has(id)),
+    });
+  }, [catalogItems, catalogOptions]);
+
   const handleDragEnd = (event: DragEndEvent) => {
     if (!event.over || event.active.id === event.over.id) {
       return;
@@ -76,18 +88,18 @@ export const ProgramEditor = ({
       </Stack>
       {catalogState.status === "loading" ? (
         <Alert severity="info" variant="outlined">
-          운동 카탈로그를 불러오는 중입니다. 직접 입력은 바로 사용할 수 있습니다.
+          Shared Runtime 운동 목록을 불러오는 중입니다.
           <LinearProgress sx={{ mt: 1.5 }} />
         </Alert>
       ) : null}
       {catalogState.status === "error" ? (
         <Alert severity="warning">
-          운동 카탈로그를 불러오지 못해 직접 입력 모드로 동작합니다. {catalogState.message}
+          Shared Runtime 운동 목록을 불러오지 못했습니다. {catalogState.message}
         </Alert>
       ) : null}
       {catalogState.status === "ready" && catalogOptions.length === 0 ? (
         <Alert severity="info" variant="outlined">
-          등록된 운동 카탈로그가 없습니다. 직접 입력으로 프로그램을 작성할 수 있습니다.
+          Shared Runtime에 등록된 운동이 없습니다.
         </Alert>
       ) : null}
       {!form.validation.valid ? <Alert severity="info">{form.validation.errors[0]}</Alert> : null}

@@ -3,7 +3,6 @@ export { useExerciseCatalog } from "./hooks/useExerciseCatalog";
 export type {
   ExerciseCatalogItem,
   ExerciseCatalogOption,
-  ExerciseCatalogFormValues,
   ExerciseCategory,
   EquipmentType,
   PrimaryMuscle,

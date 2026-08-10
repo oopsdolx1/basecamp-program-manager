@@ -82,20 +82,6 @@ export interface ExerciseCatalogItem {
   updatedBy: string | null;
 }
 
-export interface ExerciseCatalogFormValues {
-  name: string;
-  englishName: string;
-  aliases: string[];
-  category: ExerciseCategory;
-  primaryMuscle: PrimaryMuscle;
-  secondaryMuscles: PrimaryMuscle[];
-  equipmentType: EquipmentType;
-  movementPattern: MovementPattern | null;
-  difficulty: ExerciseDifficulty | null;
-  memo: string;
-  isFavorite: boolean;
-}
-
 export interface ExerciseCatalogFilters {
   search: string;
   category: ExerciseCategory | "ALL";

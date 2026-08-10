@@ -19,8 +19,8 @@ interface ExerciseSortableRowProps {
 const findSelectedOption = (
   exercise: ProgramFormExercise,
   options: ExerciseCatalogOption[],
-): ExerciseCatalogOption | string =>
-  options.find((option) => option.id === exercise.catalogExerciseId) ?? exercise.displayName ?? exercise.name;
+): ExerciseCatalogOption | null =>
+  options.find((option) => option.id === exercise.catalogExerciseId) ?? null;
 
 const normalizeOptionSearch = (value: string): string => value.trim().replace(/\s+/g, " ").toLocaleLowerCase("ko-KR");
 
@@ -45,7 +45,9 @@ export const ExerciseSortableRow = ({
         ? `후보 ${resolveResult.candidateExercises.length}개: ${resolveResult.candidateExercises
             .map((candidate) => candidate.name)
             .join(", ")}`
-        : undefined;
+        : exercise.name && !catalogOptions.some((option) => option.id === exercise.catalogExerciseId)
+          ? `현재 저장값: ${exercise.name} (Shared Runtime에 없음)`
+          : undefined;
 
   return (
     <Box
@@ -69,7 +71,6 @@ export const ExerciseSortableRow = ({
         </Grid>
         <Grid item md={5} xs={12}>
           <Autocomplete
-            freeSolo
             options={catalogOptions}
             value={findSelectedOption(exercise, catalogOptions)}
             filterOptions={(options, state) => {
@@ -77,20 +78,11 @@ export const ExerciseSortableRow = ({
               if (!query) return options;
               return options.filter((option) => catalogOptionSearchText(option).includes(query));
             }}
-            getOptionLabel={(option) => (typeof option === "string" ? option : option.displayName)}
-            isOptionEqualToValue={(option, value) => typeof value !== "string" && option.id === value.id}
+            getOptionLabel={(option) => option.displayName}
+            isOptionEqualToValue={(option, value) => option.id === value.id}
             onChange={(_, value) => {
-              if (typeof value === "string") {
-                onChange({ name: value, displayName: value, catalogExerciseId: undefined });
-                return;
-              }
               if (value) {
                 onChange({ name: value.name, displayName: value.displayName, catalogExerciseId: value.id });
-              }
-            }}
-            onInputChange={(_, value, reason) => {
-              if (reason === "input") {
-                onChange({ name: value, displayName: value, catalogExerciseId: undefined });
               }
             }}
             renderOption={(props, option) => (

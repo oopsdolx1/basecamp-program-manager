@@ -1,13 +1,25 @@
 @media screen {
   .print-preview-shell {
-    background: #ecece7;
+    background: #000;
     min-height: calc(100vh - 64px);
-    padding: 24px;
+    padding: 24px 24px calc(96px + env(safe-area-inset-bottom, 0px));
   }
 
   .a5-workout-document {
     box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16);
     margin: 0 auto;
+  }
+
+  @media (max-width: 600px) {
+    .print-preview-shell {
+      overflow-x: hidden;
+      padding: 16px 0 calc(104px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .a5-workout-document {
+      height: calc(141.8919vw - 22.7027px);
+      width: calc(100vw - 16px);
+    }
   }
 }
 

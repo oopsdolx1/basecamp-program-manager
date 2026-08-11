@@ -11,7 +11,7 @@ export const palette = {
   inputBackground: "#000000",
 
   primaryGold: "#D9C54B",
-  primaryGoldHover: "#ca8a04",
+  primaryGoldHover: "#c9b53b",
   primaryGoldLight: "#eab308",
   primaryGoldDark: "#713f12",
   primaryGoldMuted: "rgba(217, 197, 75, 0.2)",
@@ -28,8 +28,8 @@ export const palette = {
   slate200: "#e5e5e5",
 
   textPrimary: "#FFFFFF",
-  textSecondary: "#a3a3a3",
-  textMuted: "#737373",
+  textSecondary: "#9CA3AF",
+  textMuted: "#6B7280",
 
   borderSubtle: "rgba(217, 197, 75, 0.15)",
   borderDefault: "#262626",
@@ -37,7 +37,7 @@ export const palette = {
   borderAccent: "rgba(217, 197, 75, 0.4)",
 
   success: "#10B981",
-  warning: "#ca8a04",
+  warning: "#FACC15",
   error: "#EF4444",
   info: "#3B82F6",
 

@@ -25,7 +25,7 @@ import {
   Typography,
 } from "@mui/material";
 import type { AppId } from "../../../../types/brandedIds";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useExerciseCatalog } from "../../../exercise-catalog";
 import { useExerciseResolver } from "../../../exercise-resolver";
 import { programCategories, programDifficulties } from "../../config/programOptions";
@@ -33,6 +33,8 @@ import { useProgramForm } from "../../hooks/useProgramForm";
 import type { Program, ProgramFormValues } from "../../types/program.types";
 import { PROGRAM_EXERCISE_LIMIT } from "../../types/program.types";
 import { ExerciseSortableRow } from "../ExerciseSortableRow/ExerciseSortableRow";
+import { ExercisePicker } from "../ExercisePicker/ExercisePicker";
+import type { ExerciseCatalogOption } from "../../../exercise-catalog";
 
 interface ProgramEditorProps {
   initialValues?: ProgramFormValues;
@@ -60,6 +62,8 @@ export const ProgramEditor = ({
   const resolver = useExerciseResolver(catalogItems);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   const canAddExercise = form.values.exercises.length < PROGRAM_EXERCISE_LIMIT;
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerTargetId, setPickerTargetId] = useState<string | null>(null);
 
   useEffect(() => {
     const runtimeIds = new Set(catalogItems.map(({ id }) => id));
@@ -78,6 +82,15 @@ export const ProgramEditor = ({
     }
 
     form.reorder(String(event.active.id), String(event.over.id));
+  };
+
+  const openAddPicker = () => { setPickerTargetId(null); setPickerOpen(true); };
+  const openReplacePicker = (exerciseId: string) => { setPickerTargetId(exerciseId); setPickerOpen(true); };
+  const selectExercise = (exercise: ExerciseCatalogOption) => {
+    const patch = { name: exercise.name, displayName: exercise.displayName, catalogExerciseId: exercise.id };
+    if (pickerTargetId) form.updateExercise(pickerTargetId, patch);
+    else form.addExercise(patch);
+    setPickerOpen(false);
   };
 
   return (
@@ -168,10 +181,10 @@ export const ProgramEditor = ({
               <Stack spacing={0.25}>
                 <Typography variant="h2">Exercise List</Typography>
                 <Typography color="text.secondary" variant="body2">
-                  카탈로그 운동을 선택하거나 직접 입력할 수 있습니다.
+                  Shared Runtime 운동만 선택할 수 있습니다.
                 </Typography>
               </Stack>
-              <Button disabled={!canAddExercise} startIcon={<AddIcon />} onClick={form.addExercise}>
+              <Button disabled={!canAddExercise && !form.values.exercises.some((exercise) => !exercise.name)} startIcon={<AddIcon />} variant="contained" onClick={openAddPicker} sx={{ minHeight: 52 }}>
                 운동 추가
               </Button>
             </Stack>
@@ -181,15 +194,20 @@ export const ProgramEditor = ({
                 strategy={verticalListSortingStrategy}
               >
                 <Stack spacing={1.5}>
-                  {form.values.exercises.map((exercise) => (
+                  {form.values.exercises.map((exercise, index) => (
                     <ExerciseSortableRow
                       key={exercise.id}
                       exercise={exercise}
                       catalogOptions={catalogOptions}
                       resolveResult={exercise.name ? resolver.resolve(exercise.name) : null}
                       canDelete={form.values.exercises.length > 1}
+                      index={index}
+                      total={form.values.exercises.length}
                       onChange={(patch) => form.updateExercise(exercise.id, patch)}
                       onDelete={() => form.removeExercise(exercise.id)}
+                      onMoveUp={() => form.moveExercise(exercise.id, "up")}
+                      onMoveDown={() => form.moveExercise(exercise.id, "down")}
+                      onOpenPicker={() => openReplacePicker(exercise.id)}
                     />
                   ))}
                 </Stack>
@@ -198,15 +216,15 @@ export const ProgramEditor = ({
           </Stack>
         </CardContent>
       </Card>
-      <Stack direction="row" justifyContent="flex-end" spacing={1}>
-        <Button onClick={onCancel}>취소</Button>
+      <Stack direction={{ sm: "row", xs: "column-reverse" }} justifyContent="flex-end" spacing={1} sx={{ bgcolor: "background.default", bottom: 0, borderTop: 1, borderColor: "divider", mx: { xs: -2, sm: 0 }, p: { xs: 2, sm: 1.5 }, position: "sticky", zIndex: 10 }}>
+        <Button onClick={onCancel} sx={{ minHeight: 52 }}>취소</Button>
         {onDuplicate ? (
-          <Button startIcon={<ContentCopyIcon />} onClick={onDuplicate}>
+          <Button startIcon={<ContentCopyIcon />} onClick={onDuplicate} sx={{ minHeight: 52 }}>
             복사
           </Button>
         ) : null}
         {onArchive ? (
-          <Button startIcon={<ArchiveIcon />} onClick={onArchive}>
+          <Button startIcon={<ArchiveIcon />} onClick={onArchive} sx={{ minHeight: 52 }}>
             Archive
           </Button>
         ) : null}
@@ -215,10 +233,12 @@ export const ProgramEditor = ({
           startIcon={<SaveIcon />}
           variant="contained"
           onClick={() => onSave(form.sanitizedValues)}
+          sx={{ minHeight: 56, minWidth: 144 }}
         >
           저장
         </Button>
       </Stack>
+      <ExercisePicker open={pickerOpen} exercises={catalogOptions} onClose={() => setPickerOpen(false)} onSelect={selectExercise} />
     </Stack>
   );
 };

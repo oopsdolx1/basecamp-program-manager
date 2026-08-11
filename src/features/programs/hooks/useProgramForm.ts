@@ -6,7 +6,7 @@ import {
   sanitizeProgramForm,
   validateProgramForm,
 } from "../services/programService";
-import type { ProgramFormValues } from "../types/program.types";
+import type { ProgramFormExercise, ProgramFormValues } from "../types/program.types";
 
 export const useProgramForm = (initialValues?: ProgramFormValues) => {
   const [values, setValues] = useState<ProgramFormValues>(
@@ -18,15 +18,22 @@ export const useProgramForm = (initialValues?: ProgramFormValues) => {
   const update = <TKey extends keyof ProgramFormValues>(key: TKey, value: ProgramFormValues[TKey]) =>
     setValues((current) => ({ ...current, [key]: value }));
 
-  const addExercise = () =>
+  const addExercise = (exercise?: Partial<ProgramFormExercise>) =>
     setValues((current) => {
+      const blankIndex = current.exercises.findIndex((item) => !item.name.trim());
+      if (exercise && blankIndex >= 0) {
+        return {
+          ...current,
+          exercises: current.exercises.map((item, index) => index === blankIndex ? { ...item, ...exercise } : item),
+        };
+      }
       if (current.exercises.length >= 8) {
         return current;
       }
 
       return {
         ...current,
-        exercises: [...current.exercises, createBlankExercise(current.exercises.length + 1)],
+        exercises: [...current.exercises, { ...createBlankExercise(current.exercises.length + 1), ...exercise }],
       };
     });
 
@@ -63,6 +70,16 @@ export const useProgramForm = (initialValues?: ProgramFormValues) => {
       };
     });
 
+  const moveExercise = (exerciseId: string, direction: "up" | "down") =>
+    setValues((current) => {
+      const index = current.exercises.findIndex((exercise) => exercise.id === exerciseId);
+      const target = direction === "up" ? index - 1 : index + 1;
+      if (index < 0 || target < 0 || target >= current.exercises.length) return current;
+      const next = [...current.exercises];
+      [next[index], next[target]] = [next[target], next[index]];
+      return { ...current, exercises: reorderExercises(next) };
+    });
+
   return {
     values,
     validation,
@@ -71,6 +88,7 @@ export const useProgramForm = (initialValues?: ProgramFormValues) => {
     updateExercise,
     removeExercise,
     reorder,
+    moveExercise,
     sanitizedValues: sanitizeProgramForm(values),
   };
 };

@@ -64,10 +64,10 @@ export const SnapshotExerciseBuilderRow = memo(function SnapshotExerciseBuilderR
               <Chip label={index + 1 === total ? "Last" : `#${index + 1}`} size="small" variant="outlined" />
             </Stack>
             <Stack direction="row" spacing={0.5}>
-              <IconButton aria-label="move up" disabled={index === 0} onClick={onMoveUp}><KeyboardArrowUpIcon /></IconButton>
-              <IconButton aria-label="move down" disabled={index === total - 1} onClick={onMoveDown}><KeyboardArrowDownIcon /></IconButton>
-              <IconButton aria-label="duplicate" onClick={onDuplicate}><ContentCopyIcon /></IconButton>
-              <IconButton aria-label="delete" disabled={total <= 1} onClick={onDelete}><DeleteIcon /></IconButton>
+              <IconButton aria-label={`${exercise.order}번 운동 위로 이동`} disabled={index === 0} onClick={onMoveUp} sx={{ minHeight: 48, minWidth: 48 }}><KeyboardArrowUpIcon /></IconButton>
+              <IconButton aria-label={`${exercise.order}번 운동 아래로 이동`} disabled={index === total - 1} onClick={onMoveDown} sx={{ minHeight: 48, minWidth: 48 }}><KeyboardArrowDownIcon /></IconButton>
+              <IconButton aria-label={`${exercise.order}번 운동 복사`} onClick={onDuplicate} sx={{ minHeight: 48, minWidth: 48 }}><ContentCopyIcon /></IconButton>
+              <IconButton aria-label={`${exercise.order}번 운동 삭제`} disabled={total <= 1} onClick={onDelete} sx={{ minHeight: 48, minWidth: 48 }}><DeleteIcon /></IconButton>
             </Stack>
           </Stack>
 

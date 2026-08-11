@@ -24,7 +24,7 @@ export const SearchField = ({ label, value, onChange }: SearchFieldProps): JSX.E
       ),
       endAdornment: value ? (
         <InputAdornment position="end">
-          <IconButton aria-label={`${label} clear`} edge="end" size="small" onClick={() => onChange("")}>
+          <IconButton aria-label={`${label} 지우기`} edge="end" onClick={() => onChange("")} sx={{ minHeight: 44, minWidth: 44 }}>
             <CloseIcon fontSize="small" />
           </IconButton>
         </InputAdornment>

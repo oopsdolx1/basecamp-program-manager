@@ -42,6 +42,17 @@ interface RuntimeSnapshot {
   items: SharedExerciseKnowledge[];
 }
 
+interface RuntimeDistributionEnvelope {
+  metadata?: {
+    revision?: number;
+    updatedAt?: unknown;
+    importedBy?: string;
+    checksum?: string;
+    count?: number;
+  };
+  runtime?: Partial<RuntimeSnapshot>;
+}
+
 const appId = (import.meta.env.VITE_CONDITION_LAB_APP_ID ?? "").trim();
 const projectId = (import.meta.env.VITE_FIREBASE_PROJECT_ID ?? "").trim();
 const runtimePath = `artifacts/${appId}/public/data/sharedKnowledgeRuntime/current`;
@@ -68,6 +79,21 @@ const isRuntimeSnapshot = (value: unknown): value is RuntimeSnapshot => {
   return typeof snapshot.revision === "number" && Array.isArray(snapshot.items)
     && snapshot.items.every(isExercise)
     && snapshot.exerciseCount === snapshot.items.length;
+};
+const unwrapRuntimeSnapshot = (value: unknown): RuntimeSnapshot | null => {
+  if (isRuntimeSnapshot(value)) return value;
+  if (!value || typeof value !== "object") return null;
+  const envelope = value as RuntimeDistributionEnvelope;
+  if (!envelope.runtime || !envelope.metadata) return null;
+  const candidate = {
+    ...envelope.runtime,
+    revision: envelope.metadata.revision,
+    updatedAt: envelope.metadata.updatedAt,
+    updatedBy: envelope.metadata.importedBy ?? "",
+    checksum: envelope.metadata.checksum ?? "",
+    exerciseCount: envelope.runtime.exerciseCount ?? envelope.metadata.count,
+  };
+  return isRuntimeSnapshot(candidate) ? candidate : null;
 };
 const notify = () => listeners.forEach((listener) => listener());
 const replaceSnapshot = (snapshot: RuntimeSnapshot) => {
@@ -110,8 +136,8 @@ const start = (): Promise<void> => {
         });
         return;
       }
-      const value: unknown = snapshot.data();
-      if (!isRuntimeSnapshot(value)) {
+      const value = unwrapRuntimeSnapshot(snapshot.data());
+      if (!value) {
         connectionStatus = "error";
         connectionError = "Shared Runtime document does not match the production contract.";
         console.error("[ProgramManager Runtime] Invalid Shared Runtime document; retaining the last successful snapshot.");

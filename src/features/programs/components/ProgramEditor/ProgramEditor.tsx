@@ -216,7 +216,7 @@ export const ProgramEditor = ({
           </Stack>
         </CardContent>
       </Card>
-      <Stack direction={{ sm: "row", xs: "column-reverse" }} justifyContent="flex-end" spacing={1} sx={{ bgcolor: "background.default", bottom: 0, borderTop: 1, borderColor: "divider", mx: { xs: -2, sm: 0 }, p: { xs: 2, sm: 1.5 }, position: "sticky", zIndex: 10 }}>
+      <Stack direction={{ sm: "row", xs: "column-reverse" }} justifyContent="flex-end" spacing={1} sx={{ bgcolor: "background.default", bottom: 0, borderTop: 1, borderColor: "divider", mx: { xs: -2, sm: 0 }, px: { xs: 2, sm: 1.5 }, pt: { xs: 2, sm: 1.5 }, pb: { xs: "max(16px, env(safe-area-inset-bottom, 0px))", sm: 1.5 }, position: "sticky", zIndex: 10 }}>
         <Button onClick={onCancel} sx={{ minHeight: 52 }}>취소</Button>
         {onDuplicate ? (
           <Button startIcon={<ContentCopyIcon />} onClick={onDuplicate} sx={{ minHeight: 52 }}>

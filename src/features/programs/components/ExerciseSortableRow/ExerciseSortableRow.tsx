@@ -56,6 +56,7 @@ export const ExerciseSortableRow = ({ exercise, catalogOptions, resolveResult, c
         </Button>
 
         <Autocomplete
+          sx={{ "& .MuiAutocomplete-popupIndicator": { minHeight: 44, minWidth: 44 } }}
           options={catalogOptions}
           value={selected}
           filterOptions={(options, state) => {

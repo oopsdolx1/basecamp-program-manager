@@ -26,7 +26,7 @@ export const AppHeader = (): JSX.Element => {
       }}
     >
       <Toolbar sx={{ gap: 2, height: 64, maxWidth: 1152, mx: "auto", px: 2, width: "100%" }}>
-        <Box sx={{ alignItems: "center", cursor: "pointer", display: "flex", gap: 1.5, userSelect: "none" }}>
+        <Box sx={{ alignItems: "center", display: "flex", gap: 1.5, userSelect: "none" }}>
           <Box
             sx={{
               alignItems: "center",
@@ -39,7 +39,6 @@ export const AppHeader = (): JSX.Element => {
               justifyContent: "center",
               transition: "transform 150ms ease, box-shadow 150ms ease",
               width: 44,
-              "&:hover": { transform: "scale(1.04)", boxShadow: palette.shadowAccentStrong },
             }}
           >
             <FitnessCenterIcon />
@@ -56,7 +55,7 @@ export const AppHeader = (): JSX.Element => {
 
         <Box sx={{ flexGrow: 1 }} />
 
-        <Box sx={{ display: { md: "flex", xs: "none" }, gap: 1 }}>
+        <Box sx={{ display: "flex", gap: { sm: 1, xs: 0.5 } }}>
           {navItems.map((item) => {
             const active = item.matches.some(
               (match) => location.pathname === match || location.pathname.startsWith(`${match}/`),
@@ -72,9 +71,10 @@ export const AppHeader = (): JSX.Element => {
                   bgcolor: active ? "primary.main" : "transparent",
                   border: active ? `1px solid ${palette.borderAccent}` : "1px solid transparent",
                   color: active ? "primary.contrastText" : "text.secondary",
-                  fontSize: 14,
-                  minHeight: 40,
-                  px: 2,
+                  fontSize: { sm: 14, xs: 13 },
+                  minHeight: 48,
+                  minWidth: { sm: 88, xs: 68 },
+                  px: { sm: 2, xs: 1.25 },
                   "&:hover": {
                     bgcolor: active ? "primary.main" : palette.surface,
                     color: active ? "primary.contrastText" : "text.primary",

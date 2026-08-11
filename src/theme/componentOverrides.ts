@@ -60,6 +60,14 @@ export const componentOverrides: ThemeOptions["components"] = {
       },
     },
   },
+  MuiIconButton: {
+    styleOverrides: {
+      root: {
+        minHeight: 44,
+        minWidth: 44,
+      },
+    },
+  },
   MuiCard: {
     styleOverrides: {
       root: {

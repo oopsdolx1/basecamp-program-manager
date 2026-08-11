@@ -55,6 +55,7 @@ interface RuntimeEnvelope {
 }
 
 const appId = (import.meta.env.VITE_CONDITION_LAB_APP_ID ?? "").trim();
+const projectId = (import.meta.env.VITE_FIREBASE_PROJECT_ID ?? "").trim();
 const runtimePath = `artifacts/${appId}/public/data/sharedKnowledgeRuntime/current`;
 const listeners = new Set<() => void>();
 let exercises: SharedExerciseKnowledge[] = [];
@@ -91,7 +92,17 @@ const replaceSnapshot = (envelope: RuntimeEnvelope) => {
   }));
   byId = new Map(exercises.map((exercise) => [exercise.id, exercise]));
   revision = envelope.metadata.revision;
-  console.info("[ProgramManager Runtime]", { revision, updatedAt: envelope.metadata.updatedAt, count: exercises.length });
+  console.info("[SharedRuntime Receive]", {
+    documentExists: true,
+    projectId,
+    appId,
+    documentPath: runtimePath,
+    revision,
+    firestoreCount: envelope.metadata.count,
+    receivedCount: envelope.runtime.items.length,
+    catalogCount: exercises.length,
+    exerciseIds: exercises.map(({ id }) => id),
+  });
   notify();
 };
 
@@ -103,6 +114,9 @@ const start = (): Promise<void> => {
     unsubscribeRemote = onSnapshot(doc(getFirestoreClient(), runtimePath), (snapshot) => {
       if (!snapshot.exists()) {
         exercises = []; byId = new Map(); revision = 0; notify();
+        console.info("[SharedRuntime Receive]", {
+          documentExists: false, projectId, appId, documentPath: runtimePath, revision: 0, receivedCount: 0, exerciseIds: [],
+        });
         return;
       }
       const value: unknown = snapshot.data();

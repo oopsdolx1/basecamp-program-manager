@@ -20,7 +20,8 @@ import { SearchField } from "../../../../components/common/SearchField";
 import type { AppId } from "../../../../types/brandedIds";
 import { useExerciseCatalog } from "../../../exercise-catalog";
 import type { MemberSelectionItem } from "../../../members";
-import { filterMembers } from "../../../members/services/memberService";
+import { filterMembers, sortMembersByName } from "../../../members/services/memberService";
+import { filterMembersByInitial, KOREAN_INITIALS, type MemberInitialFilter } from "../../../members/utils/koreanInitial";
 import { getCategoryLabel, getDifficultyLabel, programCategories, programDifficulties } from "../../../programs/config/programOptions";
 import { usePrograms } from "../../../programs/hooks/usePrograms";
 import { hydrateProgramExerciseKnowledge } from "../../../../shared-knowledge/resolveProgramExercises";
@@ -179,6 +180,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
   const [members, setMembers] = useState<MemberSelectionItem[]>([]);
   const [currentStep, setCurrentStep] = useState<PrintStep>(1);
   const [memberQuery, setMemberQuery] = useState("");
+  const [memberInitial, setMemberInitial] = useState<MemberInitialFilter>("ALL");
   const [selectedMember, setSelectedMember] = useState<MemberSelectionItem | null>(null);
   const [condition, setCondition] = useState<ConditionInput>(defaultCondition);
   const [recentWorkout, setRecentWorkout] = useState<RecentWorkoutSummary | null>(null);
@@ -197,7 +199,9 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
   const [aiRecommendation, setAiRecommendation] = useState<AiRecommendationResult | null>(null);
   const [aiError, setAiError] = useState("");
   const hasSearchQuery = memberQuery.trim().length > 0;
-  const filteredMembers = useMemo(() => (hasSearchQuery ? filterMembers(members, memberQuery).slice(0, 40) : []), [hasSearchQuery, memberQuery, members]);
+  const filteredMembers = useMemo(() => sortMembersByName(hasSearchQuery
+    ? filterMembers(members, memberQuery)
+    : filterMembersByInitial(members, memberInitial)), [hasSearchQuery, memberInitial, memberQuery, members]);
   const builderState = builderHistory?.present ?? null;
   const snapshotValues = useMemo(() => (builderState ? snapshotBuilderService.toProgramFormValues(builderState) : null), [builderState]);
   const snapshotValidation = useMemo(() => (snapshotValues ? validateProgramForm(snapshotValues) : { valid: false, errors: ["Snapshot이 준비되지 않았습니다."] }), [snapshotValues]);
@@ -381,7 +385,73 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
       <StepIndicator currentStep={currentStep} />
 
       {currentStep === 1 ? (
-        <Card sx={centeredCardSx(880)}><CardContent sx={{ p: { md: 4, xs: 2.5 } }}><Stack spacing={3}><Stack alignItems="center" spacing={1} textAlign="center"><FitnessCenterIcon color="primary" fontSize="large" /><Typography variant="h1">회원 선택</Typography><Typography color="text.secondary">회원 이름 또는 전화번호로 회원을 검색해 선택하세요.</Typography></Stack><SearchField label="회원 이름 또는 전화번호 검색" value={memberQuery} onChange={setMemberQuery} />{memberStatus === "loading" ? <LoadingState message="회원 목록을 불러오는 중입니다." /> : null}{memberStatus === "error" ? <ErrorState message={memberError} /> : null}{memberStatus === "ready" && !hasSearchQuery ? <EmptyState title="회원 이름 또는 전화번호를 검색하세요." description="검색어를 입력하면 일치하는 회원 카드만 표시됩니다." /> : null}{memberStatus === "ready" && hasSearchQuery && filteredMembers.length === 0 ? <EmptyState title="검색 결과가 없습니다." description="다른 이름이나 전화번호로 다시 검색해 주세요." /> : null}{memberStatus === "ready" && hasSearchQuery ? <Grid container spacing={1.5}>{filteredMembers.map((member) => <Grid item key={member.memberId} md={4} sm={6} xs={12}><CardActionArea aria-label={`${member.displayName} 회원 선택`} onClick={() => selectMember(member)} sx={{ bgcolor: palette.surfaceInteractive, border: 1, borderColor: "divider", borderRadius: `${palette.radiusMd}px`, boxShadow: "none", minHeight: 88, p: 1.75, transition: "border-color 150ms ease, background-color 150ms ease, transform 150ms ease", "&:hover": { borderColor: "primary.main", bgcolor: palette.surfaceRaised, transform: "translateY(-1px)" } }}><Typography fontWeight={900}>{member.displayName}</Typography><Typography color="text.secondary" variant="body2">{member.phone ?? "전화번호 없음"}</Typography></CardActionArea></Grid>)}</Grid> : null}</Stack></CardContent></Card>
+        <Card sx={centeredCardSx(1040)}>
+          <CardContent sx={{ p: { md: 4, xs: 2.5 } }}>
+            <Stack spacing={3}>
+              <Stack alignItems="center" spacing={1} textAlign="center">
+                <FitnessCenterIcon color="primary" fontSize="large" />
+                <Typography variant="h1">회원 선택</Typography>
+                <Typography color="text.secondary">초성을 누르고 회원 카드를 선택하세요.</Typography>
+              </Stack>
+              <Stack spacing={1.25}>
+                <Typography fontWeight={900}>초성 선택</Typography>
+                <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: "repeat(auto-fit, minmax(48px, 1fr))" }}>
+                  {([{ value: "ALL", label: "전체" }, ...KOREAN_INITIALS.map((initial) => ({ value: initial, label: initial })), { value: "OTHER", label: "기타" }] as Array<{ value: MemberInitialFilter; label: string }>).map((option) => (
+                    <Button
+                      key={option.value}
+                      aria-pressed={!hasSearchQuery && memberInitial === option.value}
+                      color={!hasSearchQuery && memberInitial === option.value ? "primary" : "inherit"}
+                      variant={!hasSearchQuery && memberInitial === option.value ? "contained" : "outlined"}
+                      onClick={() => { setMemberInitial(option.value); setMemberQuery(""); }}
+                      sx={{ minHeight: 52, minWidth: 48, px: 1 }}
+                    >
+                      {option.label}
+                    </Button>
+                  ))}
+                </Box>
+              </Stack>
+              {memberStatus === "loading" ? <LoadingState message="회원 목록을 불러오는 중입니다." /> : null}
+              {memberStatus === "error" ? <ErrorState message={memberError} /> : null}
+              {memberStatus === "ready" && filteredMembers.length === 0 ? (
+                <EmptyState
+                  title={hasSearchQuery ? "검색 결과가 없습니다." : `${memberInitial === "OTHER" ? "기타" : memberInitial === "ALL" ? "선택한 조건" : memberInitial}으로 시작하는 회원이 없습니다.`}
+                  description={hasSearchQuery ? "다른 이름이나 전화번호로 다시 검색해 주세요." : "다른 초성을 선택해 주세요."}
+                />
+              ) : null}
+              {memberStatus === "ready" && filteredMembers.length > 0 ? (
+                <Grid container spacing={1.5}>
+                  {filteredMembers.map((member) => (
+                    <Grid item key={member.memberId} md={4} sm={6} xs={12}>
+                      <CardActionArea
+                        aria-label={`${member.displayName} 회원 선택`}
+                        onClick={() => selectMember(member)}
+                        sx={{
+                          bgcolor: palette.surfaceInteractive,
+                          border: 1,
+                          borderColor: "divider",
+                          borderRadius: `${palette.radiusMd}px`,
+                          boxShadow: "none",
+                          minHeight: 88,
+                          p: 1.75,
+                          transition: "border-color 150ms ease, background-color 150ms ease, transform 150ms ease",
+                          "&:hover": { borderColor: "primary.main", bgcolor: palette.surfaceRaised, transform: "translateY(-1px)" },
+                          "&:active": { bgcolor: palette.primaryGoldMuted, transform: "none" },
+                        }}
+                      >
+                        <Typography fontWeight={900}>{member.displayName}</Typography>
+                        <Typography color="text.secondary" variant="body2">{member.phone ?? "전화번호 없음"}</Typography>
+                      </CardActionArea>
+                    </Grid>
+                  ))}
+                </Grid>
+              ) : null}
+              <Stack spacing={1}>
+                <Typography color="text.secondary" fontWeight={700} variant="body2">직접 이름 또는 전화번호 검색</Typography>
+                <SearchField label="회원 이름 또는 전화번호 검색" value={memberQuery} onChange={setMemberQuery} />
+              </Stack>
+            </Stack>
+          </CardContent>
+        </Card>
       ) : null}
 
       {currentStep === 2 ? (

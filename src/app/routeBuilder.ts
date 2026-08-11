@@ -6,7 +6,6 @@ export const routeBuilder = {
   quickPrint: (): AppRoute => routes.quickPrint,
   master: (tab?: "programs" | "history"): string => (tab ? `${routes.master}?tab=${tab}` : routes.master),
   programs: (): AppRoute => routes.programs,
-  exerciseCatalog: (): AppRoute => routes.exerciseCatalog,
   newProgram: (): AppRoute => routes.newProgram,
   programDetail: (id: string): string => `/program-manager/programs/${id}`,
   editProgram: (id: string): string => `/program-manager/programs/${id}/edit`,

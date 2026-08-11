@@ -7,7 +7,6 @@ import { palette } from "../../../theme/palette";
 
 const navItems = [
   { label: "Print", to: routeBuilder.print(), matches: [routeBuilder.print(), routeBuilder.quickPrint()] },
-  { label: "Exercise Catalog", to: routeBuilder.exerciseCatalog(), matches: [routeBuilder.exerciseCatalog()] },
   { label: "Master", to: routeBuilder.master(), matches: [routeBuilder.master(), routes.programs, routes.printHistory] },
 ];
 

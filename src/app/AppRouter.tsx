@@ -1,6 +1,5 @@
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { PageContainer } from "../components/layout/PageContainer";
-import { ExerciseCatalogPage } from "../features/exercise-catalog";
 import { MasterPage } from "../features/master";
 import { ProgramEditorPage } from "../features/programs";
 import { PrintPreviewPage, QuickPrintPage } from "../features/printing";
@@ -27,7 +26,6 @@ export const AppRouter = (): JSX.Element => (
     <Route path="/program-manager" element={<Navigate replace to={routeBuilder.print()} />} />
     <Route path={routeBuilder.print()} element={<QuickPrintPage />} />
     <Route path={routeBuilder.quickPrint()} element={<Navigate replace to={routeBuilder.print()} />} />
-    <Route path={routeBuilder.exerciseCatalog()} element={<ExerciseCatalogPage />} />
     <Route path={routeBuilder.master()} element={<MasterPage />} />
     <Route path={routeBuilder.programs()} element={<Navigate replace to={routeBuilder.master("programs")} />} />
     <Route path={routeBuilder.newProgram()} element={<ProgramEditorPage />} />

@@ -31,27 +31,15 @@ export interface SharedExerciseKnowledge {
   memo: string;
 }
 
-interface RuntimeDocument {
+interface RuntimeSnapshot {
   schemaVersion: number;
   knowledgeVersion: string;
-  platform: "BaseCamp";
-  generatedAt: string;
-  generatedBy: string;
-  sourceWorkbook?: string;
+  revision: number;
+  updatedAt: unknown;
+  updatedBy: string;
+  checksum: string;
   exerciseCount: number;
   items: SharedExerciseKnowledge[];
-}
-
-interface RuntimeEnvelope {
-  metadata: {
-    revision: number;
-    updatedAt: string;
-    count: number;
-    source: string;
-    schemaVersion: number;
-    checksum?: string;
-  };
-  runtime: RuntimeDocument;
 }
 
 const appId = (import.meta.env.VITE_CONDITION_LAB_APP_ID ?? "").trim();
@@ -61,6 +49,8 @@ const listeners = new Set<() => void>();
 let exercises: SharedExerciseKnowledge[] = [];
 let byId = new Map<string, SharedExerciseKnowledge>();
 let revision = 0;
+let connectionStatus: "loading" | "ready" | "error" = "loading";
+let connectionError = "";
 let unsubscribeRemote: (() => void) | null = null;
 let startPromise: Promise<void> | null = null;
 
@@ -72,17 +62,16 @@ const isExercise = (value: unknown): value is SharedExerciseKnowledge => {
   const exercise = value as Partial<SharedExerciseKnowledge>;
   return typeof exercise.id === "string" && typeof exercise.name === "string" && Array.isArray(exercise.aliases);
 };
-const isEnvelope = (value: unknown): value is RuntimeEnvelope => {
+const isRuntimeSnapshot = (value: unknown): value is RuntimeSnapshot => {
   if (!value || typeof value !== "object") return false;
-  const envelope = value as Partial<RuntimeEnvelope>;
-  return !!envelope.metadata && !!envelope.runtime && Array.isArray(envelope.runtime.items)
-    && envelope.runtime.items.every(isExercise)
-    && envelope.metadata.count === envelope.runtime.items.length
-    && envelope.runtime.exerciseCount === envelope.runtime.items.length;
+  const snapshot = value as Partial<RuntimeSnapshot>;
+  return typeof snapshot.revision === "number" && Array.isArray(snapshot.items)
+    && snapshot.items.every(isExercise)
+    && snapshot.exerciseCount === snapshot.items.length;
 };
 const notify = () => listeners.forEach((listener) => listener());
-const replaceSnapshot = (envelope: RuntimeEnvelope) => {
-  exercises = envelope.runtime.items.filter((item) => item.status === "active").map((item) => ({
+const replaceSnapshot = (snapshot: RuntimeSnapshot) => {
+  exercises = snapshot.items.filter((item) => item.status === "active").map((item) => ({
     ...item,
     aliases: copy(item.aliases), tags: copy(item.tags), purpose: copy(item.purpose),
     secondaryMuscles: copy(item.secondaryMuscles), coachingCues: copy(item.coachingCues),
@@ -91,15 +80,17 @@ const replaceSnapshot = (envelope: RuntimeEnvelope) => {
     relatedExerciseIds: copy(item.relatedExerciseIds),
   }));
   byId = new Map(exercises.map((exercise) => [exercise.id, exercise]));
-  revision = envelope.metadata.revision;
+  revision = snapshot.revision;
+  connectionStatus = "ready";
+  connectionError = "";
   console.info("[SharedRuntime Receive]", {
     documentExists: true,
     projectId,
     appId,
     documentPath: runtimePath,
     revision,
-    firestoreCount: envelope.metadata.count,
-    receivedCount: envelope.runtime.items.length,
+    firestoreCount: snapshot.exerciseCount,
+    receivedCount: snapshot.items.length,
     catalogCount: exercises.length,
     exerciseIds: exercises.map(({ id }) => id),
   });
@@ -113,22 +104,33 @@ const start = (): Promise<void> => {
     await ensureFirebaseAuth();
     unsubscribeRemote = onSnapshot(doc(getFirestoreClient(), runtimePath), (snapshot) => {
       if (!snapshot.exists()) {
-        exercises = []; byId = new Map(); revision = 0; notify();
+        exercises = []; byId = new Map(); revision = 0; connectionStatus = "ready"; connectionError = ""; notify();
         console.info("[SharedRuntime Receive]", {
           documentExists: false, projectId, appId, documentPath: runtimePath, revision: 0, receivedCount: 0, exerciseIds: [],
         });
         return;
       }
       const value: unknown = snapshot.data();
-      if (!isEnvelope(value)) {
+      if (!isRuntimeSnapshot(value)) {
+        connectionStatus = "error";
+        connectionError = "Shared Runtime document does not match the production contract.";
         console.error("[ProgramManager Runtime] Invalid Shared Runtime document; retaining the last successful snapshot.");
+        notify();
         return;
       }
       replaceSnapshot(value);
-    }, (error) => console.error("[ProgramManager Runtime] Subscription failed; retaining the last successful snapshot.", error));
+    }, (error) => {
+      connectionStatus = "error";
+      connectionError = error.message;
+      console.error("[ProgramManager Runtime] Subscription failed; retaining the last successful snapshot.", error);
+      notify();
+    });
   })().catch((error) => {
     startPromise = null;
+    connectionStatus = "error";
+    connectionError = error instanceof Error ? error.message : String(error);
     console.error("[ProgramManager Runtime] Startup failed; using Empty Runtime.", error);
+    notify();
   });
   return startPromise;
 };
@@ -147,6 +149,8 @@ export const programManagerRuntime = Object.freeze({
   stop: () => { unsubscribeRemote?.(); unsubscribeRemote = null; startPromise = null; },
   subscribe(listener: () => void) { listeners.add(listener); void start(); return () => { listeners.delete(listener); }; },
   getRevision: () => revision,
+  getStatus: () => connectionStatus,
+  getError: () => connectionError,
   getAll: () => [...exercises],
   getById: (id: string) => byId.get(id) ?? null,
   getCatalog,

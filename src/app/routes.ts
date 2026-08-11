@@ -4,7 +4,6 @@ export const routes = {
   quickPrint: "/program-manager/quick-print",
   master: "/program-manager/master",
   programs: "/program-manager/programs",
-  exerciseCatalog: "/program-manager/exercise-catalog",
   newProgram: "/program-manager/programs/new",
   programDetail: "/program-manager/programs/:id",
   editProgram: "/program-manager/programs/:id/edit",

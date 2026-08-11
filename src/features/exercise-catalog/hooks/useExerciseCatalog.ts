@@ -24,6 +24,7 @@ export const useExerciseCatalog = (_appId: AppId) => {
   useEffect(() => {
     const refresh = () => {
       try {
+        const runtimeStatus = programManagerRuntime.getStatus();
         const runtimeExercises = programManagerRuntime.getCatalog();
         const items = runtimeExercises.map(fromSharedKnowledge);
         const runtimeIds = runtimeExercises.map(({ id }) => id);
@@ -37,7 +38,13 @@ export const useExerciseCatalog = (_appId: AppId) => {
           catalogIds,
           identityMatch: runtimeIds.length === catalogIds.length && runtimeIds.every((id, index) => id === catalogIds[index]),
         });
-        setCatalogState({ status: "ready", data: items });
+        if (runtimeStatus === "loading") {
+          setCatalogState({ status: "loading", data: [] });
+        } else if (runtimeStatus === "error") {
+          setCatalogState({ status: "error", data: items, message: `Shared Knowledge Runtime을 불러오지 못했습니다. (${programManagerRuntime.getError()})` });
+        } else {
+          setCatalogState({ status: "ready", data: items });
+        }
       } catch (caught) {
         const message = caught instanceof Error ? caught.message : "Unknown runtime error";
         setCatalogState({ status: "error", data: [], message: `Shared Knowledge Runtime을 읽지 못했습니다. (${message})` });

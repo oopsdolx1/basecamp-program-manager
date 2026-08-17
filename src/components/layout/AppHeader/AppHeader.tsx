@@ -6,9 +6,9 @@ import { routes } from "../../../app/routes";
 import { palette } from "../../../theme/palette";
 
 const navItems = [
-  { label: "Guided Print", to: routeBuilder.print(), matches: [routeBuilder.print(), routeBuilder.quickPrint(), routeBuilder.dashboard()] },
-  { label: "History", to: routeBuilder.master("history"), matches: [routeBuilder.master(), routes.printHistory] },
-  { label: "Sessions", to: routeBuilder.workoutSessions(), matches: [routes.workoutSessions] },
+  { label: "추천 출력", to: routeBuilder.print(), matches: [routeBuilder.print(), routeBuilder.quickPrint(), routeBuilder.dashboard()] },
+  { label: "출력 이력", to: routeBuilder.master("history"), matches: [routeBuilder.master(), routes.printHistory] },
+  { label: "운동 세션", to: routeBuilder.workoutSessions(), matches: [routes.workoutSessions] },
 ];
 
 export const AppHeader = (): JSX.Element => {

@@ -9,7 +9,7 @@ import RedoIcon from "@mui/icons-material/Redo";
 import SmartToyIcon from "@mui/icons-material/SmartToy";
 import UndoIcon from "@mui/icons-material/Undo";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
-import { Alert, Box, Button, Card, CardActionArea, CardContent, Chip, CircularProgress, Collapse, FormControlLabel, Grid, LinearProgress, Slider, Stack, Switch, TextField, Typography } from "@mui/material";
+import { Alert, Box, Button, Card, CardActionArea, CardContent, Chip, CircularProgress, FormControlLabel, Grid, LinearProgress, Slider, Stack, Switch, Typography } from "@mui/material";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { routeBuilder } from "../../../../app/routeBuilder";
@@ -51,7 +51,7 @@ interface QuickPrintFlowProps {
   recommendationProvider: RecommendationProvider;
 }
 
-const stepLabels = ["회원 선택", "컨디션 확인", "AI 추천 · Program 선택", "Program 편집"];
+const stepLabels = ["회원 선택", "컨디션 확인", "AI 추천 · 프로그램 선택", "프로그램 편집"];
 const conditionOptions: Array<{ value: ConditionStatus; label: string; icon: string; description: string }> = [
   { value: "GOOD", label: "좋음", icon: "😊", description: "최상의 컨디션입니다." },
   { value: "NORMAL", label: "보통", icon: "🙂", description: "평소와 비슷합니다." },
@@ -159,17 +159,27 @@ const MemberIntelligenceCard = ({ intelligence, status }: { intelligence: Member
 const TrainingTrendCard = ({ periodization, status }: { periodization: PeriodizationSummary | null; status: IntelligenceStatus }): JSX.Element => <Card sx={infoCardSx}><CardContent><Stack spacing={2}><Stack direction="row" justifyContent="space-between" spacing={1}><Typography variant="h2">Training Trend</Typography>{status === "loading" ? <Chip label="분석 중" size="small" /> : null}</Stack>{status === "loading" ? <LinearProgress /> : null}{!periodization ? <Typography color="text.secondary">최근 운동 흐름을 분석하면 Cycle, Plateau, Deload, 다음 추천을 표시합니다.</Typography> : <Grid container spacing={1.5}><Grid item md={3} xs={6}><Typography color="text.secondary">현재 Cycle</Typography><Typography fontWeight={900}>{periodization.currentCycle}</Typography></Grid><Grid item md={3} xs={6}><Typography color="text.secondary">Recovery</Typography><Typography fontWeight={900}>{recoveryTrendLabel(periodization.recoveryTrend)}</Typography></Grid><Grid item md={3} xs={6}><Typography color="text.secondary">Plateau</Typography><Typography fontWeight={900}>{periodization.plateau ? "Yes" : "No"}</Typography></Grid><Grid item md={3} xs={6}><Typography color="text.secondary">다음 추천</Typography><Typography fontWeight={900}>{periodization.nextProgramHint ?? "없음"}</Typography></Grid><Grid item md={3} xs={6}><Chip color="primary" label={modeLabel(periodization.recommendedMode)} /></Grid><Grid item md={3} xs={6}><Chip color={periodization.deload ? "warning" : "default"} label={periodization.deload ? "Deload" : "Normal Load"} variant={periodization.deload ? "filled" : "outlined"} /></Grid><Grid item md={3} xs={6}><Chip label={`주간 운동 ${periodization.weeklyFrequency}회`} variant="outlined" /></Grid><Grid item md={3} xs={6}><Chip label={`반복 ${periodization.repeatedProgramCount}회`} variant="outlined" /></Grid><Grid item xs={12}><Typography color="text.secondary">최근 Program</Typography><Stack direction="row" flexWrap="wrap" gap={1} sx={{ mt: 0.5 }}>{periodization.recentProgramSequence.length > 0 ? periodization.recentProgramSequence.map((title) => <Chip key={title} label={title} size="small" />) : <Chip label="기록 없음" size="small" variant="outlined" />}</Stack></Grid></Grid>}</Stack></CardContent></Card>;
 
 const formatSignedScore = (value: number): string => `${value >= 0 ? "+" : ""}${value}`;
+const factorDisplayLabel = (factor: RecommendationTrace["decisionFactors"][number]): string => ({
+  condition: "컨디션 적합",
+  recentWorkout: "최근 운동",
+  recovery: "회복 상태",
+  risk: "운동 위험도",
+  programRepeat: "프로그램 반복",
+  bias: "운동 부위 균형",
+  history: "운동 이력",
+  periodization: "운동 주기",
+  plateau: "정체 상태",
+  weeklyFrequency: "주간 빈도",
+  favorite: "즐겨찾기",
+  usageCount: "최근 사용 이력",
+})[factor.key] ?? factor.label;
 
 const RecommendationTraceCard = ({
   recommendation,
   trace,
-  showCandidates,
-  onToggleCandidates,
 }: {
   recommendation: RecommendationResult | null;
   trace: RecommendationTrace | null;
-  showCandidates: boolean;
-  onToggleCandidates: () => void;
 }): JSX.Element => {
   if (!recommendation) {
     return <Card sx={infoCardSx}><CardContent><Typography color="text.secondary">추천 결과가 없습니다.</Typography></CardContent></Card>;
@@ -181,7 +191,7 @@ const RecommendationTraceCard = ({
 
   const positiveFactors = trace.decisionFactors.filter((factor) => factor.score > 0);
   const negativeFactors = trace.decisionFactors.filter((factor) => factor.score < 0);
-  const candidates = trace.candidatePrograms.slice(0, 5);
+  const fitPercent = Math.max(0, Math.min(100, trace.selectedProgram.score));
   const factorCardSx = {
     border: 1,
     borderColor: "divider",
@@ -190,7 +200,12 @@ const RecommendationTraceCard = ({
     p: 1.5,
   };
 
-  return <Card sx={infoCardSx}><CardContent><Stack spacing={2.5}><Stack direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1.5}><Stack spacing={0.5}><Typography variant="h2">추천 근거</Typography><Typography color="text.secondary">Rule Recommendation의 선택 근거와 후보 점수를 표시합니다.</Typography></Stack><Chip color="primary" label={`Final Score ${trace.selectedProgram.score}`} /></Stack><Grid container spacing={1.5}><Grid item md={6} xs={12}><Typography color="text.secondary">최종 추천 Program</Typography><Typography fontWeight={900}>{trace.selectedProgram.title}</Typography></Grid><Grid item md={6} xs={12}><Typography color="text.secondary">선택 이유</Typography><Typography fontWeight={900}>{trace.selectedProgram.reason}</Typography></Grid></Grid><Grid container spacing={2}><Grid item md={6} xs={12}><Stack spacing={1}><Typography fontWeight={900}>긍정 요인</Typography>{positiveFactors.length > 0 ? positiveFactors.map((factor) => <Box key={`${factor.key}-${factor.reason}`} sx={factorCardSx}><Stack alignItems="center" direction="row" justifyContent="space-between" spacing={1}><Typography fontWeight={700}>{factor.label}</Typography><Typography color="success.main" fontWeight={900}>{formatSignedScore(factor.score)}</Typography></Stack><Typography color="text.secondary" variant="body2">{factor.reason}</Typography></Box>) : <Typography color="text.secondary">긍정 요인이 없습니다.</Typography>}</Stack></Grid><Grid item md={6} xs={12}><Stack spacing={1}><Typography fontWeight={900}>감점 요인</Typography>{negativeFactors.length > 0 ? negativeFactors.map((factor) => <Box key={`${factor.key}-${factor.reason}`} sx={factorCardSx}><Stack alignItems="center" direction="row" justifyContent="space-between" spacing={1}><Typography fontWeight={700}>{factor.label}</Typography><Typography color="error.main" fontWeight={900}>{formatSignedScore(factor.score)}</Typography></Stack><Typography color="text.secondary" variant="body2">{factor.reason}</Typography></Box>) : <Typography color="text.secondary">감점 요인이 없습니다.</Typography>}</Stack></Grid></Grid><Stack alignItems="flex-start" spacing={1}><Button size="small" variant="outlined" onClick={onToggleCandidates}>{showCandidates ? "후보 프로그램 숨기기" : "후보 프로그램 보기"}</Button><Collapse in={showCandidates} sx={{ width: "100%" }}><Stack spacing={1} sx={{ pt: 1 }}>{candidates.map((candidate) => { const selected = candidate.programId === trace.selectedProgram.programId; return <Box key={candidate.programId} sx={{ border: 1, borderColor: selected ? "primary.main" : "divider", borderRadius: `${palette.radiusSm}px`, bgcolor: selected ? palette.primaryGoldMuted : palette.surfaceInteractive, boxShadow: selected ? palette.shadowAccent : "none", p: 1.5 }}><Stack alignItems="center" direction="row" justifyContent="space-between" spacing={1.5}><Typography fontWeight={selected ? 900 : 700}>{candidate.title}</Typography><Stack alignItems="center" direction="row" spacing={1}><Typography fontWeight={900}>{candidate.score}</Typography>{selected ? <Chip color="primary" label="Selected" size="small" /> : null}</Stack></Stack></Box>; })}</Stack></Collapse></Stack><Typography color="text.secondary" variant="caption">Engine v{trace.engineVersion}</Typography></Stack></CardContent></Card>;
+  return <Card sx={infoCardSx}><CardContent><Stack spacing={2.5}>
+    <Stack direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1.5}><Box><Typography variant="h2">추천 분석</Typography><Typography color="text.secondary">현재 상태와 프로그램의 적합 요인을 빠르게 확인하세요.</Typography></Box><Chip color="primary" label={`추천 점수 ${trace.selectedProgram.score}점`} /></Stack>
+    <Box><Stack alignItems="center" direction="row" justifyContent="space-between"><Typography fontWeight={900}>추천 적합도</Typography><Typography color="primary.main" fontWeight={900}>{trace.selectedProgram.title}</Typography></Stack><Box sx={{ bgcolor: palette.surfaceInteractive, borderRadius: 999, height: 12, mt: 1, overflow: "hidden" }}><Box sx={{ background: `linear-gradient(90deg, ${palette.primaryGoldDark}, ${palette.primaryGold})`, borderRadius: 999, height: "100%", width: `${fitPercent}%` }} /></Box></Box>
+    <Grid container spacing={2}><Grid item md={6} xs={12}><Stack spacing={1}><Typography fontWeight={900}>적합 요인</Typography>{positiveFactors.length > 0 ? positiveFactors.map((factor) => <Box key={`${factor.key}-${factor.reason}`} sx={factorCardSx}><Stack alignItems="center" direction="row" justifyContent="space-between" spacing={1}><Stack direction="row" spacing={1}><CheckCircleIcon color="success" fontSize="small" /><Typography fontWeight={700}>{factorDisplayLabel(factor)}</Typography></Stack><Chip color="success" label={formatSignedScore(factor.score)} size="small" /></Stack><Typography color="text.secondary" variant="body2">{factor.reason}</Typography></Box>) : <Typography color="text.secondary">추가 적합 요인이 없습니다.</Typography>}</Stack></Grid><Grid item md={6} xs={12}><Stack spacing={1}><Typography fontWeight={900}>확인 요인</Typography>{negativeFactors.length > 0 ? negativeFactors.map((factor) => <Box key={`${factor.key}-${factor.reason}`} sx={factorCardSx}><Stack alignItems="center" direction="row" justifyContent="space-between" spacing={1}><Stack direction="row" spacing={1}><WarningAmberIcon color="warning" fontSize="small" /><Typography fontWeight={700}>{factorDisplayLabel(factor)}</Typography></Stack><Chip color="warning" label={formatSignedScore(factor.score)} size="small" /></Stack><Typography color="text.secondary" variant="body2">{factor.reason}</Typography></Box>) : <Box sx={factorCardSx}><Typography color="text.secondary">감점 요인이 없습니다.</Typography></Box>}</Stack></Grid></Grid>
+    <Typography color="text.secondary" variant="body2">추천 기준: {trace.selectedProgram.reason === "Highest Score" ? "가장 높은 추천 점수" : trace.selectedProgram.reason}</Typography>
+  </Stack></CardContent></Card>;
 };
 
 export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }: QuickPrintFlowProps): JSX.Element => {
@@ -203,7 +218,6 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
   const [members, setMembers] = useState<MemberSelectionItem[]>([]);
   const [currentStep, setCurrentStep] = useState<PrintStep>(1);
   const [memberQuery, setMemberQuery] = useState("");
-  const [programQuery, setProgramQuery] = useState("");
   const [memberInitial, setMemberInitial] = useState<MemberInitialFilter | null>(null);
   const [selectedMember, setSelectedMember] = useState<MemberSelectionItem | null>(null);
   const [condition, setCondition] = useState<ConditionInput>(defaultCondition);
@@ -214,7 +228,6 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
   const [periodization, setPeriodization] = useState<PeriodizationSummary | null>(null);
   const [recommendation, setRecommendation] = useState<RecommendationResult | null>(null);
   const [recommendationTrace, setRecommendationTrace] = useState<RecommendationTrace | null>(null);
-  const [showCandidates, setShowCandidates] = useState(false);
   const [recommendationReason, setRecommendationReason] = useState("");
   const [snapshotSourceProgram, setSnapshotSourceProgram] = useState<Program | null>(null);
   const [builderHistory, setBuilderHistory] = useState<SnapshotBuilderHistory | null>(null);
@@ -230,12 +243,10 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
     if (!memberInitial) return [];
     return sortMembersByName(filterMembersByInitial(members, memberInitial));
   }, [hasSearchQuery, memberInitial, memberQuery, members]);
-  const selectablePrograms = useMemo(() => {
-    const query = programQuery.trim().toLocaleLowerCase("ko-KR");
-    if (!query) return runtimePrograms;
-    return runtimePrograms.filter((program) => [program.title, getCategoryLabel(program.category), ...program.exercises.map((exercise) => exercise.name)]
-      .join(" ").toLocaleLowerCase("ko-KR").includes(query));
-  }, [programQuery, runtimePrograms]);
+  const rankedPrograms = useMemo(() => (recommendationTrace?.candidatePrograms ?? [])
+    .map((candidate) => ({ candidate, program: runtimePrograms.find((program) => program.id === candidate.programId) }))
+    .filter((item): item is { candidate: RecommendationTrace["candidatePrograms"][number]; program: Program } => Boolean(item.program))
+    .slice(0, 3), [recommendationTrace, runtimePrograms]);
   const builderState = builderHistory?.present ?? null;
   const snapshotValues = useMemo(() => (builderState ? snapshotBuilderService.toProgramFormValues(builderState) : null), [builderState]);
   const snapshotValidation = useMemo(() => (snapshotValues ? validateProgramForm(snapshotValues) : { valid: false, errors: ["Snapshot이 준비되지 않았습니다."] }), [snapshotValues]);
@@ -312,7 +323,6 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
   const resetRecommendationState = () => {
     setRecommendation(null);
     setRecommendationTrace(null);
-    setShowCandidates(false);
     setRecommendationReason("");
     setSnapshotSourceProgram(null);
     setBuilderHistory(null);
@@ -346,7 +356,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
     }
     setRecommendationReason(program.id === recommendation?.program.id
       ? recommendationReason
-      : "Shared Program Repository에서 트레이너가 선택한 Program입니다.");
+      : "차순위 추천에서 트레이너가 선택한 프로그램입니다.");
     setCurrentStep(4);
   };
 
@@ -365,7 +375,6 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
     const baseHistory = createSnapshotBuilderHistory(next.program);
     setRecommendation(next);
     setRecommendationTrace(next.trace);
-    setShowCandidates(false);
     setRecommendationReason(ruleReason);
     setSnapshotSourceProgram(next.program);
     setBuilderHistory(baseHistory);
@@ -436,7 +445,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
       });
       navigate(routeBuilder.printPreview(snapshotProgramId, selectedMember.memberId, sessionId));
     } catch (caught) {
-      setSessionError(caught instanceof Error ? caught.message : "Workout Session을 생성하지 못했습니다.");
+      setSessionError(caught instanceof Error ? caught.message : "운동 세션을 생성하지 못했습니다.");
     } finally {
       setSessionSaving(false);
     }
@@ -444,8 +453,8 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
 
   const renderAiCards = (): JSX.Element | null => {
     if (aiStatus === "loading") return <Card sx={infoCardSx}><CardContent><Stack alignItems="center" direction="row" spacing={1.5}><CircularProgress size={20} /><Typography>AI Recommendation을 불러오는 중입니다.</Typography></Stack></CardContent></Card>;
-    if (aiStatus === "error") return <Alert severity="warning">AI Recommendation을 불러오지 못해 Rule Recommendation을 사용합니다. {aiError}</Alert>;
-    if (aiStatus === "skipped") return useAiRecommendation ? null : <Alert severity="info">AI 추천을 사용하지 않아 Rule Recommendation을 사용합니다.</Alert>;
+    if (aiStatus === "error") return <Alert severity="warning">AI 추천을 불러오지 못해 기본 추천 분석을 사용합니다. {aiError}</Alert>;
+    if (aiStatus === "skipped") return useAiRecommendation ? null : <Alert severity="info">기본 추천 분석 결과입니다.</Alert>;
     if (!aiRecommendation) return null;
     return <Grid container spacing={2}>{[{ title: "추천 이유", value: aiRecommendation.reason }, { title: "회원 코칭", value: aiRecommendation.coach }, { title: "주의 사항", value: aiRecommendation.warning }].map((item) => <Grid item key={item.title} md={4} xs={12}><Card sx={infoCardSx}><CardContent><Stack spacing={1}><Stack alignItems="center" direction="row" spacing={1}><Chip color="primary" icon={<SmartToyIcon />} label="AI" size="small" /><Typography variant="h2">{item.title}</Typography></Stack><Typography color="text.secondary">{item.value}</Typography></Stack></CardContent></Card></Grid>)}</Grid>;
   };
@@ -453,7 +462,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
     <Stack alignItems="center" spacing={3}>
       <StepIndicator currentStep={currentStep} />
       {sessionError ? <Alert severity="error" sx={{ maxWidth: 1180, width: "100%" }}>{sessionError}</Alert> : null}
-      {sessionSaving ? <Alert icon={<CircularProgress size={20} />} severity="info" sx={{ maxWidth: 1180, width: "100%" }}>Workout Session을 저장하고 있습니다.</Alert> : null}
+      {sessionSaving ? <Alert icon={<CircularProgress size={20} />} severity="info" sx={{ maxWidth: 1180, width: "100%" }}>운동 세션을 저장하고 있습니다.</Alert> : null}
 
       {currentStep === 1 ? (
         <Card sx={centeredCardSx(1040)}>
@@ -538,8 +547,6 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
                 <Button startIcon={<ArrowBackIcon />} variant="outlined" onClick={() => setCurrentStep(1)}>회원 선택</Button>
               </Stack>
 
-              <Grid container spacing={1.5}><Grid item md={6} xs={12}><MemberIntelligenceCard intelligence={intelligence} status={intelligenceStatus} /></Grid><Grid item md={6} xs={12}><TrainingTrendCard periodization={periodization} status={intelligenceStatus} /></Grid></Grid>
-
               <Stack spacing={1}><Typography fontWeight={900}>컨디션 상태</Typography><Grid container spacing={1.5}>{conditionOptions.map((option) => <Grid item key={option.value} md={4} xs={12}><CardActionArea aria-label={`컨디션 상태 ${option.label}`} aria-pressed={condition.condition === option.value} onClick={() => setCondition((current) => ({ ...current, condition: option.value }))} sx={largeChoiceCardSx(condition.condition === option.value)}><Stack alignItems="center" direction="row" spacing={1.5}><Typography aria-hidden="true" fontSize={30}>{option.icon}</Typography><Box><Typography fontWeight={900}>{option.label}</Typography><Typography color="text.secondary" variant="body2">{option.description}</Typography></Box></Stack></CardActionArea></Grid>)}</Grid></Stack>
 
               <Stack spacing={1}><Typography fontWeight={900}>수면 상태</Typography><Grid container spacing={1.5}>{sleepOptions.map((option) => <Grid item key={option.value} md={4} xs={12}><CardActionArea aria-label={`수면 상태 ${option.label}`} aria-pressed={condition.sleep === option.value} onClick={() => setCondition((current) => ({ ...current, sleep: option.value }))} sx={largeChoiceCardSx(condition.sleep === option.value)}><Stack alignItems="center" direction="row" spacing={1.5}><Typography aria-hidden="true" fontSize={28}>{option.icon}</Typography><Box><Typography fontWeight={900}>{option.label}</Typography><Typography color="text.secondary" variant="body2">{option.description}</Typography></Box></Stack></CardActionArea></Grid>)}</Grid></Stack>
@@ -550,7 +557,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
 
               <Stack spacing={1}><Typography fontWeight={900}>음주 여부</Typography><Grid container spacing={1.5}>{alcoholOptions.map((option) => <Grid item key={option.value} md={6} xs={12}><CardActionArea aria-label={`음주 여부 ${option.label}`} aria-pressed={condition.alcohol === option.value} onClick={() => setCondition((current) => ({ ...current, alcohol: option.value }))} sx={{ ...largeChoiceCardSx(condition.alcohol === option.value), minHeight: 78 }}><Stack alignItems="center" direction="row" spacing={1.5}><Typography aria-hidden="true" fontSize={26}>{option.icon}</Typography><Typography fontWeight={900}>{option.label}</Typography></Stack></CardActionArea></Grid>)}</Grid></Stack>
 
-              <Card sx={{ ...infoCardSx, height: "auto" }}><CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}><Stack alignItems={{ sm: "center", xs: "stretch" }} direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1.5}><Box><FormControlLabel control={<Switch checked={useAiRecommendation} onChange={(event) => setUseAiRecommendation(event.target.checked)} />} label="AI 추천 사용" /><Typography color="text.secondary" variant="body2">기존 Recommendation Context와 Rule Recommendation 결과를 사용합니다.</Typography></Box><Button disabled={!canRecommend || programState.status !== "ready"} startIcon={<AutoAwesomeIcon />} variant="contained" onClick={() => void runRecommendation()} sx={{ minHeight: 48, minWidth: 180, transition: "transform 120ms ease", "&:hover": { transform: "translateY(-2px)" } }}>추천 확인</Button></Stack></CardContent></Card>
+              <Card sx={{ ...infoCardSx, height: "auto" }}><CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}><Stack alignItems={{ sm: "center", xs: "stretch" }} direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1.5}><Box><FormControlLabel control={<Switch checked={useAiRecommendation} onChange={(event) => setUseAiRecommendation(event.target.checked)} />} label="AI 추천 사용" /><Typography color="text.secondary" variant="body2">회원 상태와 최근 운동 기록을 함께 반영합니다.</Typography></Box><Button disabled={!canRecommend || programState.status !== "ready"} startIcon={<AutoAwesomeIcon />} variant="contained" onClick={() => void runRecommendation()} sx={{ minHeight: 48, minWidth: 180, transition: "transform 120ms ease", "&:hover": { transform: "translateY(-2px)" } }}>추천 확인</Button></Stack></CardContent></Card>
             </Stack>
           </CardContent>
         </Card>
@@ -563,36 +570,30 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
               <Stack direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1.5}>
                 <Stack spacing={0.75}>
                   <Stack alignItems="center" direction="row" spacing={1}>
-                    <Typography variant="h1">AI 추천 · Program 선택</Typography>
+                    <Typography variant="h1">AI 추천 · 프로그램 선택</Typography>
                     {aiStatus === "ready" ? <Chip color="primary" icon={<SmartToyIcon />} label="AI Applied" size="small" /> : null}
                   </Stack>
-                  <Typography color="text.secondary">추천 결과를 확인하고 Shared Program Repository에서 출력할 Program을 선택하세요.</Typography>
+                  <Typography color="text.secondary">추천 결과와 근거를 확인하고 출력할 프로그램을 선택하세요.</Typography>
                 </Stack>
                 <Button startIcon={<ArrowBackIcon />} variant="outlined" onClick={() => setCurrentStep(2)}>컨디션 수정</Button>
               </Stack>
-              <TrainingTrendCard periodization={periodization} status={intelligenceStatus} />
-              <MemberIntelligenceCard intelligence={intelligence} status={intelligenceStatus} />
               {programState.status === "loading" ? <LoadingState message="운동 프로그램을 불러오는 중입니다." /> : null}
               {programState.status === "error" ? <ErrorState message={programState.message} /> : null}
               {recommendationReason ? <Alert severity="info">{recommendationReason}</Alert> : null}
-              <RecommendationTraceCard recommendation={recommendation} trace={recommendationTrace} showCandidates={showCandidates} onToggleCandidates={() => setShowCandidates((current) => !current)} />
+              <RecommendationTraceCard recommendation={recommendation} trace={recommendationTrace} />
               {renderAiCards()}
               {recommendation ? (
                 <Card sx={{ ...infoCardSx, borderColor: "primary.main" }}>
                   <CardContent><Stack spacing={2}>
                     <Stack direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1.5}>
-                      <Box><Chip color="primary" label="추천 Program" size="small" /><Typography sx={{ mt: 1 }} variant="h2">{recommendation.program.title}</Typography><Stack direction="row" flexWrap="wrap" gap={1} sx={{ mt: 1 }}><Chip label={getCategoryLabel(recommendation.program.category)} /><Chip label={getDifficultyLabel(recommendation.program.difficulty)} variant="outlined" /><Chip label={`${recommendation.program.exercises.length}개 운동`} variant="outlined" /></Stack></Box>
-                      <Stack alignItems={{ sm: "flex-end", xs: "stretch" }} spacing={1}><Chip color="primary" label={`추천 점수 ${recommendation.score}`} /><Button startIcon={<CheckCircleIcon />} variant="contained" onClick={() => selectProgramForBuilder(recommendation.program)} sx={{ minHeight: 48 }}>추천 Program 선택</Button></Stack>
+                      <Box><Chip color="primary" label="1순위 추천" size="small" /><Typography sx={{ mt: 1 }} variant="h2">{recommendation.program.title}</Typography><Stack direction="row" flexWrap="wrap" gap={1} sx={{ mt: 1 }}><Chip label={getCategoryLabel(recommendation.program.category)} /><Chip label={getDifficultyLabel(recommendation.program.difficulty)} variant="outlined" /><Chip label={`${recommendation.program.exercises.length}개 운동`} variant="outlined" /></Stack></Box>
+                      <Stack alignItems={{ sm: "flex-end", xs: "stretch" }} spacing={1}><Chip color="primary" label={`추천 점수 ${recommendation.score}`} /><Button startIcon={<CheckCircleIcon />} variant="contained" onClick={() => selectProgramForBuilder(recommendation.program)} sx={{ minHeight: 48 }}>추천 프로그램 선택</Button></Stack>
                     </Stack>
                     <Stack spacing={1}>{recommendation.program.exercises.map((exercise) => <Box key={exercise.id} sx={{ border: 1, borderColor: "divider", borderRadius: `${palette.radiusSm}px`, bgcolor: palette.surfaceInteractive, p: 1.5 }}><Typography fontWeight={900}>{exercise.order}. {exercise.name}</Typography><Typography color="text.secondary" variant="body2">{exercise.sets}세트{exercise.memo ? ` · ${exercise.memo}` : ""}</Typography></Box>)}</Stack>
                   </Stack></CardContent>
                 </Card>
               ) : null}
-              <Stack spacing={1.5}>
-                <Stack direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1.5}><Box><Typography variant="h2">Program Repository</Typography><Typography color="text.secondary">Program Manager에서는 조회와 선택만 가능합니다.</Typography></Box><TextField label="Program 검색" size="small" value={programQuery} onChange={(event) => setProgramQuery(event.target.value)} sx={{ minWidth: { sm: 280 } }} /></Stack>
-                {programState.status === "ready" && selectablePrograms.length === 0 ? <EmptyState title="선택할 Program이 없습니다." description="Program 생성과 관리는 Condition Lab Master에서 수행합니다." /> : null}
-                <Grid container spacing={1.5}>{selectablePrograms.map((program) => <Grid item key={program.id} md={6} xs={12}><CardActionArea aria-label={`${program.title} 선택`} onClick={() => selectProgramForBuilder(program)} sx={largeChoiceCardSx(program.id === recommendation?.program.id)}><Stack spacing={1}><Stack alignItems="center" direction="row" justifyContent="space-between" spacing={1}><Typography fontWeight={900}>{program.title}</Typography>{program.id === recommendation?.program.id ? <Chip color="primary" label="추천" size="small" /> : null}</Stack><Stack direction="row" flexWrap="wrap" gap={1}><Chip label={getCategoryLabel(program.category)} size="small" /><Chip label={getDifficultyLabel(program.difficulty)} size="small" variant="outlined" /><Chip label={`${program.exercises.length}개`} size="small" variant="outlined" /></Stack></Stack></CardActionArea></Grid>)}</Grid>
-              </Stack>
+              {rankedPrograms.filter(({ program }) => program.id !== recommendation?.program.id).length > 0 ? <Stack spacing={1.5}><Box><Typography variant="h2">다른 추천</Typography><Typography color="text.secondary">동일한 추천 분석에서 계산된 차순위 프로그램입니다.</Typography></Box><Grid container spacing={1.5}>{rankedPrograms.filter(({ program }) => program.id !== recommendation?.program.id).slice(0, 2).map(({ candidate, program }) => { const rank = (recommendationTrace?.candidatePrograms.findIndex((item) => item.programId === candidate.programId) ?? 0) + 1; return <Grid item key={program.id} md={6} xs={12}><Card sx={{ ...infoCardSx, boxShadow: "none" }}><CardContent><Stack spacing={1.5}><Stack alignItems="center" direction="row" justifyContent="space-between"><Chip label={`${rank}순위`} size="small" variant="outlined" /><Typography fontWeight={900}>{candidate.score}점</Typography></Stack><Typography variant="h2">{program.title}</Typography><Stack direction="row" flexWrap="wrap" gap={1}><Chip label={getCategoryLabel(program.category)} size="small" /><Chip label={getDifficultyLabel(program.difficulty)} size="small" variant="outlined" /><Chip label={`${program.exercises.length}개 운동`} size="small" variant="outlined" /></Stack><Button variant="outlined" onClick={() => selectProgramForBuilder(program)}>이 프로그램 선택</Button></Stack></CardContent></Card></Grid>; })}</Grid></Stack> : null}
             </Stack>
           </CardContent>
         </Card>

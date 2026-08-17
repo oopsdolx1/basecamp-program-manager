@@ -2,24 +2,26 @@ import { QRCodeSVG } from "qrcode.react";
 import { PRINT_SET_COLUMN_COUNT } from "../../constants/print.constants";
 import type { WorkoutPrintDocument } from "../../types/print.types";
 import { formatPrintDate } from "../../utils/formatPrintDate";
-import { bodyPartLabels } from "../../utils/mapCategoryToBodyParts";
 
 interface WorkoutPrintTemplateV1Props {
   document: WorkoutPrintDocument;
 }
 
 export const WorkoutPrintTemplateV1 = ({ document }: WorkoutPrintTemplateV1Props): JSX.Element => {
-  const runtimeBodyParts = document.bodyParts.map((value) => value.trim()).filter(Boolean);
-  const knownBodyParts = bodyPartLabels.filter((item) => runtimeBodyParts.some((value) => value === item.label || value.includes(item.label)));
-  const unknownBodyParts = runtimeBodyParts.filter((value) => !bodyPartLabels.some((item) => value === item.label || value.includes(item.label)));
+  const runtimeBodyParts = document.bodyParts.map((value) => value.trim().replace(/[_\s]*\([^)]*\)$/u, "")).filter(Boolean);
+  const bodyPartText = runtimeBodyParts.length > 0 ? runtimeBodyParts.join(" · ") : document.program.categoryLabel;
   const setColumns = Array.from({ length: PRINT_SET_COLUMN_COUNT }, (_, index) => index + 1);
+  const compactCue = (value: string): string => {
+    const summary = value.split(/\(상세:|상세:/u)[0].replace(/\s+/gu, " ").trim();
+    return summary.length > 48 ? `${summary.slice(0, 47)}…` : summary;
+  };
 
   return (
     <article className="a5-workout-document" aria-label="A5 가로 운동 일지">
       <header className="print-header">
         <div className="print-brand-block">
           <div className="print-logo">BASECAMP</div>
-          <div className="print-subtitle">WORKOUT LOG · {document.program.title}</div>
+          <div className="print-subtitle">운동 일지 · {document.program.title}</div>
         </div>
         <div className="print-meta">
           <div>회원: {document.member.name}</div>
@@ -37,15 +39,7 @@ export const WorkoutPrintTemplateV1 = ({ document }: WorkoutPrintTemplateV1Props
       </section>
 
       <section className="print-section">
-        <div className="print-section-title">운동 부위</div>
-        <div className="body-part-grid">
-          {bodyPartLabels.map((item) => <span key={item.key}><span className={`print-checkbox ${knownBodyParts.includes(item) ? "checked" : ""}`} />{item.label}</span>)}
-          {unknownBodyParts.map((label) => <span key={label}><span className="print-checkbox checked" />{label}</span>)}
-        </div>
-      </section>
-
-      <section className="print-section">
-        <div className="print-info-grid"><div>유산소 종류 <span className="blank-line" /></div><div>운동 시간 <span className="blank-line" /></div><div>강도 <span className="blank-line" /></div></div>
+        <div className="print-compact-info"><div><strong>운동 부위</strong><span>{bodyPartText}</span></div><div><strong>유산소</strong><span className="cardio-write-line" /><small>종류 · 시간 · 속도 · 경사</small></div></div>
       </section>
 
       <table className="exercise-print-table">
@@ -55,12 +49,11 @@ export const WorkoutPrintTemplateV1 = ({ document }: WorkoutPrintTemplateV1Props
             <tr className="exercise-row" key={row.order}>
               <td className="exercise-name-cell">
                 <div className="exercise-title">{row.isBlank ? "" : `${row.order}. ${row.exerciseName}`}</div>
-                {row.exerciseMemo ? <div className="exercise-memo">{row.exerciseMemo}</div> : null}
-                {row.memberWhy ? <div className="exercise-why">WHY: {row.memberWhy}</div> : null}
+                {!row.isBlank && (row.memberWhy || row.exerciseMemo) ? <div className="exercise-cue">{compactCue(row.memberWhy || row.exerciseMemo)}</div> : null}
               </td>
               {setColumns.map((setNumber) => {
                 const inactive = row.configuredSets !== null && setNumber > row.configuredSets;
-                return <td className={`set-cell ${inactive ? "inactive" : ""}`} key={setNumber}><div className="handwrite-grid"><div className="handwrite-line"><span>kg</span></div><div className="handwrite-line"><span>횟수</span></div><div className="handwrite-line"><span>수축</span></div></div></td>;
+                return <td className={`set-cell ${inactive ? "inactive" : ""}`} key={setNumber}><div className="handwrite-grid"><span>KG</span><span>횟수</span><span>수축</span></div></td>;
               })}
             </tr>
           ))}
@@ -68,7 +61,7 @@ export const WorkoutPrintTemplateV1 = ({ document }: WorkoutPrintTemplateV1Props
       </table>
 
       <section className="print-section print-memo-section"><div className="print-section-title">메모</div><div className="print-memo" /></section>
-      <footer className="print-footer"><span>BASECAMP CONDITION LAB</span><span>{document.templateKey} v{document.templateVersion}</span></footer>
+      <footer className="print-footer"><span>BASECAMP CONDITION LAB</span><span>A5 가로 운동 일지</span></footer>
     </article>
   );
 };

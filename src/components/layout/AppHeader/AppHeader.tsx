@@ -6,8 +6,10 @@ import { routes } from "../../../app/routes";
 import { palette } from "../../../theme/palette";
 
 const navItems = [
+  { label: "Dashboard", to: routeBuilder.dashboard(), matches: [routeBuilder.dashboard()] },
   { label: "Print", to: routeBuilder.print(), matches: [routeBuilder.print(), routeBuilder.quickPrint()] },
   { label: "Master", to: routeBuilder.master(), matches: [routeBuilder.master(), routes.programs, routes.printHistory] },
+  { label: "Sessions", to: routeBuilder.workoutSessions(), matches: [routes.workoutSessions] },
 ];
 
 export const AppHeader = (): JSX.Element => {

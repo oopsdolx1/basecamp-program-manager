@@ -8,6 +8,7 @@ import type {
 
 export interface PrintRequestRepository {
   createPrintRequest: (input: CreatePrintRequestInput) => Promise<PrintRequestRecord>;
+  getPrintRequests: (appId: AppId, ids: string[]) => Promise<PrintRequestRecord[]>;
   subscribeRecentRequests: (
     options: PrintRequestQueryOptions,
     callback: (records: PrintRequestRecord[]) => void,

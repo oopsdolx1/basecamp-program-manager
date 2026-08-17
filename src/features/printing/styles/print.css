@@ -89,6 +89,28 @@
   padding-bottom: 2.5mm;
 }
 
+.print-session-code {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  margin-left: 3mm;
+  width: 19mm;
+}
+
+.print-session-code svg {
+  height: 17mm;
+  width: 17mm;
+}
+
+.print-session-code span {
+  font-size: 4.2pt;
+  margin-top: 0.5mm;
+  max-width: 19mm;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .print-logo {
   font-size: 18pt;
   font-weight: 800;
@@ -107,6 +129,7 @@
 .print-meta {
   font-size: 8pt;
   line-height: 1.7;
+  margin-left: auto;
   text-align: right;
 }
 

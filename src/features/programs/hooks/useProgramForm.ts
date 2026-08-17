@@ -80,6 +80,8 @@ export const useProgramForm = (initialValues?: ProgramFormValues) => {
       return { ...current, exercises: reorderExercises(next) };
     });
 
+  const reset = () => setValues(initialValues ?? createInitialProgramFormValues());
+
   return {
     values,
     validation,
@@ -89,6 +91,7 @@ export const useProgramForm = (initialValues?: ProgramFormValues) => {
     removeExercise,
     reorder,
     moveExercise,
+    reset,
     sanitizedValues: sanitizeProgramForm(values),
   };
 };

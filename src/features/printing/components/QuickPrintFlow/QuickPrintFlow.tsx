@@ -24,7 +24,7 @@ import { filterMembers, sortMembersByName } from "../../../members/services/memb
 import { filterMembersByInitial, KOREAN_INITIALS, type MemberInitialFilter } from "../../../members/utils/koreanInitial";
 import { getCategoryLabel, getDifficultyLabel, programCategories, programDifficulties } from "../../../programs/config/programOptions";
 import { usePrograms } from "../../../programs/hooks/usePrograms";
-import { hydrateProgramExerciseKnowledge } from "../../../../shared-knowledge/resolveProgramExercises";
+import { hydrateProgramExerciseKnowledge, resolveProgramExerciseKnowledge } from "../../../../shared-knowledge/resolveProgramExercises";
 import { sanitizeProgramForm, validateProgramForm } from "../../../programs/services/programService";
 import type { Program, ProgramDifficulty, ProgramFormValues } from "../../../programs/types/program.types";
 import type { MemberProvider } from "../../providers/memberProvider";
@@ -38,6 +38,7 @@ import { createSnapshotBuilderHistory, snapshotBuilderService, type SnapshotBuil
 import type { AiRecommendationResult, AlcoholStatus, ConditionInput, ConditionStatus, FatigueArea, MemberIntelligenceMetadata, MemberIntelligenceSummary, PeriodizationSummary, RecommendationResult, RecommendationTrace, RecentWorkoutSummary, SleepQuality } from "../../types/condition.types";
 import { SnapshotExerciseBuilderRow } from "../SnapshotExerciseBuilderRow/SnapshotExerciseBuilderRow";
 import { palette } from "../../../../theme/palette";
+import { createWorkoutSession } from "../../../workout-sessions/services/workoutSessionService";
 
 type PrintStep = 1 | 2 | 3 | 4;
 type AiStatus = "idle" | "loading" | "ready" | "error" | "skipped";
@@ -198,6 +199,8 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
   const [aiStatus, setAiStatus] = useState<AiStatus>("idle");
   const [aiRecommendation, setAiRecommendation] = useState<AiRecommendationResult | null>(null);
   const [aiError, setAiError] = useState("");
+  const [sessionSaving, setSessionSaving] = useState(false);
+  const [sessionError, setSessionError] = useState("");
   const hasSearchQuery = memberQuery.trim().length > 0;
   const filteredMembers = useMemo(() => sortMembersByName(hasSearchQuery
     ? filterMembers(members, memberQuery)
@@ -355,9 +358,32 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
     setCurrentStep(3);
   };
 
-  const goPrintPreview = () => {
-    if (!selectedMember || !snapshotSourceProgram || !snapshotValues) return;
-    const snapshotProgramId = savePrintSnapshot({
+  const goPrintPreview = async () => {
+    if (!selectedMember || !snapshotSourceProgram || !snapshotValues || sessionSaving) return;
+    const sanitized = sanitizeProgramForm(snapshotValues);
+    if (sanitized.exercises.length > 8) {
+      setSessionError("운동이 8개를 초과하여 이번 Sprint에서는 출력할 수 없습니다.");
+      return;
+    }
+    setSessionSaving(true);
+    setSessionError("");
+    try {
+      const sessionProgram = historyToProgram(snapshotSourceProgram, sanitized);
+      const resolved = resolveProgramExerciseKnowledge(sessionProgram);
+      const sessionId = await createWorkoutSession({
+        appId,
+        memberId: selectedMember.memberId,
+        memberName: selectedMember.displayName,
+        programId: snapshotSourceProgram.id,
+        programTitle: sanitized.title,
+        exercises: sessionProgram.exercises.map((exercise) => ({
+          exerciseId: resolved.get(exercise.id)?.id ?? exercise.catalogExerciseId ?? exercise.id,
+          programExerciseId: exercise.id,
+          name: resolved.get(exercise.id)?.name ?? exercise.name,
+          order: exercise.order,
+        })),
+      });
+      const snapshotProgramId = savePrintSnapshot({
       sourceProgramId: snapshotSourceProgram.id,
       sourceProgramTitle: snapshotSourceProgram.title,
       recommendationReasons: recommendationReason ? [recommendationReason] : [],
@@ -368,9 +394,14 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
       recommendationTrace,
       condition,
       recentWorkout,
-      formValues: sanitizeProgramForm(snapshotValues),
-    });
-    navigate(routeBuilder.printPreview(snapshotProgramId, selectedMember.memberId));
+        formValues: sanitized,
+      });
+      navigate(routeBuilder.printPreview(snapshotProgramId, selectedMember.memberId, sessionId));
+    } catch (caught) {
+      setSessionError(caught instanceof Error ? caught.message : "Workout Session을 생성하지 못했습니다.");
+    } finally {
+      setSessionSaving(false);
+    }
   };
 
   const renderAiCards = (): JSX.Element | null => {
@@ -383,6 +414,8 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
   return (
     <Stack alignItems="center" spacing={3}>
       <StepIndicator currentStep={currentStep} />
+      {sessionError ? <Alert severity="error" sx={{ maxWidth: 1180, width: "100%" }}>{sessionError}</Alert> : null}
+      {sessionSaving ? <Alert icon={<CircularProgress size={20} />} severity="info" sx={{ maxWidth: 1180, width: "100%" }}>Workout Session을 저장하고 있습니다.</Alert> : null}
 
       {currentStep === 1 ? (
         <Card sx={centeredCardSx(1040)}>

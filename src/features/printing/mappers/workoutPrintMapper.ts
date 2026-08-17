@@ -20,6 +20,7 @@ export class PrintMapperError extends Error {
 interface CreateWorkoutPrintDocumentParams {
   member: MemberSelectionItem | null;
   program: Program | null;
+  workoutSessionId: string;
   printDate?: Date;
 }
 
@@ -65,6 +66,7 @@ export const createWorkoutPrintDocument = ({
   member,
   program,
   printDate,
+  workoutSessionId,
 }: CreateWorkoutPrintDocumentParams): WorkoutPrintDocument => {
   if (!member) {
     throw new PrintMapperError("회원을 선택해 주세요.");
@@ -72,6 +74,10 @@ export const createWorkoutPrintDocument = ({
 
   if (!program) {
     throw new PrintMapperError("프로그램을 선택해 주세요.");
+  }
+
+  if (!workoutSessionId.trim()) {
+    throw new PrintMapperError("Workout Session ID가 없습니다.");
   }
 
   if (program.isArchived) {
@@ -85,6 +91,10 @@ export const createWorkoutPrintDocument = ({
     templateKey: PRINT_TEMPLATE_KEY,
     templateVersion: PRINT_TEMPLATE_VERSION,
     format: PRINT_FORMAT,
+    workoutSessionId,
+    bodyParts: [...new Set(program.exercises
+      .map((exercise) => resolved.get(exercise.id)?.bodyPart ?? "")
+      .filter(Boolean))],
     member: {
       memberId: member.memberId,
       name: member.displayName,
@@ -100,6 +110,7 @@ export const createWorkoutPrintDocument = ({
       exercises: program.exercises
         .map((exercise) => ({
           id: exercise.id,
+          exerciseId: resolved.get(exercise.id)?.id ?? exercise.catalogExerciseId ?? exercise.id,
           name: truncateText(resolved.get(exercise.id)?.name ?? exercise.name, 34),
           memo: truncateText(exercise.memo ?? "", 28),
           memberWhy: truncateText(resolved.get(exercise.id)?.memberWhy ?? "", 72),

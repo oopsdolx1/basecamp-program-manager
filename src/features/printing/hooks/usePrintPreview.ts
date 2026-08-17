@@ -10,19 +10,22 @@ import { createWorkoutPrintDocument, PrintMapperError } from "../mappers/workout
 import { isSnapshotProgramId, loadPrintSnapshot } from "../services/printSnapshotSession";
 import type { WorkoutPrintDocument } from "../types/print.types";
 import { programManagerRuntime } from "../../../shared-knowledge/programManagerRuntime";
+import { getWorkoutSession } from "../../workout-sessions/services/workoutSessionService";
+import type { WorkoutSessionRecord } from "../../workout-sessions/domain/workoutSession.types";
 
 type PreviewState =
   | { status: "loading" }
-  | { status: "ready"; document: WorkoutPrintDocument; member: MemberSelectionItem; program: Program }
+  | { status: "ready"; document: WorkoutPrintDocument; member: MemberSelectionItem; program: Program; workoutSession: WorkoutSessionRecord }
   | { status: "error"; message: string };
 
 interface UsePrintPreviewParams {
   appId: AppId;
   memberId: ProfileId | null;
   programId: ProgramId | null;
+  workoutSessionId: string | null;
 }
 
-export const usePrintPreview = ({ appId, memberId, programId }: UsePrintPreviewParams): PreviewState => {
+export const usePrintPreview = ({ appId, memberId, programId, workoutSessionId }: UsePrintPreviewParams): PreviewState => {
   const [state, setState] = useState<PreviewState>({ status: "loading" });
   const [runtimeRevision, setRuntimeRevision] = useState(() => programManagerRuntime.getRevision());
 
@@ -42,21 +45,31 @@ export const usePrintPreview = ({ appId, memberId, programId }: UsePrintPreviewP
         return;
       }
 
+      if (!workoutSessionId) {
+        setState({ status: "error", message: "Workout Session ID가 없습니다. Quick Print에서 다시 진행해 주세요." });
+        return;
+      }
+
       setState({ status: "loading" });
 
       try {
         await ensureFirebaseAuth();
-        const [member, program] = await Promise.all([
+        const [member, program, workoutSession] = await Promise.all([
           getMemberById(appId, memberId),
           isSnapshotProgramId(programId)
             ? Promise.resolve(createSnapshotProgram(programId))
             : programRepository.getProgram(appId, programId),
+          getWorkoutSession(appId, workoutSessionId),
         ]);
 
         if (!active) return;
 
-        const document = createWorkoutPrintDocument({ member, program });
-        setState({ status: "ready", document, member: member as MemberSelectionItem, program: program as Program });
+        if (!workoutSession) throw new PrintMapperError("Workout Session을 찾지 못했습니다.");
+        if (workoutSession.memberId !== memberId || workoutSession.programId !== program?.id) {
+          throw new PrintMapperError("Workout Session의 회원 또는 프로그램이 Preview와 일치하지 않습니다.");
+        }
+        const document = createWorkoutPrintDocument({ member, program, workoutSessionId });
+        setState({ status: "ready", document, member: member as MemberSelectionItem, program: program as Program, workoutSession });
       } catch (caught) {
         if (!active) return;
         const message =
@@ -72,7 +85,7 @@ export const usePrintPreview = ({ appId, memberId, programId }: UsePrintPreviewP
     return () => {
       active = false;
     };
-  }, [appId, memberId, programId, runtimeRevision]);
+  }, [appId, memberId, programId, runtimeRevision, workoutSessionId]);
 
   return state;
 };
@@ -86,7 +99,7 @@ const createSnapshotProgram = (programId: ProgramId): Program => {
   const values = sanitizeProgramForm(snapshot.formValues);
 
   return {
-    id: programId,
+    id: snapshot.sourceProgramId as ProgramId,
     schemaVersion: 1,
     category: values.category,
     title: values.title,

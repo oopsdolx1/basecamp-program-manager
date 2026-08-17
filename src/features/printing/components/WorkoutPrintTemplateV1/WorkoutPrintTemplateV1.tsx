@@ -1,6 +1,7 @@
+import { QRCodeSVG } from "qrcode.react";
 import { PRINT_SET_COLUMN_COUNT } from "../../constants/print.constants";
 import { formatPrintDate } from "../../utils/formatPrintDate";
-import { bodyPartLabels, mapCategoryToBodyParts } from "../../utils/mapCategoryToBodyParts";
+import { bodyPartLabels } from "../../utils/mapCategoryToBodyParts";
 import type { WorkoutPrintDocument } from "../../types/print.types";
 
 interface WorkoutPrintTemplateV1Props {
@@ -8,7 +9,13 @@ interface WorkoutPrintTemplateV1Props {
 }
 
 export const WorkoutPrintTemplateV1 = ({ document }: WorkoutPrintTemplateV1Props): JSX.Element => {
-  const checkedBodyParts = new Set(mapCategoryToBodyParts(document.program.category));
+  const runtimeBodyParts = document.bodyParts.map((value) => value.trim()).filter(Boolean);
+  const knownBodyParts = bodyPartLabels.filter((item) => runtimeBodyParts.some((value) =>
+    value === item.label || value.includes(item.label),
+  ));
+  const unknownBodyParts = runtimeBodyParts.filter((value) =>
+    !bodyPartLabels.some((item) => value === item.label || value.includes(item.label)),
+  );
   const setColumns = Array.from({ length: PRINT_SET_COLUMN_COUNT }, (_, index) => index + 1);
 
   return (
@@ -22,6 +29,10 @@ export const WorkoutPrintTemplateV1 = ({ document }: WorkoutPrintTemplateV1Props
           <div>회원: {document.member.name}</div>
           <div>날짜: {formatPrintDate(document.printDate)}</div>
           <div>카테고리: {document.program.categoryLabel}</div>
+        </div>
+        <div className="print-session-code" aria-label={`Workout Session ${document.workoutSessionId}`}>
+          <QRCodeSVG value={document.workoutSessionId} size={68} level="M" marginSize={0} />
+          <span>{document.workoutSessionId}</span>
         </div>
       </header>
 
@@ -38,9 +49,12 @@ export const WorkoutPrintTemplateV1 = ({ document }: WorkoutPrintTemplateV1Props
         <div className="body-part-grid">
           {bodyPartLabels.map((item) => (
             <span key={item.key}>
-              <span className={`print-checkbox ${checkedBodyParts.has(item.key) ? "checked" : ""}`} />
+              <span className={`print-checkbox ${knownBodyParts.includes(item) ? "checked" : ""}`} />
               {item.label}
             </span>
+          ))}
+          {unknownBodyParts.map((label) => (
+            <span key={label}><span className="print-checkbox checked" />{label}</span>
           ))}
         </div>
       </section>
@@ -89,7 +103,7 @@ export const WorkoutPrintTemplateV1 = ({ document }: WorkoutPrintTemplateV1Props
 
       <section className="print-section print-memo-section">
         <div className="print-section-title">메모</div>
-        <div className="print-memo">{document.program.memo}</div>
+        <div className="print-memo" />
       </section>
 
       <footer className="print-footer">

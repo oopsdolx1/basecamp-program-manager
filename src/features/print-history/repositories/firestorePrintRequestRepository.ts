@@ -1,6 +1,7 @@
 import {
   collection,
   doc,
+  getDoc,
   limit as firestoreLimit,
   onSnapshot,
   orderBy,
@@ -68,6 +69,12 @@ export const firestorePrintRequestRepository: PrintRequestRepository = {
         requestedAt,
         requestedBy: input.requestedBy,
         requestSource: "quick-print",
+        status: "printed",
+        workoutSessionId: input.workoutSessionId,
+        printedAt: requestedAt,
+        printedBy: input.requestedBy,
+        printer: input.printer,
+        copy: input.copy,
         memberId: input.memberSnapshot.memberId,
         programId: input.programSnapshot.programId,
         memberSnapshot: input.memberSnapshot,
@@ -90,6 +97,12 @@ export const firestorePrintRequestRepository: PrintRequestRepository = {
       requestedAt: new Date(),
       requestedBy: input.requestedBy,
       requestSource: "quick-print",
+      status: "printed",
+      workoutSessionId: input.workoutSessionId,
+      printedAt: new Date(),
+      printedBy: input.requestedBy,
+      printer: input.printer,
+      copy: input.copy,
       memberId: input.memberSnapshot.memberId,
       programId: input.programSnapshot.programId,
       memberSnapshot: input.memberSnapshot,
@@ -99,6 +112,13 @@ export const firestorePrintRequestRepository: PrintRequestRepository = {
       createdBy: input.requestedBy,
       isArchived: false,
     };
+  },
+
+  async getPrintRequests(appId, ids) {
+    const snapshots = await Promise.all(ids.map((id) => getDoc(doc(currentDb(), printHistoryCollectionPath(appId), id))));
+    return snapshots
+      .filter((snapshot) => snapshot.exists())
+      .map((snapshot) => mapPrintRequestDocument(snapshot.id, snapshot.data()));
   },
 
   subscribeRecentRequests(options, callback, onError) {

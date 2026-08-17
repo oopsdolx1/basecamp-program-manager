@@ -1,0 +1,3 @@
+import { IconButton as MuiIconButton, type IconButtonProps as MuiIconButtonProps } from "@mui/material";
+import { colors, motion, radius, spacing } from "../../tokens";
+export const IconButton = (props: MuiIconButtonProps): JSX.Element => <MuiIconButton {...props} sx={{ bgcolor: colors.neutral.gray800, borderRadius: `${radius.full}px`, color: colors.neutral.gray100, height: spacing[12], minHeight: spacing[12], minWidth: spacing[12], transition: motion.transition, width: spacing[12], "&:hover": { bgcolor: colors.primary.gold, color: colors.neutral.black }, "&:focus-visible": { outline: `3px solid ${colors.alpha.goldFocus}` }, ...props.sx }} />;

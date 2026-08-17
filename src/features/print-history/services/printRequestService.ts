@@ -10,6 +10,7 @@ import { firestorePrintRequestRepository } from "../repositories/firestorePrintR
 export const createPrintRequestFromDocument = async (
   appId: AppId,
   document: WorkoutPrintDocument,
+  copy: number,
 ): Promise<PrintRequestRecord> => {
   await ensureFirebaseAuth();
   const uid = getFirebaseAuth().currentUser?.uid;
@@ -28,6 +29,9 @@ export const createPrintRequestFromDocument = async (
   return firestorePrintRequestRepository.createPrintRequest({
     appId,
     requestedBy: uid,
+    workoutSessionId: document.workoutSessionId,
+    printer: "browser-default",
+    copy,
     ...snapshots,
   });
 };
@@ -57,3 +61,6 @@ export const filterPrintRequests = (
       ).includes(search);
     });
 };
+
+export const getPrintRequestsByIds = (appId: AppId, ids: string[]): Promise<PrintRequestRecord[]> =>
+  firestorePrintRequestRepository.getPrintRequests(appId, ids);

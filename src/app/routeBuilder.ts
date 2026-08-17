@@ -2,6 +2,7 @@ import { routes, type AppRoute } from "./routes";
 
 export const routeBuilder = {
   home: (): AppRoute => routes.home,
+  dashboard: (): AppRoute => routes.dashboard,
   print: (): AppRoute => routes.print,
   quickPrint: (): AppRoute => routes.quickPrint,
   master: (tab?: "programs" | "history"): string => (tab ? `${routes.master}?tab=${tab}` : routes.master),
@@ -9,8 +10,10 @@ export const routeBuilder = {
   newProgram: (): AppRoute => routes.newProgram,
   programDetail: (id: string): string => `/program-manager/programs/${id}`,
   editProgram: (id: string): string => `/program-manager/programs/${id}/edit`,
-  printPreview: (programId: string, memberId: string): string =>
-    `/program-manager/print/${programId}?memberId=${memberId}`,
+  printPreview: (programId: string, memberId: string, sessionId: string): string => {
+    const params = new URLSearchParams({ memberId, sessionId });
+    return `/program-manager/print/${programId}?${params.toString()}`;
+  },
   printHistory: (filters?: { memberId?: string; programId?: string; category?: string; search?: string }): string => {
     const params = new URLSearchParams();
     params.set("tab", "history");
@@ -20,5 +23,7 @@ export const routeBuilder = {
     if (filters?.search) params.set("search", filters.search);
     return `${routes.master}?${params.toString()}`;
   },
+  workoutSessions: (): AppRoute => routes.workoutSessions,
+  workoutSessionDetail: (sessionId: string): string => `/program-manager/workout-sessions/${sessionId}`,
   settings: (): AppRoute => routes.settings,
 };

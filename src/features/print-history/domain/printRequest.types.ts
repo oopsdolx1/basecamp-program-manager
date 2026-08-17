@@ -43,6 +43,12 @@ export interface PrintRequestRecord {
   requestedAt: Date;
   requestedBy: string | null;
   requestSource: PrintRequestSource;
+  status: "printed";
+  workoutSessionId: string;
+  printedAt: Date;
+  printedBy: string | null;
+  printer: string;
+  copy: number;
   memberId: string;
   programId: string;
   memberSnapshot: PrintRequestMemberSnapshot;
@@ -56,6 +62,9 @@ export interface PrintRequestRecord {
 export interface CreatePrintRequestInput {
   appId: AppId;
   requestedBy: string;
+  workoutSessionId: string;
+  printer: string;
+  copy: number;
   memberSnapshot: PrintRequestMemberSnapshot;
   programSnapshot: PrintRequestProgramSnapshot;
   template: PrintRequestTemplateSnapshot;

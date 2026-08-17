@@ -8,6 +8,7 @@ export interface PrintMemberSnapshot {
 
 export interface PrintProgramExerciseSnapshot {
   id: string;
+  exerciseId: string;
   name: string;
   memo: string;
   order: number;
@@ -40,6 +41,8 @@ export interface WorkoutPrintDocument {
   templateVersion: 1;
   format: "A5-portrait";
   member: PrintMemberSnapshot;
+  workoutSessionId: string;
+  bodyParts: string[];
   program: PrintProgramSnapshot;
   printDate: Date;
   rows: PrintExerciseRow[];

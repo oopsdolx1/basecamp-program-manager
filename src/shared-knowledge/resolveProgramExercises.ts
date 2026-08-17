@@ -6,6 +6,7 @@ export interface ResolvedExerciseKnowledge {
   id: string;
   name: string;
   memberWhy: string;
+  bodyPart: string;
 }
 
 export const resolveProgramExerciseKnowledge = (program: Program): Map<string, ResolvedExerciseKnowledge> => {
@@ -22,6 +23,7 @@ export const resolveProgramExerciseKnowledge = (program: Program): Map<string, R
       id: knowledge?.id ?? exercise.catalogExerciseId ?? exercise.id,
       name: knowledge?.name ?? exercise.name,
       memberWhy: knowledge?.memberWhy ?? "",
+      bodyPart: knowledge?.bodyPart ?? "",
     }];
   }));
 };

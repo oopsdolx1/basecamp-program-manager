@@ -52,19 +52,19 @@ interface QuickPrintFlowProps {
 }
 
 const stepLabels = ["회원 선택", "컨디션 확인", "AI 추천 · Program 선택", "Program 편집"];
-const conditionOptions: Array<{ value: ConditionStatus; label: string }> = [
-  { value: "GOOD", label: "좋음" },
-  { value: "NORMAL", label: "보통" },
-  { value: "BAD", label: "나쁨" },
+const conditionOptions: Array<{ value: ConditionStatus; label: string; icon: string; description: string }> = [
+  { value: "GOOD", label: "좋음", icon: "😊", description: "최상의 컨디션입니다." },
+  { value: "NORMAL", label: "보통", icon: "🙂", description: "평소와 비슷합니다." },
+  { value: "BAD", label: "나쁨", icon: "☹️", description: "회복이 필요한 상태입니다." },
 ];
-const sleepOptions: Array<{ value: SleepQuality; label: string }> = [
-  { value: "ENOUGH", label: "충분함" },
-  { value: "NORMAL", label: "보통" },
-  { value: "LACK", label: "부족함" },
+const sleepOptions: Array<{ value: SleepQuality; label: string; icon: string; description: string }> = [
+  { value: "ENOUGH", label: "충분함", icon: "🌙", description: "7시간 이상" },
+  { value: "NORMAL", label: "보통", icon: "🛏️", description: "5~7시간" },
+  { value: "LACK", label: "부족함", icon: "😴", description: "5시간 미만" },
 ];
-const alcoholOptions: Array<{ value: AlcoholStatus; label: string }> = [
-  { value: "NO", label: "없음" },
-  { value: "YES", label: "있음" },
+const alcoholOptions: Array<{ value: AlcoholStatus; label: string; icon: string }> = [
+  { value: "NO", label: "없음", icon: "🚫" },
+  { value: "YES", label: "있음", icon: "🍷" },
 ];
 const fatigueOptions: Array<{ value: FatigueArea; label: string }> = [
   { value: "CHEST", label: "가슴" },
@@ -73,6 +73,13 @@ const fatigueOptions: Array<{ value: FatigueArea; label: string }> = [
   { value: "ARMS", label: "팔" },
   { value: "LOWER_BODY", label: "하체" },
 ];
+const fatigueScale = [
+  { value: 1, label: "매우 피곤", description: "회복이 가장 필요한 상태" },
+  { value: 2, label: "조금 피곤", description: "피로가 남아 있습니다." },
+  { value: 3, label: "보통", description: "평균적인 컨디션입니다." },
+  { value: 4, label: "상쾌", description: "몸 상태가 좋은 편입니다." },
+  { value: 5, label: "매우 상쾌", description: "최상의 컨디션입니다." },
+] as const;
 const defaultCondition: ConditionInput = { condition: null, sleep: null, fatigueAreas: [], stress: 3, alcohol: null };
 const centeredCardSx = (maxWidth: number) => ({ maxWidth, mx: "auto", width: "100%" });
 const largeChoiceCardSx = (active: boolean) => ({
@@ -89,6 +96,22 @@ const largeChoiceCardSx = (active: boolean) => ({
   "&:hover": { borderColor: "primary.main", transform: "translateY(-1px)" },
   "&:focus-visible": { outline: `3px solid ${palette.primaryGoldGlowStrong}`, outlineOffset: 3 },
 });
+const MuscleSilhouette = ({ area, active }: { area: FatigueArea | "NONE"; active: boolean }): JSX.Element => {
+  const base = active ? palette.primaryGoldBorder : palette.borderStrong;
+  const highlight = active ? palette.primaryGold : palette.primaryGoldHover;
+  const muted = palette.surfaceRaised;
+  return <Box aria-hidden="true" component="svg" viewBox="0 0 80 96" sx={{ height: 72, width: 60 }}>
+    <circle cx="40" cy="11" fill={muted} stroke={base} strokeWidth="2" r="8" />
+    <path d="M29 22 Q40 17 51 22 L56 54 Q49 61 40 61 Q31 61 24 54 Z" fill={area === "CHEST" || area === "BACK" ? highlight : muted} opacity={area === "BACK" ? 0.72 : 1} stroke={base} strokeWidth="2" />
+    <path d="M28 25 L17 32 L11 57 L19 60 L28 40" fill={area === "ARMS" ? highlight : muted} stroke={base} strokeWidth="2" />
+    <path d="M52 25 L63 32 L69 57 L61 60 L52 40" fill={area === "ARMS" ? highlight : muted} stroke={base} strokeWidth="2" />
+    <path d="M31 59 L25 89 L36 89 L41 63" fill={area === "LOWER_BODY" ? highlight : muted} stroke={base} strokeWidth="2" />
+    <path d="M49 59 L55 89 L44 89 L39 63" fill={area === "LOWER_BODY" ? highlight : muted} stroke={base} strokeWidth="2" />
+    {area === "CHEST" ? <path d="M30 29 Q40 24 50 29 L49 40 Q40 44 31 40 Z" fill={palette.primaryGoldDark} opacity="0.72" /> : null}
+    {area === "BACK" ? <path d="M30 26 L40 32 L50 26 L49 48 L40 54 L31 48 Z" fill={palette.primaryGoldDark} opacity="0.7" /> : null}
+    {area === "SHOULDER" ? <><circle cx="25" cy="29" fill={highlight} r="6" /><circle cx="55" cy="29" fill={highlight} r="6" /></> : null}
+  </Box>;
+};
 const infoCardSx = {
   bgcolor: palette.surfaceSection,
   border: 1,
@@ -502,7 +525,35 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
       ) : null}
 
       {currentStep === 2 ? (
-        <Card sx={centeredCardSx(1040)}><CardContent sx={{ p: { md: 4, xs: 2.5 } }}><Stack spacing={3}><Stack direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1.5}><Stack spacing={0.75}><Typography variant="h1">컨디션 확인</Typography><Typography color="text.secondary">{selectedMember?.displayName} 회원 정보</Typography>{recentWorkout ? <Stack direction="row" flexWrap="wrap" gap={1}><Chip label={`최근 운동 ${recentWorkout.title}`} /><Chip label={formatDaysAgo(recentWorkout.daysAgo)} variant="outlined" /></Stack> : <Typography color="text.secondary">최근 운동 기록이 없습니다.</Typography>}</Stack><Button startIcon={<ArrowBackIcon />} variant="outlined" onClick={() => setCurrentStep(1)}>회원 선택</Button></Stack><MemberIntelligenceCard intelligence={intelligence} status={intelligenceStatus} /><TrainingTrendCard periodization={periodization} status={intelligenceStatus} /><Card sx={infoCardSx}><CardContent><FormControlLabel control={<Switch checked={useAiRecommendation} onChange={(event) => setUseAiRecommendation(event.target.checked)} />} label="AI 추천 사용" /><Typography color="text.secondary" variant="body2">기존 Recommendation Context와 Rule Recommendation 결과를 사용합니다.</Typography></CardContent></Card><Stack spacing={1.5}><Typography fontWeight={900}>컨디션 상태</Typography><Grid container spacing={1.5}>{conditionOptions.map((option) => <Grid item key={option.value} md={4} xs={12}><CardActionArea aria-label={`컨디션 상태 ${option.label}`} aria-pressed={condition.condition === option.value} onClick={() => setCondition((current) => ({ ...current, condition: option.value }))} sx={largeChoiceCardSx(condition.condition === option.value)}><Typography fontWeight={900}>{option.label}</Typography></CardActionArea></Grid>)}</Grid></Stack><Stack spacing={1.5}><Typography fontWeight={900}>수면 상태</Typography><Grid container spacing={1.5}>{sleepOptions.map((option) => <Grid item key={option.value} md={4} xs={12}><CardActionArea aria-label={`수면 상태 ${option.label}`} aria-pressed={condition.sleep === option.value} onClick={() => setCondition((current) => ({ ...current, sleep: option.value }))} sx={largeChoiceCardSx(condition.sleep === option.value)}><Typography fontWeight={900}>{option.label}</Typography></CardActionArea></Grid>)}</Grid></Stack><Stack spacing={1.5}><Typography fontWeight={900}>피로 · 근육통 부위</Typography><Stack direction="row" flexWrap="wrap" gap={1}>{fatigueOptions.map((option) => <Chip key={option.value} aria-label={`피로 또는 근육통 부위 ${option.label}`} clickable color={condition.fatigueAreas.includes(option.value) ? "primary" : "default"} label={option.label} onClick={() => toggleFatigue(option.value)} sx={{ minHeight: 56, px: 1.5 }} />)}<Chip aria-label="피로 또는 근육통 부위 없음" clickable color={condition.fatigueAreas.length === 0 ? "primary" : "default"} label="없음" onClick={() => setCondition((current) => ({ ...current, fatigueAreas: [] }))} sx={{ minHeight: 56, px: 1.5 }} /></Stack></Stack><Stack spacing={1.5}><Typography fontWeight={900}>피로도</Typography><Box sx={{ px: 1 }}><Slider aria-label="피로도" marks max={5} min={1} step={1} value={condition.stress} onChange={(_, value) => setCondition((current) => ({ ...current, stress: Number(value) }))} /><Typography color="text.secondary">현재 피로도: {condition.stress}</Typography></Box></Stack><Stack spacing={1.5}><Typography fontWeight={900}>음주 여부</Typography><Grid container spacing={1.5}>{alcoholOptions.map((option) => <Grid item key={option.value} md={6} xs={12}><CardActionArea aria-label={`음주 여부 ${option.label}`} aria-pressed={condition.alcohol === option.value} onClick={() => setCondition((current) => ({ ...current, alcohol: option.value }))} sx={largeChoiceCardSx(condition.alcohol === option.value)}><Typography fontWeight={900}>{option.label}</Typography></CardActionArea></Grid>)}</Grid></Stack><Stack direction={{ sm: "row", xs: "column" }} justifyContent="flex-end" spacing={1}><Button disabled={!canRecommend || programState.status !== "ready"} size="large" startIcon={<AutoAwesomeIcon />} variant="contained" onClick={() => void runRecommendation()} sx={{ minHeight: 56, minWidth: 180 }}>추천 확인</Button></Stack></Stack></CardContent></Card>
+        <Card sx={centeredCardSx(1040)}>
+          <CardContent sx={{ p: { md: 3, xs: 2 } }}>
+            <Stack spacing={2.25}>
+              <Stack direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1.5}>
+                <Stack spacing={0.5}>
+                  <Typography color="primary.main" fontWeight={800} variant="overline">TODAY'S CONDITION</Typography>
+                  <Typography variant="h1">컨디션 확인</Typography>
+                  <Typography color="text.secondary"><Box component="span" color="text.primary" fontWeight={900}>{selectedMember?.displayName}</Box> 회원의 오늘 상태를 알려주세요.</Typography>
+                  {recentWorkout ? <Stack direction="row" flexWrap="wrap" gap={1}><Chip label={`최근 운동 ${recentWorkout.title}`} /><Chip label={formatDaysAgo(recentWorkout.daysAgo)} variant="outlined" /></Stack> : <Typography color="text.secondary" variant="body2">최근 운동 기록이 없습니다.</Typography>}
+                </Stack>
+                <Button startIcon={<ArrowBackIcon />} variant="outlined" onClick={() => setCurrentStep(1)}>회원 선택</Button>
+              </Stack>
+
+              <Grid container spacing={1.5}><Grid item md={6} xs={12}><MemberIntelligenceCard intelligence={intelligence} status={intelligenceStatus} /></Grid><Grid item md={6} xs={12}><TrainingTrendCard periodization={periodization} status={intelligenceStatus} /></Grid></Grid>
+
+              <Stack spacing={1}><Typography fontWeight={900}>컨디션 상태</Typography><Grid container spacing={1.5}>{conditionOptions.map((option) => <Grid item key={option.value} md={4} xs={12}><CardActionArea aria-label={`컨디션 상태 ${option.label}`} aria-pressed={condition.condition === option.value} onClick={() => setCondition((current) => ({ ...current, condition: option.value }))} sx={largeChoiceCardSx(condition.condition === option.value)}><Stack alignItems="center" direction="row" spacing={1.5}><Typography aria-hidden="true" fontSize={30}>{option.icon}</Typography><Box><Typography fontWeight={900}>{option.label}</Typography><Typography color="text.secondary" variant="body2">{option.description}</Typography></Box></Stack></CardActionArea></Grid>)}</Grid></Stack>
+
+              <Stack spacing={1}><Typography fontWeight={900}>수면 상태</Typography><Grid container spacing={1.5}>{sleepOptions.map((option) => <Grid item key={option.value} md={4} xs={12}><CardActionArea aria-label={`수면 상태 ${option.label}`} aria-pressed={condition.sleep === option.value} onClick={() => setCondition((current) => ({ ...current, sleep: option.value }))} sx={largeChoiceCardSx(condition.sleep === option.value)}><Stack alignItems="center" direction="row" spacing={1.5}><Typography aria-hidden="true" fontSize={28}>{option.icon}</Typography><Box><Typography fontWeight={900}>{option.label}</Typography><Typography color="text.secondary" variant="body2">{option.description}</Typography></Box></Stack></CardActionArea></Grid>)}</Grid></Stack>
+
+              <Stack spacing={1}><Typography fontWeight={900}>피로 · 근육통 부위 <Typography color="text.secondary" component="span" variant="body2">(복수 선택 가능)</Typography></Typography><Box sx={{ display: "grid", gap: 1.25, gridTemplateColumns: { md: "repeat(6, 1fr)", sm: "repeat(3, 1fr)", xs: "repeat(2, 1fr)" } }}>{fatigueOptions.map((option) => { const active = condition.fatigueAreas.includes(option.value); return <CardActionArea key={option.value} aria-label={`피로 또는 근육통 부위 ${option.label}`} aria-pressed={active} onClick={() => toggleFatigue(option.value)} sx={{ ...largeChoiceCardSx(active), minHeight: 126, p: 1.5 }}><Stack alignItems="center" spacing={0.5}><MuscleSilhouette active={active} area={option.value} /><Typography fontWeight={900}>{option.label}</Typography></Stack></CardActionArea>; })}<CardActionArea aria-label="피로 또는 근육통 부위 없음" aria-pressed={condition.fatigueAreas.length === 0} onClick={() => setCondition((current) => ({ ...current, fatigueAreas: [] }))} sx={{ ...largeChoiceCardSx(condition.fatigueAreas.length === 0), minHeight: 126, p: 1.5 }}><Stack alignItems="center" spacing={0.5}><MuscleSilhouette active={condition.fatigueAreas.length === 0} area="NONE" /><Typography fontWeight={900}>없음</Typography></Stack></CardActionArea></Box></Stack>
+
+              <Stack spacing={1}><Stack alignItems="center" direction="row" justifyContent="space-between"><Typography fontWeight={900}>피로도</Typography><Chip color="primary" label={`${fatigueScale[condition.stress - 1].value}. ${fatigueScale[condition.stress - 1].label}`} /></Stack><Box sx={{ px: 1 }}><Slider aria-label="피로도" marks={fatigueScale.map(({ value }) => ({ value }))} max={5} min={1} step={1} value={condition.stress} valueLabelDisplay="off" onChange={(_, value) => setCondition((current) => ({ ...current, stress: Number(value) }))} /><Box sx={{ display: "grid", gap: 0.5, gridTemplateColumns: "repeat(5, 1fr)" }}>{fatigueScale.map((level) => { const active = condition.stress === level.value; return <Box key={level.value} sx={{ color: active ? "primary.main" : "text.secondary", textAlign: "center" }}><Typography fontWeight={active ? 900 : 700} variant="caption">{level.label}</Typography><Typography sx={{ display: { md: "block", xs: "none" } }} variant="caption">{level.description}</Typography></Box>; })}</Box></Box></Stack>
+
+              <Stack spacing={1}><Typography fontWeight={900}>음주 여부</Typography><Grid container spacing={1.5}>{alcoholOptions.map((option) => <Grid item key={option.value} md={6} xs={12}><CardActionArea aria-label={`음주 여부 ${option.label}`} aria-pressed={condition.alcohol === option.value} onClick={() => setCondition((current) => ({ ...current, alcohol: option.value }))} sx={{ ...largeChoiceCardSx(condition.alcohol === option.value), minHeight: 78 }}><Stack alignItems="center" direction="row" spacing={1.5}><Typography aria-hidden="true" fontSize={26}>{option.icon}</Typography><Typography fontWeight={900}>{option.label}</Typography></Stack></CardActionArea></Grid>)}</Grid></Stack>
+
+              <Card sx={{ ...infoCardSx, height: "auto" }}><CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}><Stack alignItems={{ sm: "center", xs: "stretch" }} direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1.5}><Box><FormControlLabel control={<Switch checked={useAiRecommendation} onChange={(event) => setUseAiRecommendation(event.target.checked)} />} label="AI 추천 사용" /><Typography color="text.secondary" variant="body2">기존 Recommendation Context와 Rule Recommendation 결과를 사용합니다.</Typography></Box><Button disabled={!canRecommend || programState.status !== "ready"} startIcon={<AutoAwesomeIcon />} variant="contained" onClick={() => void runRecommendation()} sx={{ minHeight: 48, minWidth: 180, transition: "transform 120ms ease", "&:hover": { transform: "translateY(-2px)" } }}>추천 확인</Button></Stack></CardContent></Card>
+            </Stack>
+          </CardContent>
+        </Card>
       ) : null}
 
       {currentStep === 3 ? (

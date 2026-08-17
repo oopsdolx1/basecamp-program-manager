@@ -1,4 +1,3 @@
-import AddIcon from "@mui/icons-material/Add";
 import FitnessCenterIcon from "@mui/icons-material/FitnessCenter";
 import GroupsIcon from "@mui/icons-material/Groups";
 import PrintIcon from "@mui/icons-material/Print";
@@ -46,7 +45,6 @@ export const DashboardPage = (): JSX.Element => {
   const loading = members.status === "loading" || programState.status === "loading" || printState.status === "loading" || sessionStatus === "loading";
   const quickActions = [
     ["회원 선택", "오늘 지도할 회원을 선택합니다.", <GroupsIcon />, routeBuilder.print()],
-    ["프로그램 생성", "새 프로그램을 구성합니다.", <AddIcon />, routeBuilder.newProgram()],
     ["프로그램 출력", "회원용 운동지를 출력합니다.", <PrintIcon />, routeBuilder.print()],
     ["운동 종목 관리", "Shared Knowledge를 확인합니다.", <FitnessCenterIcon />, routeBuilder.master()],
     ["Workout Sessions", "최근 세션 상태를 확인합니다.", <QrCode2Icon />, routeBuilder.workoutSessions()],
@@ -62,7 +60,7 @@ export const DashboardPage = (): JSX.Element => {
 
     <Grid container spacing={3}>
       <Grid item md={6} xs={12}><Card><Stack spacing={2}><Typography variant="h2">최근 회원</Typography>{members.status === "ready" && members.data.members.length === 0 ? <EmptyState title="최근 회원이 없습니다" description="회원 선택에서 첫 작업을 시작해보세요." action={<Button onClick={() => navigate(routeBuilder.print())}>회원 선택</Button>} /> : members.data.members.slice(0, 5).map((member) => <Button key={member.memberId} onClick={() => navigate(routeBuilder.print())} sx={{ justifyContent: "space-between" }} variant="tertiary"><span>{member.displayName}</span><span>선택</span></Button>)}</Stack></Card></Grid>
-      <Grid item md={6} xs={12}><Card><Stack spacing={2}><Typography variant="h2">최근 프로그램</Typography>{programState.status === "ready" && listItems.length === 0 ? <EmptyState title="프로그램이 없습니다" description="첫 프로그램을 만들어보세요." action={<Button onClick={() => navigate(routeBuilder.newProgram())}>프로그램 생성</Button>} /> : listItems.slice(0, 5).map((program) => <Button key={program.id} onClick={() => navigate(routeBuilder.programDetail(program.id))} sx={{ justifyContent: "space-between" }} variant="tertiary"><span>{program.favorite ? "★ " : ""}{program.title}</span><Badge>{program.exerciseCount}개 운동</Badge></Button>)}</Stack></Card></Grid>
+      <Grid item md={6} xs={12}><Card><Stack spacing={2}><Typography variant="h2">사용 가능한 프로그램</Typography>{programState.status === "ready" && listItems.length === 0 ? <EmptyState title="프로그램이 없습니다" description="Condition Lab Master에서 Program을 등록해 주세요." /> : listItems.slice(0, 5).map((program) => <Button key={program.id} onClick={() => navigate(routeBuilder.print())} sx={{ justifyContent: "space-between" }} variant="tertiary"><span>{program.favorite ? "★ " : ""}{program.title}</span><Badge>{program.exerciseCount}개 운동</Badge></Button>)}</Stack></Card></Grid>
       <Grid item md={6} xs={12}><Card><Stack spacing={2}><Typography variant="h2">최근 Workout Sessions</Typography>{sessionStatus === "ready" && sessions.length === 0 ? <EmptyState title="Workout Session이 없습니다" description="프로그램을 출력하면 세션이 생성됩니다." /> : sessions.slice(0, 5).map((session) => { const view = workoutSessionStatusPresentation[session.status]; return <Button key={session.sessionId} onClick={() => navigate(routeBuilder.workoutSessionDetail(session.sessionId))} sx={{ justifyContent: "space-between" }} variant="tertiary"><span>{session.memberSnapshot.name} · {session.programSnapshot.title}</span><StatusChip label={view.label} status={session.status === "confirmed" || session.status === "ai_completed" ? "success" : session.status === "ocr_completed" ? "info" : "pending"} /></Button>; })}</Stack></Card></Grid>
       <Grid item md={6} xs={12}><Card><Stack spacing={2}><Typography variant="h2">최근 출력 기록</Typography>{printState.status === "ready" && printRecords.length === 0 ? <EmptyState title="출력 기록이 없습니다" description="Quick Print에서 첫 출력을 진행해보세요." /> : printRecords.slice(0, 5).map((record) => <Button key={record.id} onClick={() => navigate(routeBuilder.printHistory({ memberId: record.memberId }))} sx={{ justifyContent: "space-between" }} variant="tertiary"><span>{record.memberSnapshot.name} · {record.programSnapshot.title}</span><span>{dateLabel(record.printedAt)} · {record.copy}부</span></Button>)}</Stack></Card></Grid>
     </Grid>

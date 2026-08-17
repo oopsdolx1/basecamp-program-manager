@@ -27,7 +27,7 @@ export interface WorkoutSessionRecord {
   programSnapshot: { title: string };
   exercises: WorkoutSessionExerciseSnapshot[];
   print: {
-    format: "A5-portrait";
+    format: "A5-portrait" | "A5-landscape";
     templateKey: "basecamp-workout-log-v1";
     templateVersion: 1;
     printHistoryId: string | null;

@@ -10,6 +10,7 @@ import { normalizeText } from "../../../../utils/normalizeText";
 import type { SnapshotBuilderExercise } from "../../services/snapshotBuilderService";
 
 interface SnapshotExerciseBuilderRowProps {
+  guided?: boolean;
   exercise: SnapshotBuilderExercise;
   index: number;
   total: number;
@@ -40,6 +41,7 @@ const searchText = (option: ExerciseCatalogOption): string =>
   normalizeText([option.name, option.displayName, option.englishName ?? "", ...option.aliases].join(" "));
 
 export const SnapshotExerciseBuilderRow = memo(function SnapshotExerciseBuilderRow({
+  guided = false,
   exercise,
   index,
   total,
@@ -66,8 +68,8 @@ export const SnapshotExerciseBuilderRow = memo(function SnapshotExerciseBuilderR
             <Stack direction="row" spacing={0.5}>
               <IconButton aria-label={`${exercise.order}번 운동 위로 이동`} disabled={index === 0} onClick={onMoveUp} sx={{ minHeight: 48, minWidth: 48 }}><KeyboardArrowUpIcon /></IconButton>
               <IconButton aria-label={`${exercise.order}번 운동 아래로 이동`} disabled={index === total - 1} onClick={onMoveDown} sx={{ minHeight: 48, minWidth: 48 }}><KeyboardArrowDownIcon /></IconButton>
-              <IconButton aria-label={`${exercise.order}번 운동 복사`} onClick={onDuplicate} sx={{ minHeight: 48, minWidth: 48 }}><ContentCopyIcon /></IconButton>
-              <IconButton aria-label={`${exercise.order}번 운동 삭제`} disabled={total <= 1} onClick={onDelete} sx={{ minHeight: 48, minWidth: 48 }}><DeleteIcon /></IconButton>
+              {!guided ? <IconButton aria-label={`${exercise.order}번 운동 복사`} onClick={onDuplicate} sx={{ minHeight: 48, minWidth: 48 }}><ContentCopyIcon /></IconButton> : null}
+              {!guided ? <IconButton aria-label={`${exercise.order}번 운동 삭제`} disabled={total <= 1} onClick={onDelete} sx={{ minHeight: 48, minWidth: 48 }}><DeleteIcon /></IconButton> : null}
             </Stack>
           </Stack>
 
@@ -89,21 +91,28 @@ export const SnapshotExerciseBuilderRow = memo(function SnapshotExerciseBuilderR
             renderInput={(params) => <TextField {...params} helperText={unavailableName ? `현재 저장값: ${unavailableName} (Shared Runtime에 없음)` : undefined} label="Exercise Replace" />}
           />
 
-          <Grid container spacing={1.5}>
-            <Grid item md={2.4} sm={4} xs={6}><TextField fullWidth label="세트" type="number" inputProps={{ min: 1 }} value={exercise.sets} onChange={(event) => onPatch({ sets: Number(event.target.value) })} /></Grid>
-            <Grid item md={2.4} sm={4} xs={6}><TextField fullWidth label="횟수" value={exercise.reps} onChange={(event) => onPatch({ reps: event.target.value })} /></Grid>
-            <Grid item md={2.4} sm={4} xs={6}><TextField fullWidth label="무게" value={exercise.weight} onChange={(event) => onPatch({ weight: event.target.value })} /></Grid>
-            <Grid item md={2.4} sm={6} xs={6}><TextField fullWidth label="휴식(초)" type="number" inputProps={{ min: 0 }} value={exercise.restSeconds} onChange={(event) => onPatch({ restSeconds: Number(event.target.value) })} /></Grid>
-            <Grid item md={2.4} sm={6} xs={12}><TextField fullWidth label="메모" value={exercise.memo} onChange={(event) => onPatch({ memo: event.target.value })} /></Grid>
-          </Grid>
+          {guided ? (
+            <Stack spacing={1.5}>
+              <Stack direction="row" flexWrap="wrap" gap={1}><Chip label={`${exercise.sets}세트`} /><Chip label={exercise.reps ? `${exercise.reps}회` : "횟수 미지정"} variant="outlined" /><Chip label={`휴식 ${exercise.restSeconds}초`} variant="outlined" /></Stack>
+              <TextField fullWidth label="출력 메모" value={exercise.memo} onChange={(event) => onPatch({ memo: event.target.value })} />
+            </Stack>
+          ) : (
+            <Grid container spacing={1.5}>
+              <Grid item md={2.4} sm={4} xs={6}><TextField fullWidth label="세트" type="number" inputProps={{ min: 1 }} value={exercise.sets} onChange={(event) => onPatch({ sets: Number(event.target.value) })} /></Grid>
+              <Grid item md={2.4} sm={4} xs={6}><TextField fullWidth label="횟수" value={exercise.reps} onChange={(event) => onPatch({ reps: event.target.value })} /></Grid>
+              <Grid item md={2.4} sm={4} xs={6}><TextField fullWidth label="무게" value={exercise.weight} onChange={(event) => onPatch({ weight: event.target.value })} /></Grid>
+              <Grid item md={2.4} sm={6} xs={6}><TextField fullWidth label="휴식(초)" type="number" inputProps={{ min: 0 }} value={exercise.restSeconds} onChange={(event) => onPatch({ restSeconds: Number(event.target.value) })} /></Grid>
+              <Grid item md={2.4} sm={6} xs={12}><TextField fullWidth label="메모" value={exercise.memo} onChange={(event) => onPatch({ memo: event.target.value })} /></Grid>
+            </Grid>
+          )}
 
-          <Stack direction="row" flexWrap="wrap" gap={1}>
+          {!guided ? <Stack direction="row" flexWrap="wrap" gap={1}>
             {presetButtons.map((preset) => (
               <Button key={preset.key} size="small" variant="outlined" onClick={() => onPreset(preset.key)}>
                 {preset.label}
               </Button>
             ))}
-          </Stack>
+          </Stack> : null}
         </Stack>
       </CardContent>
     </Card>

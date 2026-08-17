@@ -19,7 +19,7 @@ const mapRecord = (id: string, data: DocumentData): WorkoutSessionRecord => ({
   programSnapshot: data.programSnapshot,
   exercises: Array.isArray(data.exercises) ? data.exercises : [],
   print: {
-    format: "A5-portrait",
+    format: "A5-landscape",
     templateKey: "basecamp-workout-log-v1",
     templateVersion: 1,
     printHistoryId: typeof data.print?.printHistoryId === "string" ? data.print.printHistoryId : null,

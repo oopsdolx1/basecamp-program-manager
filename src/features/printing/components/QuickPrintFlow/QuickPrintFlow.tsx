@@ -9,7 +9,7 @@ import RedoIcon from "@mui/icons-material/Redo";
 import SmartToyIcon from "@mui/icons-material/SmartToy";
 import UndoIcon from "@mui/icons-material/Undo";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
-import { Alert, Box, Button, Card, CardActionArea, CardContent, Chip, CircularProgress, Collapse, FormControlLabel, Grid, LinearProgress, MenuItem, Slider, Stack, Switch, TextField, Typography } from "@mui/material";
+import { Alert, Box, Button, Card, CardActionArea, CardContent, Chip, CircularProgress, Collapse, FormControlLabel, Grid, LinearProgress, Slider, Stack, Switch, TextField, Typography } from "@mui/material";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { routeBuilder } from "../../../../app/routeBuilder";
@@ -22,11 +22,11 @@ import { useExerciseCatalog } from "../../../exercise-catalog";
 import type { MemberSelectionItem } from "../../../members";
 import { filterMembers, sortMembersByName } from "../../../members/services/memberService";
 import { filterMembersByInitial, KOREAN_INITIALS, type MemberInitialFilter } from "../../../members/utils/koreanInitial";
-import { getCategoryLabel, getDifficultyLabel, programCategories, programDifficulties } from "../../../programs/config/programOptions";
+import { getCategoryLabel, getDifficultyLabel } from "../../../programs/config/programOptions";
 import { usePrograms } from "../../../programs/hooks/usePrograms";
 import { hydrateProgramExerciseKnowledge, resolveProgramExerciseKnowledge } from "../../../../shared-knowledge/resolveProgramExercises";
 import { sanitizeProgramForm, validateProgramForm } from "../../../programs/services/programService";
-import type { Program, ProgramDifficulty, ProgramFormValues } from "../../../programs/types/program.types";
+import type { Program, ProgramFormValues } from "../../../programs/types/program.types";
 import type { MemberProvider } from "../../providers/memberProvider";
 import type { RecommendationProvider } from "../../providers/recommendationProvider";
 import { applyAiRecommendationToSnapshot, requestAiRecommendation } from "../../services/aiRecommendationService";
@@ -51,7 +51,7 @@ interface QuickPrintFlowProps {
   recommendationProvider: RecommendationProvider;
 }
 
-const stepLabels = ["회원 선택", "Today's Condition", "추천 프로그램", "Snapshot 수정"];
+const stepLabels = ["회원 선택", "컨디션 확인", "AI 추천 · Program 선택", "Program 편집"];
 const conditionOptions: Array<{ value: ConditionStatus; label: string }> = [
   { value: "GOOD", label: "좋음" },
   { value: "NORMAL", label: "보통" },
@@ -97,7 +97,6 @@ const infoCardSx = {
   boxShadow: palette.shadowCard,
   height: "100%",
 };
-const globalActions = [{ key: "sets_plus", label: "전체 세트 +1" }, { key: "sets_minus", label: "전체 세트 -1" }, { key: "rest_plus", label: "휴식 +30초" }, { key: "rest_minus", label: "휴식 -30초" }, { key: "clear_memo", label: "전체 메모 지우기" }, { key: "restore", label: "추천 상태로 복원" }] as const;
 const formatDaysAgo = (daysAgo: number | null): string => (daysAgo === null ? "운동 기록 없음" : daysAgo === 0 ? "오늘" : daysAgo === 1 ? "1일 전" : `${daysAgo}일 전`);
 const formatRatio = (value: number): string => `${Math.round(value * 100)}%`;
 const scoreColor = (value: number, goodHigh: boolean): "success" | "warning" | "error" => goodHigh ? (value >= 70 ? "success" : value >= 40 ? "warning" : "error") : (value >= 70 ? "error" : value >= 40 ? "warning" : "success");
@@ -181,7 +180,8 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
   const [members, setMembers] = useState<MemberSelectionItem[]>([]);
   const [currentStep, setCurrentStep] = useState<PrintStep>(1);
   const [memberQuery, setMemberQuery] = useState("");
-  const [memberInitial, setMemberInitial] = useState<MemberInitialFilter>("ALL");
+  const [programQuery, setProgramQuery] = useState("");
+  const [memberInitial, setMemberInitial] = useState<MemberInitialFilter | null>(null);
   const [selectedMember, setSelectedMember] = useState<MemberSelectionItem | null>(null);
   const [condition, setCondition] = useState<ConditionInput>(defaultCondition);
   const [recentWorkout, setRecentWorkout] = useState<RecentWorkoutSummary | null>(null);
@@ -202,9 +202,17 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
   const [sessionSaving, setSessionSaving] = useState(false);
   const [sessionError, setSessionError] = useState("");
   const hasSearchQuery = memberQuery.trim().length > 0;
-  const filteredMembers = useMemo(() => sortMembersByName(hasSearchQuery
-    ? filterMembers(members, memberQuery)
-    : filterMembersByInitial(members, memberInitial)), [hasSearchQuery, memberInitial, memberQuery, members]);
+  const filteredMembers = useMemo(() => {
+    if (hasSearchQuery) return sortMembersByName(filterMembers(members, memberQuery));
+    if (!memberInitial) return [];
+    return sortMembersByName(filterMembersByInitial(members, memberInitial));
+  }, [hasSearchQuery, memberInitial, memberQuery, members]);
+  const selectablePrograms = useMemo(() => {
+    const query = programQuery.trim().toLocaleLowerCase("ko-KR");
+    if (!query) return runtimePrograms;
+    return runtimePrograms.filter((program) => [program.title, getCategoryLabel(program.category), ...program.exercises.map((exercise) => exercise.name)]
+      .join(" ").toLocaleLowerCase("ko-KR").includes(query));
+  }, [programQuery, runtimePrograms]);
   const builderState = builderHistory?.present ?? null;
   const snapshotValues = useMemo(() => (builderState ? snapshotBuilderService.toProgramFormValues(builderState) : null), [builderState]);
   const snapshotValidation = useMemo(() => (snapshotValues ? validateProgramForm(snapshotValues) : { valid: false, errors: ["Snapshot이 준비되지 않았습니다."] }), [snapshotValues]);
@@ -308,8 +316,15 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
     }));
   };
 
-  const updateBuilderMeta = (patch: Partial<SnapshotBuilderHistory["present"]>) => {
-    setBuilderHistory((current) => (current ? snapshotBuilderService.updateMeta(current, patch) : current));
+  const selectProgramForBuilder = (program: Program) => {
+    setSnapshotSourceProgram(program);
+    if (program.id !== recommendation?.program.id || !builderHistory) {
+      setBuilderHistory(createSnapshotBuilderHistory(program));
+    }
+    setRecommendationReason(program.id === recommendation?.program.id
+      ? recommendationReason
+      : "Shared Program Repository에서 트레이너가 선택한 Program입니다.");
+    setCurrentStep(4);
   };
 
   const runRecommendation = async () => {
@@ -424,12 +439,12 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
               <Stack alignItems="center" spacing={1} textAlign="center">
                 <FitnessCenterIcon color="primary" fontSize="large" />
                 <Typography variant="h1">회원 선택</Typography>
-                <Typography color="text.secondary">초성을 누르고 회원 카드를 선택하세요.</Typography>
+                 <Typography color="text.secondary">본인 이름을 선택해 주세요.</Typography>
               </Stack>
               <Stack spacing={1.25}>
                 <Typography fontWeight={900}>초성 선택</Typography>
                 <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: "repeat(auto-fit, minmax(48px, 1fr))" }}>
-                  {([{ value: "ALL", label: "전체" }, ...KOREAN_INITIALS.map((initial) => ({ value: initial, label: initial })), { value: "OTHER", label: "기타" }] as Array<{ value: MemberInitialFilter; label: string }>).map((option) => (
+                  {([...KOREAN_INITIALS.map((initial) => ({ value: initial, label: initial })), { value: "OTHER", label: "기타" }] as Array<{ value: MemberInitialFilter; label: string }>).map((option) => (
                     <Button
                       key={option.value}
                       aria-pressed={!hasSearchQuery && memberInitial === option.value}
@@ -445,9 +460,9 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
               </Stack>
               {memberStatus === "loading" ? <LoadingState message="회원 목록을 불러오는 중입니다." /> : null}
               {memberStatus === "error" ? <ErrorState message={memberError} /> : null}
-              {memberStatus === "ready" && filteredMembers.length === 0 ? (
+              {memberStatus === "ready" && filteredMembers.length === 0 && (hasSearchQuery || memberInitial) ? (
                 <EmptyState
-                  title={hasSearchQuery ? "검색 결과가 없습니다." : `${memberInitial === "OTHER" ? "기타" : memberInitial === "ALL" ? "선택한 조건" : memberInitial}으로 시작하는 회원이 없습니다.`}
+                  title={hasSearchQuery ? "검색 결과가 없습니다." : `${memberInitial === "OTHER" ? "기타" : memberInitial}로 시작하는 회원이 없습니다.`}
                   description={hasSearchQuery ? "다른 이름이나 전화번호로 다시 검색해 주세요." : "다른 초성을 선택해 주세요."}
                 />
               ) : null}
@@ -471,8 +486,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
                           "&:active": { bgcolor: palette.primaryGoldMuted, transform: "none" },
                         }}
                       >
-                        <Typography fontWeight={900}>{member.displayName}</Typography>
-                        <Typography color="text.secondary" variant="body2">{member.phone ?? "전화번호 없음"}</Typography>
+                         <Typography fontWeight={900}>{member.displayName}</Typography>
                       </CardActionArea>
                     </Grid>
                   ))}
@@ -488,14 +502,74 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
       ) : null}
 
       {currentStep === 2 ? (
-        <Card sx={centeredCardSx(1040)}><CardContent sx={{ p: { md: 4, xs: 2.5 } }}><Stack spacing={3}><Stack direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1.5}><Stack spacing={0.75}><Typography variant="h1">Today's Condition</Typography><Typography color="text.secondary">{selectedMember?.displayName} 회원 정보</Typography>{recentWorkout ? <Stack direction="row" flexWrap="wrap" gap={1}><Chip label={`최근 운동 ${recentWorkout.title}`} /><Chip label={formatDaysAgo(recentWorkout.daysAgo)} variant="outlined" /></Stack> : <Typography color="text.secondary">최근 운동 기록이 없습니다.</Typography>}</Stack><Button startIcon={<ArrowBackIcon />} variant="outlined" onClick={() => setCurrentStep(1)}>회원 선택</Button></Stack><MemberIntelligenceCard intelligence={intelligence} status={intelligenceStatus} /><TrainingTrendCard periodization={periodization} status={intelligenceStatus} /><Card sx={infoCardSx}><CardContent><FormControlLabel control={<Switch checked={useAiRecommendation} onChange={(event) => setUseAiRecommendation(event.target.checked)} />} label="AI 추천 사용" /><Typography color="text.secondary" variant="body2">AI가 Recommendation Context와 Rule Recommendation 결과를 보완해 Snapshot에 반영합니다.</Typography></CardContent></Card><Stack spacing={1.5}><Typography fontWeight={900}>컨디션 상태</Typography><Grid container spacing={1.5}>{conditionOptions.map((option) => <Grid item key={option.value} md={4} xs={12}><CardActionArea aria-label={`컨디션 상태 ${option.label}`} aria-pressed={condition.condition === option.value} onClick={() => setCondition((current) => ({ ...current, condition: option.value }))} sx={largeChoiceCardSx(condition.condition === option.value)}><Typography fontWeight={900}>{option.label}</Typography></CardActionArea></Grid>)}</Grid></Stack><Stack spacing={1.5}><Typography fontWeight={900}>수면 상태</Typography><Grid container spacing={1.5}>{sleepOptions.map((option) => <Grid item key={option.value} md={4} xs={12}><CardActionArea aria-label={`수면 상태 ${option.label}`} aria-pressed={condition.sleep === option.value} onClick={() => setCondition((current) => ({ ...current, sleep: option.value }))} sx={largeChoiceCardSx(condition.sleep === option.value)}><Typography fontWeight={900}>{option.label}</Typography></CardActionArea></Grid>)}</Grid></Stack><Stack spacing={1.5}><Typography fontWeight={900}>피로 부위</Typography><Stack direction="row" flexWrap="wrap" gap={1}>{fatigueOptions.map((option) => <Chip key={option.value} aria-label={`피로 부위 ${option.label}`} clickable color={condition.fatigueAreas.includes(option.value) ? "primary" : "default"} label={option.label} onClick={() => toggleFatigue(option.value)} sx={{ minHeight: 56, px: 1.5 }} />)}<Chip aria-label="피로 부위 없음" clickable color={condition.fatigueAreas.length === 0 ? "primary" : "default"} label="없음" onClick={() => setCondition((current) => ({ ...current, fatigueAreas: [] }))} sx={{ minHeight: 56, px: 1.5 }} /></Stack></Stack><Stack spacing={1.5}><Typography fontWeight={900}>스트레스</Typography><Box sx={{ px: 1 }}><Slider aria-label="스트레스" marks max={5} min={1} step={1} value={condition.stress} onChange={(_, value) => setCondition((current) => ({ ...current, stress: Number(value) }))} /><Typography color="text.secondary">현재 스트레스: {condition.stress}</Typography></Box></Stack><Stack spacing={1.5}><Typography fontWeight={900}>음주 여부</Typography><Grid container spacing={1.5}>{alcoholOptions.map((option) => <Grid item key={option.value} md={6} xs={12}><CardActionArea aria-label={`음주 여부 ${option.label}`} aria-pressed={condition.alcohol === option.value} onClick={() => setCondition((current) => ({ ...current, alcohol: option.value }))} sx={largeChoiceCardSx(condition.alcohol === option.value)}><Typography fontWeight={900}>{option.label}</Typography></CardActionArea></Grid>)}</Grid></Stack><Stack direction={{ sm: "row", xs: "column" }} justifyContent="flex-end" spacing={1}><Button disabled={!canRecommend || programState.status !== "ready"} size="large" startIcon={<AutoAwesomeIcon />} variant="contained" onClick={() => void runRecommendation()} sx={{ minHeight: 56, minWidth: 180 }}>추천하기</Button></Stack></Stack></CardContent></Card>
+        <Card sx={centeredCardSx(1040)}><CardContent sx={{ p: { md: 4, xs: 2.5 } }}><Stack spacing={3}><Stack direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1.5}><Stack spacing={0.75}><Typography variant="h1">컨디션 확인</Typography><Typography color="text.secondary">{selectedMember?.displayName} 회원 정보</Typography>{recentWorkout ? <Stack direction="row" flexWrap="wrap" gap={1}><Chip label={`최근 운동 ${recentWorkout.title}`} /><Chip label={formatDaysAgo(recentWorkout.daysAgo)} variant="outlined" /></Stack> : <Typography color="text.secondary">최근 운동 기록이 없습니다.</Typography>}</Stack><Button startIcon={<ArrowBackIcon />} variant="outlined" onClick={() => setCurrentStep(1)}>회원 선택</Button></Stack><MemberIntelligenceCard intelligence={intelligence} status={intelligenceStatus} /><TrainingTrendCard periodization={periodization} status={intelligenceStatus} /><Card sx={infoCardSx}><CardContent><FormControlLabel control={<Switch checked={useAiRecommendation} onChange={(event) => setUseAiRecommendation(event.target.checked)} />} label="AI 추천 사용" /><Typography color="text.secondary" variant="body2">기존 Recommendation Context와 Rule Recommendation 결과를 사용합니다.</Typography></CardContent></Card><Stack spacing={1.5}><Typography fontWeight={900}>컨디션 상태</Typography><Grid container spacing={1.5}>{conditionOptions.map((option) => <Grid item key={option.value} md={4} xs={12}><CardActionArea aria-label={`컨디션 상태 ${option.label}`} aria-pressed={condition.condition === option.value} onClick={() => setCondition((current) => ({ ...current, condition: option.value }))} sx={largeChoiceCardSx(condition.condition === option.value)}><Typography fontWeight={900}>{option.label}</Typography></CardActionArea></Grid>)}</Grid></Stack><Stack spacing={1.5}><Typography fontWeight={900}>수면 상태</Typography><Grid container spacing={1.5}>{sleepOptions.map((option) => <Grid item key={option.value} md={4} xs={12}><CardActionArea aria-label={`수면 상태 ${option.label}`} aria-pressed={condition.sleep === option.value} onClick={() => setCondition((current) => ({ ...current, sleep: option.value }))} sx={largeChoiceCardSx(condition.sleep === option.value)}><Typography fontWeight={900}>{option.label}</Typography></CardActionArea></Grid>)}</Grid></Stack><Stack spacing={1.5}><Typography fontWeight={900}>피로 · 근육통 부위</Typography><Stack direction="row" flexWrap="wrap" gap={1}>{fatigueOptions.map((option) => <Chip key={option.value} aria-label={`피로 또는 근육통 부위 ${option.label}`} clickable color={condition.fatigueAreas.includes(option.value) ? "primary" : "default"} label={option.label} onClick={() => toggleFatigue(option.value)} sx={{ minHeight: 56, px: 1.5 }} />)}<Chip aria-label="피로 또는 근육통 부위 없음" clickable color={condition.fatigueAreas.length === 0 ? "primary" : "default"} label="없음" onClick={() => setCondition((current) => ({ ...current, fatigueAreas: [] }))} sx={{ minHeight: 56, px: 1.5 }} /></Stack></Stack><Stack spacing={1.5}><Typography fontWeight={900}>피로도</Typography><Box sx={{ px: 1 }}><Slider aria-label="피로도" marks max={5} min={1} step={1} value={condition.stress} onChange={(_, value) => setCondition((current) => ({ ...current, stress: Number(value) }))} /><Typography color="text.secondary">현재 피로도: {condition.stress}</Typography></Box></Stack><Stack spacing={1.5}><Typography fontWeight={900}>음주 여부</Typography><Grid container spacing={1.5}>{alcoholOptions.map((option) => <Grid item key={option.value} md={6} xs={12}><CardActionArea aria-label={`음주 여부 ${option.label}`} aria-pressed={condition.alcohol === option.value} onClick={() => setCondition((current) => ({ ...current, alcohol: option.value }))} sx={largeChoiceCardSx(condition.alcohol === option.value)}><Typography fontWeight={900}>{option.label}</Typography></CardActionArea></Grid>)}</Grid></Stack><Stack direction={{ sm: "row", xs: "column" }} justifyContent="flex-end" spacing={1}><Button disabled={!canRecommend || programState.status !== "ready"} size="large" startIcon={<AutoAwesomeIcon />} variant="contained" onClick={() => void runRecommendation()} sx={{ minHeight: 56, minWidth: 180 }}>추천 확인</Button></Stack></Stack></CardContent></Card>
       ) : null}
 
       {currentStep === 3 ? (
-        <Card sx={centeredCardSx(1040)}><CardContent sx={{ p: { md: 4, xs: 2.5 } }}><Stack spacing={3}><Stack direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1.5}><Stack spacing={0.75}><Stack alignItems="center" direction="row" spacing={1}><Typography variant="h1">추천 프로그램</Typography>{aiStatus === "ready" ? <Chip color="primary" icon={<SmartToyIcon />} label="AI Applied" size="small" /> : null}</Stack><Typography color="text.secondary">Provider와 Recommendation Context를 바탕으로 Rule Recommendation 결과를 확인합니다.</Typography></Stack><Stack direction={{ sm: "row", xs: "column" }} spacing={1}><Button startIcon={<ArrowBackIcon />} variant="outlined" onClick={() => setCurrentStep(2)}>컨디션 수정</Button><Button disabled={!recommendation || !builderHistory} startIcon={<CheckCircleIcon />} variant="contained" onClick={() => setCurrentStep(4)}>Snapshot 수정</Button></Stack></Stack><TrainingTrendCard periodization={periodization} status={intelligenceStatus} /><MemberIntelligenceCard intelligence={intelligence} status={intelligenceStatus} />{programState.status === "loading" ? <LoadingState message="운동 프로그램을 불러오는 중입니다." /> : null}{programState.status === "error" ? <ErrorState message={programState.message} /> : null}{recommendationReason ? <Alert severity="info">{recommendationReason}</Alert> : null}<RecommendationTraceCard recommendation={recommendation} trace={recommendationTrace} showCandidates={showCandidates} onToggleCandidates={() => setShowCandidates((current) => !current)} />{renderAiCards()}{recommendation ? <Card sx={infoCardSx}><CardContent><Stack spacing={2}><Stack direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1}><Box><Typography variant="h2">{recommendation.program.title}</Typography><Stack direction="row" flexWrap="wrap" gap={1} sx={{ mt: 1 }}><Chip label={getCategoryLabel(recommendation.program.category)} /><Chip label={getDifficultyLabel(recommendation.program.difficulty)} variant="outlined" /><Chip label={`${recommendation.program.exercises.length}개 운동`} variant="outlined" /></Stack></Box><Chip color="primary" label={`추천 점수 ${recommendation.score}`} /></Stack><Stack spacing={1}>{recommendation.program.exercises.map((exercise) => <Box key={exercise.id} sx={{ border: 1, borderColor: "divider", borderRadius: `${palette.radiusSm}px`, bgcolor: palette.surfaceInteractive, p: 1.5 }}><Typography fontWeight={900}>{exercise.order}. {exercise.name}</Typography><Typography color="text.secondary" variant="body2">{exercise.sets}세트{exercise.memo ? ` · ${exercise.memo}` : ""}</Typography></Box>)}</Stack></Stack></CardContent></Card> : null}</Stack></CardContent></Card>
+        <Card sx={centeredCardSx(1040)}>
+          <CardContent sx={{ p: { md: 4, xs: 2.5 } }}>
+            <Stack spacing={3}>
+              <Stack direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1.5}>
+                <Stack spacing={0.75}>
+                  <Stack alignItems="center" direction="row" spacing={1}>
+                    <Typography variant="h1">AI 추천 · Program 선택</Typography>
+                    {aiStatus === "ready" ? <Chip color="primary" icon={<SmartToyIcon />} label="AI Applied" size="small" /> : null}
+                  </Stack>
+                  <Typography color="text.secondary">추천 결과를 확인하고 Shared Program Repository에서 출력할 Program을 선택하세요.</Typography>
+                </Stack>
+                <Button startIcon={<ArrowBackIcon />} variant="outlined" onClick={() => setCurrentStep(2)}>컨디션 수정</Button>
+              </Stack>
+              <TrainingTrendCard periodization={periodization} status={intelligenceStatus} />
+              <MemberIntelligenceCard intelligence={intelligence} status={intelligenceStatus} />
+              {programState.status === "loading" ? <LoadingState message="운동 프로그램을 불러오는 중입니다." /> : null}
+              {programState.status === "error" ? <ErrorState message={programState.message} /> : null}
+              {recommendationReason ? <Alert severity="info">{recommendationReason}</Alert> : null}
+              <RecommendationTraceCard recommendation={recommendation} trace={recommendationTrace} showCandidates={showCandidates} onToggleCandidates={() => setShowCandidates((current) => !current)} />
+              {renderAiCards()}
+              {recommendation ? (
+                <Card sx={{ ...infoCardSx, borderColor: "primary.main" }}>
+                  <CardContent><Stack spacing={2}>
+                    <Stack direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1.5}>
+                      <Box><Chip color="primary" label="추천 Program" size="small" /><Typography sx={{ mt: 1 }} variant="h2">{recommendation.program.title}</Typography><Stack direction="row" flexWrap="wrap" gap={1} sx={{ mt: 1 }}><Chip label={getCategoryLabel(recommendation.program.category)} /><Chip label={getDifficultyLabel(recommendation.program.difficulty)} variant="outlined" /><Chip label={`${recommendation.program.exercises.length}개 운동`} variant="outlined" /></Stack></Box>
+                      <Stack alignItems={{ sm: "flex-end", xs: "stretch" }} spacing={1}><Chip color="primary" label={`추천 점수 ${recommendation.score}`} /><Button startIcon={<CheckCircleIcon />} variant="contained" onClick={() => selectProgramForBuilder(recommendation.program)} sx={{ minHeight: 48 }}>추천 Program 선택</Button></Stack>
+                    </Stack>
+                    <Stack spacing={1}>{recommendation.program.exercises.map((exercise) => <Box key={exercise.id} sx={{ border: 1, borderColor: "divider", borderRadius: `${palette.radiusSm}px`, bgcolor: palette.surfaceInteractive, p: 1.5 }}><Typography fontWeight={900}>{exercise.order}. {exercise.name}</Typography><Typography color="text.secondary" variant="body2">{exercise.sets}세트{exercise.memo ? ` · ${exercise.memo}` : ""}</Typography></Box>)}</Stack>
+                  </Stack></CardContent>
+                </Card>
+              ) : null}
+              <Stack spacing={1.5}>
+                <Stack direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1.5}><Box><Typography variant="h2">Program Repository</Typography><Typography color="text.secondary">Program Manager에서는 조회와 선택만 가능합니다.</Typography></Box><TextField label="Program 검색" size="small" value={programQuery} onChange={(event) => setProgramQuery(event.target.value)} sx={{ minWidth: { sm: 280 } }} /></Stack>
+                {programState.status === "ready" && selectablePrograms.length === 0 ? <EmptyState title="선택할 Program이 없습니다." description="Program 생성과 관리는 Condition Lab Master에서 수행합니다." /> : null}
+                <Grid container spacing={1.5}>{selectablePrograms.map((program) => <Grid item key={program.id} md={6} xs={12}><CardActionArea aria-label={`${program.title} 선택`} onClick={() => selectProgramForBuilder(program)} sx={largeChoiceCardSx(program.id === recommendation?.program.id)}><Stack spacing={1}><Stack alignItems="center" direction="row" justifyContent="space-between" spacing={1}><Typography fontWeight={900}>{program.title}</Typography>{program.id === recommendation?.program.id ? <Chip color="primary" label="추천" size="small" /> : null}</Stack><Stack direction="row" flexWrap="wrap" gap={1}><Chip label={getCategoryLabel(program.category)} size="small" /><Chip label={getDifficultyLabel(program.difficulty)} size="small" variant="outlined" /><Chip label={`${program.exercises.length}개`} size="small" variant="outlined" /></Stack></Stack></CardActionArea></Grid>)}</Grid>
+              </Stack>
+            </Stack>
+          </CardContent>
+        </Card>
       ) : null}
       {currentStep === 4 ? (
-        <Card sx={centeredCardSx(1180)}><CardContent sx={{ p: { md: 4, xs: 2.5 } }}><Stack spacing={3}><Stack direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1.5}><Stack spacing={0.75}><Stack alignItems="center" direction="row" spacing={1}><Typography variant="h1">Snapshot Program Builder</Typography>{aiStatus === "ready" ? <Chip color="primary" icon={<SmartToyIcon />} label="AI Snapshot" size="small" /> : null}</Stack><Typography color="text.secondary">추천 프로그램을 바탕으로 운동 내용을 수정한 뒤 Snapshot으로 저장합니다.</Typography></Stack><Stack direction={{ sm: "row", xs: "column" }} spacing={1}><Button startIcon={<ArrowBackIcon />} variant="outlined" onClick={() => setCurrentStep(3)}>추천 프로그램으로 돌아가기</Button><Button disabled={!snapshotValidation.valid || !selectedMember || !snapshotSourceProgram || !snapshotValues} startIcon={<PrintIcon />} variant="contained" onClick={goPrintPreview}>출력 미리보기</Button></Stack></Stack><MemberIntelligenceCard intelligence={intelligence} status={intelligenceStatus} />{recommendationReason ? <Alert severity="info">{recommendationReason}</Alert> : null}{!snapshotValidation.valid ? <Alert severity="warning">{snapshotValidation.errors[0]}</Alert> : null}{renderAiCards()}<Grid container spacing={2}><Grid item md={4} xs={12}><TextField fullWidth label="프로그램명" value={builderState?.title ?? ""} onChange={(event) => updateBuilderMeta({ title: event.target.value })} /></Grid><Grid item md={4} xs={12}><TextField fullWidth label="카테고리" select value={builderState?.category ?? "FULL_BODY"} onChange={(event) => updateBuilderMeta({ category: event.target.value as ProgramFormValues["category"] })}>{programCategories.map((category) => <MenuItem key={category.value} value={category.value}>{category.label}</MenuItem>)}</TextField></Grid><Grid item md={4} xs={12}><TextField fullWidth label="난이도" select value={builderState?.difficulty ?? "GENERAL"} onChange={(event) => updateBuilderMeta({ difficulty: event.target.value as ProgramDifficulty })}>{programDifficulties.map((difficulty) => <MenuItem key={difficulty.value} value={difficulty.value}>{difficulty.label}</MenuItem>)}</TextField></Grid><Grid item xs={12}><TextField fullWidth label="프로그램 메모" multiline minRows={2} value={builderState?.memo ?? ""} onChange={(event) => updateBuilderMeta({ memo: event.target.value })} /></Grid></Grid><Card sx={infoCardSx}><CardContent><Stack direction={{ lg: "row", xs: "column" }} justifyContent="space-between" spacing={2}><Stack direction="row" flexWrap="wrap" gap={1}><Button startIcon={<UndoIcon />} variant="outlined" disabled={!builderHistory || !snapshotBuilderService.canUndo(builderHistory)} onClick={() => setBuilderHistory((current) => (current ? snapshotBuilderService.undo(current) : current))}>Undo</Button><Button startIcon={<RedoIcon />} variant="outlined" disabled={!builderHistory || !snapshotBuilderService.canRedo(builderHistory)} onClick={() => setBuilderHistory((current) => (current ? snapshotBuilderService.redo(current) : current))}>Redo</Button><Chip icon={<HistoryIcon />} label="Ctrl+Z / Ctrl+Y 실행 취소/다시 실행" variant="outlined" /></Stack><Stack direction="row" flexWrap="wrap" gap={1}>{globalActions.map((action) => <Button key={action.key} size="small" variant={action.key === "restore" ? "contained" : "outlined"} disabled={!builderHistory || !snapshotSourceProgram} onClick={() => setBuilderHistory((current) => current && snapshotSourceProgram ? snapshotBuilderService.applyGlobal(current, action.key, snapshotSourceProgram) : current)}>{action.label}</Button>)}</Stack></Stack></CardContent></Card>{catalogState.status === "loading" ? <LoadingState message="Exercise Catalog를 불러오는 중입니다." /> : null}{catalogState.status === "error" ? <Alert severity="warning">{catalogState.message}</Alert> : null}<Stack alignItems="center" direction="row" justifyContent="space-between"><Typography variant="h2">운동 목록</Typography><Button disabled={!builderHistory || builderState?.exercises.length === 8} startIcon={<AddIcon />} onClick={() => setBuilderHistory((current) => (current ? snapshotBuilderService.addBlank(current) : current))}>운동 추가</Button></Stack><Stack spacing={1.5}>{(builderState?.exercises ?? []).map((exercise, index, array) => <SnapshotExerciseBuilderRow key={exercise.id} exercise={exercise} index={index} total={array.length} catalogOptions={catalogOptions} onPatch={(patch) => setBuilderHistory((current) => (current ? snapshotBuilderService.patchExercise(current, exercise.id, patch) : current))} onMoveUp={() => setBuilderHistory((current) => (current ? snapshotBuilderService.move(current, exercise.id, "up") : current))} onMoveDown={() => setBuilderHistory((current) => (current ? snapshotBuilderService.move(current, exercise.id, "down") : current))} onDuplicate={() => setBuilderHistory((current) => (current ? snapshotBuilderService.duplicate(current, exercise.id) : current))} onDelete={() => setBuilderHistory((current) => (current ? snapshotBuilderService.remove(current, exercise.id) : current))} onPreset={(preset) => setBuilderHistory((current) => (current ? snapshotBuilderService.applyPreset(current, exercise.id, preset) : current))} />)}</Stack></Stack></CardContent></Card>
+        <Card sx={centeredCardSx(1180)}>
+          <CardContent sx={{ p: { md: 4, xs: 2.5 } }}>
+            <Stack spacing={3}>
+              <Stack direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1.5}>
+                <Stack spacing={0.75}>
+                  <Stack alignItems="center" direction="row" spacing={1}><Typography variant="h1">Program 편집</Typography>{aiStatus === "ready" ? <Chip color="primary" icon={<SmartToyIcon />} label="AI Snapshot" size="small" /> : null}</Stack>
+                  <Typography color="text.secondary">Program 메타데이터는 읽기 전용입니다. 운동 순서·교체·메모만 출력 Snapshot에 반영됩니다.</Typography>
+                </Stack>
+                <Stack direction={{ sm: "row", xs: "column" }} spacing={1}><Button startIcon={<ArrowBackIcon />} variant="outlined" onClick={() => setCurrentStep(3)}>Program 다시 선택</Button><Button disabled={!snapshotValidation.valid || !selectedMember || !snapshotSourceProgram || !snapshotValues} startIcon={<PrintIcon />} variant="contained" onClick={goPrintPreview}>출력 미리보기</Button></Stack>
+              </Stack>
+              <Card sx={infoCardSx}><CardContent><Stack direction={{ md: "row", xs: "column" }} justifyContent="space-between" spacing={2}><Box><Typography color="text.secondary" variant="body2">선택한 Program</Typography><Typography variant="h2">{builderState?.title}</Typography></Box><Stack direction="row" flexWrap="wrap" gap={1}><Chip label={builderState ? getCategoryLabel(builderState.category) : ""} /><Chip label={builderState ? getDifficultyLabel(builderState.difficulty) : ""} variant="outlined" /><Chip label={`${builderState?.exercises.length ?? 0}개 운동`} variant="outlined" /></Stack></Stack></CardContent></Card>
+              <MemberIntelligenceCard intelligence={intelligence} status={intelligenceStatus} />
+              {recommendationReason ? <Alert severity="info">{recommendationReason}</Alert> : null}
+              {!snapshotValidation.valid ? <Alert severity="warning">{snapshotValidation.errors[0]}</Alert> : null}
+              {renderAiCards()}
+              <Card sx={infoCardSx}><CardContent><Stack direction="row" flexWrap="wrap" gap={1}><Button startIcon={<UndoIcon />} variant="outlined" disabled={!builderHistory || !snapshotBuilderService.canUndo(builderHistory)} onClick={() => setBuilderHistory((current) => (current ? snapshotBuilderService.undo(current) : current))}>실행 취소</Button><Button startIcon={<RedoIcon />} variant="outlined" disabled={!builderHistory || !snapshotBuilderService.canRedo(builderHistory)} onClick={() => setBuilderHistory((current) => (current ? snapshotBuilderService.redo(current) : current))}>다시 실행</Button><Chip icon={<HistoryIcon />} label="Ctrl+Z / Ctrl+Y" variant="outlined" /></Stack></CardContent></Card>
+              {catalogState.status === "loading" ? <LoadingState message="Exercise Catalog를 불러오는 중입니다." /> : null}
+              {catalogState.status === "error" ? <Alert severity="warning">{catalogState.message}</Alert> : null}
+              <Typography variant="h2">운동 목록</Typography>
+              <Stack spacing={1.5}>{(builderState?.exercises ?? []).map((exercise, index, array) => <SnapshotExerciseBuilderRow guided key={exercise.id} exercise={exercise} index={index} total={array.length} catalogOptions={catalogOptions} onPatch={(patch) => setBuilderHistory((current) => (current ? snapshotBuilderService.patchExercise(current, exercise.id, patch) : current))} onMoveUp={() => setBuilderHistory((current) => (current ? snapshotBuilderService.move(current, exercise.id, "up") : current))} onMoveDown={() => setBuilderHistory((current) => (current ? snapshotBuilderService.move(current, exercise.id, "down") : current))} onDuplicate={() => undefined} onDelete={() => undefined} onPreset={() => undefined} />)}</Stack>
+            </Stack>
+          </CardContent>
+        </Card>
       ) : null}
     </Stack>
   );

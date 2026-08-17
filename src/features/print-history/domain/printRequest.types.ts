@@ -31,7 +31,7 @@ export interface PrintRequestProgramSnapshot {
 export interface PrintRequestTemplateSnapshot {
   templateKey: "basecamp-workout-log-v1";
   templateVersion: 1;
-  format: "A5-portrait";
+  format: "A5-portrait" | "A5-landscape";
   approvalStatus: TemplateApprovalStatus;
   exerciseRowCount: 8;
   setColumnCount: 5;

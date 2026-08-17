@@ -17,14 +17,14 @@
     }
 
     .a5-workout-document {
-      height: calc(141.8919vw - 22.7027px);
+      height: calc((100vw - 16px) * 0.7047619);
       width: calc(100vw - 16px);
     }
   }
 }
 
 @page {
-  size: A5 portrait;
+  size: A5 landscape;
   margin: 0;
 }
 
@@ -69,16 +69,16 @@
   display: flex;
   flex-direction: column;
   font-family: "Noto Sans KR", Arial, sans-serif;
-  height: 210mm;
+  height: 148mm;
   overflow: hidden;
-  padding: 7mm;
+  padding: 5mm;
   page-break-after: avoid;
   page-break-before: avoid;
   page-break-inside: avoid;
   break-after: avoid;
   break-before: avoid;
   break-inside: avoid;
-  width: 148mm;
+  width: 210mm;
 }
 
 .print-header {
@@ -86,7 +86,7 @@
   border-bottom: 0.45mm solid #111;
   display: flex;
   justify-content: space-between;
-  padding-bottom: 2.5mm;
+  padding-bottom: 1.5mm;
 }
 
 .print-session-code {
@@ -94,12 +94,12 @@
   display: flex;
   flex-direction: column;
   margin-left: 3mm;
-  width: 19mm;
+  width: 17mm;
 }
 
 .print-session-code svg {
-  height: 17mm;
-  width: 17mm;
+  height: 14mm;
+  width: 14mm;
 }
 
 .print-session-code span {
@@ -112,7 +112,7 @@
 }
 
 .print-logo {
-  font-size: 18pt;
+  font-size: 15pt;
   font-weight: 800;
   letter-spacing: 0;
 }
@@ -135,26 +135,26 @@
 
 .print-section {
   border-bottom: 0.25mm solid #c8c8c8;
-  padding: 2mm 0;
+  padding: 1mm 0;
 }
 
 .print-section-title {
   font-size: 8pt;
   font-weight: 800;
-  margin-bottom: 1.4mm;
+  margin-bottom: 0.7mm;
 }
 
 .print-info-grid {
   display: grid;
   font-size: 8pt;
-  gap: 1.4mm 4mm;
+  gap: 0.7mm 4mm;
   grid-template-columns: 1fr 1fr 1fr;
 }
 
 .blank-line {
   border-bottom: 0.25mm solid #111;
   display: inline-block;
-  height: 4mm;
+  height: 3mm;
   min-width: 22mm;
   vertical-align: bottom;
 }
@@ -205,17 +205,17 @@
 .exercise-print-table th {
   background: #efefec;
   font-weight: 800;
-  height: 6mm;
+  height: 5mm;
 }
 
 .exercise-name-cell {
   padding: 1.2mm;
   vertical-align: top;
-  width: 31mm;
+  width: 46mm;
 }
 
 .exercise-row {
-  height: 13.4mm;
+  height: 8.2mm;
   page-break-inside: avoid;
   break-inside: avoid;
 }
@@ -273,7 +273,7 @@
   display: grid;
   gap: 0.4mm;
   grid-template-rows: repeat(3, 1fr);
-  height: 10.6mm;
+  height: 6.2mm;
 }
 
 .handwrite-line {
@@ -290,9 +290,9 @@
   flex: 1;
   font-size: 7pt;
   line-height: 1.35;
-  margin-top: 2mm;
-  max-height: 15mm;
-  min-height: 12mm;
+  margin-top: 1mm;
+  max-height: 8mm;
+  min-height: 7mm;
   overflow: hidden;
   padding: 1.8mm;
 }
@@ -300,7 +300,7 @@
 .print-memo-section {
   border-bottom: 0;
   flex: 1;
-  min-height: 18mm;
+  min-height: 10mm;
   overflow: hidden;
 }
 
@@ -309,5 +309,5 @@
   display: flex;
   font-size: 6.4pt;
   justify-content: space-between;
-  margin-top: 2mm;
+  margin-top: 1mm;
 }

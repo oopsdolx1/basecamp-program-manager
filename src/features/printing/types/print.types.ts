@@ -39,7 +39,7 @@ export interface PrintExerciseRow {
 export interface WorkoutPrintDocument {
   templateKey: "basecamp-workout-log-v1";
   templateVersion: 1;
-  format: "A5-portrait";
+  format: "A5-landscape";
   member: PrintMemberSnapshot;
   workoutSessionId: string;
   bodyParts: string[];

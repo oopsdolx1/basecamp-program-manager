@@ -38,6 +38,8 @@ export const useExerciseCatalog = (_appId: AppId) => {
           catalogIds,
           identityMatch: runtimeIds.length === catalogIds.length && runtimeIds.every((id, index) => id === catalogIds[index]),
         });
+        console.info(`[ProgramManager Hydration] Mapper count=${items.length}`, { exerciseIds: catalogIds });
+        console.info(`[ProgramManager Hydration] UI count=${items.length}`, { exerciseIds: catalogIds });
         if (runtimeStatus === "loading") {
           setCatalogState({ status: "loading", data: [] });
         } else if (runtimeStatus === "error") {

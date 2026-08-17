@@ -1,6 +1,11 @@
 import { doc, onSnapshot } from "firebase/firestore";
 import { ensureFirebaseAuth } from "../firebase/firebaseAuth";
 import { getFirestoreClient } from "../firebase/firestoreClient";
+import {
+  countRawSnapshotItems,
+  createSharedRuntimeSnapshotStore,
+  type SharedRuntimeSnapshot,
+} from "./sharedRuntimeSnapshotStore";
 
 export interface SharedExerciseKnowledge {
   schemaVersion: number;
@@ -31,27 +36,7 @@ export interface SharedExerciseKnowledge {
   memo: string;
 }
 
-interface RuntimeSnapshot {
-  schemaVersion: number;
-  knowledgeVersion: string;
-  revision: number;
-  updatedAt: unknown;
-  updatedBy: string;
-  checksum: string;
-  exerciseCount: number;
-  items: SharedExerciseKnowledge[];
-}
-
-interface RuntimeDistributionEnvelope {
-  metadata?: {
-    revision?: number;
-    updatedAt?: unknown;
-    importedBy?: string;
-    checksum?: string;
-    count?: number;
-  };
-  runtime?: Partial<RuntimeSnapshot>;
-}
+type RuntimeSnapshot = SharedRuntimeSnapshot<SharedExerciseKnowledge>;
 
 const appId = (import.meta.env.VITE_CONDITION_LAB_APP_ID ?? "").trim();
 const projectId = (import.meta.env.VITE_FIREBASE_PROJECT_ID ?? "").trim();
@@ -73,28 +58,7 @@ const isExercise = (value: unknown): value is SharedExerciseKnowledge => {
   const exercise = value as Partial<SharedExerciseKnowledge>;
   return typeof exercise.id === "string" && typeof exercise.name === "string" && Array.isArray(exercise.aliases);
 };
-const isRuntimeSnapshot = (value: unknown): value is RuntimeSnapshot => {
-  if (!value || typeof value !== "object") return false;
-  const snapshot = value as Partial<RuntimeSnapshot>;
-  return typeof snapshot.revision === "number" && Array.isArray(snapshot.items)
-    && snapshot.items.every(isExercise)
-    && snapshot.exerciseCount === snapshot.items.length;
-};
-const unwrapRuntimeSnapshot = (value: unknown): RuntimeSnapshot | null => {
-  if (isRuntimeSnapshot(value)) return value;
-  if (!value || typeof value !== "object") return null;
-  const envelope = value as RuntimeDistributionEnvelope;
-  if (!envelope.runtime || !envelope.metadata) return null;
-  const candidate = {
-    ...envelope.runtime,
-    revision: envelope.metadata.revision,
-    updatedAt: envelope.metadata.updatedAt,
-    updatedBy: envelope.metadata.importedBy ?? "",
-    checksum: envelope.metadata.checksum ?? "",
-    exerciseCount: envelope.runtime.exerciseCount ?? envelope.metadata.count,
-  };
-  return isRuntimeSnapshot(candidate) ? candidate : null;
-};
+const snapshotStore = createSharedRuntimeSnapshotStore(isExercise);
 const notify = () => listeners.forEach((listener) => listener());
 const replaceSnapshot = (snapshot: RuntimeSnapshot) => {
   exercises = snapshot.items.filter((item) => item.status === "active").map((item) => ({
@@ -109,7 +73,7 @@ const replaceSnapshot = (snapshot: RuntimeSnapshot) => {
   revision = snapshot.revision;
   connectionStatus = "ready";
   connectionError = "";
-  console.info("[SharedRuntime Receive]", {
+  console.info(`[ProgramManager Hydration] Runtime count=${exercises.length}`, {
     documentExists: true,
     projectId,
     appId,
@@ -118,6 +82,7 @@ const replaceSnapshot = (snapshot: RuntimeSnapshot) => {
     firestoreCount: snapshot.exerciseCount,
     receivedCount: snapshot.items.length,
     catalogCount: exercises.length,
+    runtimeCount: exercises.length,
     exerciseIds: exercises.map(({ id }) => id),
   });
   notify();
@@ -130,20 +95,43 @@ const start = (): Promise<void> => {
     await ensureFirebaseAuth();
     unsubscribeRemote = onSnapshot(doc(getFirestoreClient(), runtimePath), (snapshot) => {
       if (!snapshot.exists()) {
+        if ((snapshotStore.getCurrent()?.items.length ?? 0) > 0) {
+          connectionStatus = "error";
+          connectionError = "Shared Runtime document is missing; retaining the last successful snapshot.";
+          notify();
+          console.error("[ProgramManager Runtime] Shared Runtime document is missing; retaining the last successful snapshot.");
+          return;
+        }
         exercises = []; byId = new Map(); revision = 0; connectionStatus = "ready"; connectionError = ""; notify();
         console.info("[SharedRuntime Receive]", {
           documentExists: false, projectId, appId, documentPath: runtimePath, revision: 0, receivedCount: 0, exerciseIds: [],
         });
         return;
       }
-      const value = unwrapRuntimeSnapshot(snapshot.data());
-      if (!value) {
+      const raw = snapshot.data();
+      console.info(`[ProgramManager Hydration] Raw Firestore count=${countRawSnapshotItems(raw) ?? "invalid"}`, {
+        count: countRawSnapshotItems(raw),
+        keys: Object.keys(raw),
+      });
+      let value: RuntimeSnapshot;
+      try {
+        value = snapshotStore.apply(raw);
+      } catch (caught) {
         connectionStatus = "error";
-        connectionError = "Shared Runtime document does not match the production contract.";
-        console.error("[ProgramManager Runtime] Invalid Shared Runtime document; retaining the last successful snapshot.");
+        connectionError = caught instanceof Error ? caught.message : String(caught);
+        console.error("[ProgramManager Runtime] Invalid Shared Runtime document; retaining the last successful snapshot.", caught);
         notify();
         return;
       }
+      console.info(`[ProgramManager Hydration] Snapshot Store count=${snapshotStore.getCurrent()?.items.length ?? 0}`, {
+        count: snapshotStore.getCurrent()?.items.length ?? 0,
+        revision: value.revision,
+      });
+      console.info(`[ProgramManager Hydration] Normalized count=${value.items.length}`, {
+        count: value.items.length,
+        exerciseCount: value.exerciseCount,
+        exerciseIds: value.items.map(({ id }) => id),
+      });
       replaceSnapshot(value);
     }, (error) => {
       connectionStatus = "error";

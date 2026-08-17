@@ -1,6 +1,6 @@
 import CloseIcon from "@mui/icons-material/Close";
 import { Box, Button, CardActionArea, Dialog, DialogContent, DialogTitle, IconButton, Stack, TextField, Typography, useMediaQuery, useTheme } from "@mui/material";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ExerciseCatalogOption } from "../../../exercise-catalog";
 import { normalizeText } from "../../../../utils/normalizeText";
 
@@ -31,6 +31,15 @@ export const ExercisePicker = ({ open, exercises, onClose, onSelect }: ExerciseP
       .filter((exercise) => !normalizedQuery || normalizeText([exercise.name, exercise.englishName ?? "", ...exercise.aliases].join(" ")).includes(normalizedQuery))
       .sort((left, right) => left.name.localeCompare(right.name, "ko-KR"));
   }, [bodyPart, equipment, exercises, query]);
+
+  useEffect(() => {
+    if (!open) return;
+    console.info(`[ProgramManager Hydration] Exercise Picker source=${exercises.length} rendered=${filtered.length}`, {
+      sourceCount: exercises.length,
+      renderedCount: filtered.length,
+      exerciseIds: filtered.map(({ id }) => id),
+    });
+  }, [exercises, filtered, open]);
 
   const filterButton = (value: string, selected: string, onClick: () => void) => (
     <Button key={value} aria-pressed={selected === value} variant={selected === value ? "contained" : "outlined"} onClick={onClick} sx={{ minHeight: 48, minWidth: 48 }}>

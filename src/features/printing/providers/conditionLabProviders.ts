@@ -1,11 +1,13 @@
-import { collection, doc, getDoc, getDocs, limit, orderBy, query, where, type DocumentData, type QueryConstraint } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, where, type DocumentData } from "firebase/firestore";
 import { getFirestoreClient } from "../../../firebase/firestoreClient";
-import { printHistoryCollectionPath, profilesCollectionPath } from "../../../firebase/firestorePaths";
+import { profilesCollectionPath, workoutLogsCollectionPath } from "../../../firebase/firestorePaths";
 import type { AppId, ProfileId } from "../../../types/brandedIds";
 import { mapProfileDocument, toMemberSelectionItem } from "../../members/mappers/profileMapper";
 import { sortMembersByName } from "../../members/services/memberService";
 import type { MemberSelectionItem } from "../../members/types/memberViewModel.types";
 import type { RawProfileDocument } from "../../members/types/profile.types";
+import { programCategories } from "../../programs/config/programOptions";
+import type { ProgramCategory } from "../../programs/types/program.types";
 import { analyzeMemberIntelligence } from "../services/memberIntelligenceService";
 import type { ConditionInput } from "../types/condition.types";
 import type { MemberProfile, MemberProvider } from "./memberProvider";
@@ -39,6 +41,21 @@ const computeAge = (value: unknown): number | undefined => {
   if (beforeBirthday) age -= 1;
   return age >= 0 ? age : undefined;
 };
+const asDate = (value: unknown): Date | null => {
+  const timestampDate = (value as { toDate?: () => unknown } | null)?.toDate?.();
+  if (timestampDate instanceof Date && !Number.isNaN(timestampDate.getTime())) return timestampDate;
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+  if (typeof value !== "string" && typeof value !== "number") return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+const asProgramCategory = (value: unknown): ProgramCategory | null => {
+  const text = asText(value);
+  if (!text) return null;
+  const normalized = text.toLocaleLowerCase("ko-KR");
+  return programCategories.find(({ value: category, label }) =>
+    category.toLocaleLowerCase("ko-KR") === normalized || label === text)?.value ?? null;
+};
 const buildProfile = (memberId: ProfileId, raw: RawProfileDocument & Record<string, unknown>): MemberProfile | null => {
   const mapped = mapProfileDocument(String(memberId), raw);
   if (mapped.role !== "member" || !mapped.name) return null;
@@ -56,23 +73,22 @@ const buildProfile = (memberId: ProfileId, raw: RawProfileDocument & Record<stri
   };
 };
 const mapHistoryRecord = (memberId: ProfileId, data: DocumentData, id: string): WorkoutHistoryRecord | null => {
-  const snapshot = (data.programSnapshot ?? {}) as Record<string, unknown>;
-  const exercises = Array.isArray(snapshot.exercises) ? snapshot.exercises : [];
-  const requestedAt = data.requestedAt?.toDate?.() instanceof Date ? data.requestedAt.toDate() : data.createdAt?.toDate?.() instanceof Date ? data.createdAt.toDate() : null;
-  if (!requestedAt) return null;
+  const exercises = Array.isArray(data.exercises) ? data.exercises : [];
+  const workoutDate = asDate(data.date) ?? asDate(data.createdAt) ?? asDate(data.updatedAt);
+  if (!workoutDate) return null;
   return {
     memberId,
-    programId: typeof snapshot.programId === "string" && snapshot.programId ? snapshot.programId : String(data.programId ?? id),
-    programTitle: typeof snapshot.title === "string" && snapshot.title ? snapshot.title : "제목 없음",
-    category: typeof snapshot.category === "string" ? snapshot.category as WorkoutHistoryRecord["category"] : null,
-    workoutDate: requestedAt,
+    programId: asText(data.programId) ?? asText(data.workoutSessionId) ?? id,
+    programTitle: asText(data.programName) ?? asText(data.title) ?? asText(data.target) ?? "운동 기록",
+    category: asProgramCategory(data.category ?? data.target),
+    workoutDate,
     durationMinutes: asNumber(data.durationMinutes ?? data.duration ?? data.totalMinutes),
     completion: typeof data.completion === "boolean" ? data.completion : true,
     exercises: exercises.map((exercise) => ({
       name: typeof exercise?.name === "string" ? exercise.name : "운동 없음",
-      sets: typeof exercise?.configuredSets === "number" ? exercise.configuredSets : asNumber(exercise?.sets) ?? null,
-      reps: asText(exercise?.reps),
-      weight: asNumber(exercise?.weight),
+      sets: Array.isArray(exercise?.sets) ? exercise.sets.length : asNumber(exercise?.sets) ?? null,
+      reps: asText(Array.isArray(exercise?.sets) ? exercise.sets[0]?.reps : exercise?.reps),
+      weight: asNumber(Array.isArray(exercise?.sets) ? exercise.sets[0]?.weight : exercise?.weight),
     })),
   };
 };
@@ -137,14 +153,17 @@ export const createConditionLabWorkoutHistoryProvider = (appId: AppId): WorkoutH
       const cacheKey = `${memberId}:${requestedLimit}`;
       if (historyCache.has(cacheKey)) return historyCache.get(cacheKey) ?? [];
       const startedAt = now();
-      const constraints: QueryConstraint[] = [where("isArchived", "==", false), where("memberId", "==", memberId), orderBy("requestedAt", "desc"), limit(requestedLimit)];
-      const snapshot = await getDocs(query(collection(getFirestoreClient(), printHistoryCollectionPath(appId)), ...constraints));
+      const snapshot = await getDocs(query(
+        collection(getFirestoreClient(), workoutLogsCollectionPath(appId)),
+        where("memberId", "==", memberId),
+      ));
       const records = snapshot.docs
         .map((item) => mapHistoryRecord(memberId, item.data(), item.id))
         .filter((item): item is WorkoutHistoryRecord => Boolean(item))
-        .sort((left, right) => right.workoutDate.getTime() - left.workoutDate.getTime());
+        .sort((left, right) => right.workoutDate.getTime() - left.workoutDate.getTime())
+        .slice(0, requestedLimit);
       historyCache.set(cacheKey, records);
-      debugLog("getRecentWorkoutHistory success", startedAt, { memberId, requestedLimit, count: records.length, source: "printHistory" });
+      debugLog("getRecentWorkoutHistory success", startedAt, { memberId, requestedLimit, count: records.length, source: "logs" });
       return records;
     },
   };

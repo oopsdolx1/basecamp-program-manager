@@ -542,7 +542,11 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
                   <Typography color="primary.main" fontWeight={800} variant="overline">TODAY'S CONDITION</Typography>
                   <Typography variant="h1">컨디션 확인</Typography>
                   <Typography color="text.secondary"><Box component="span" color="text.primary" fontWeight={900}>{selectedMember?.displayName}</Box> 회원의 오늘 상태를 알려주세요.</Typography>
-                  {recentWorkout ? <Stack direction="row" flexWrap="wrap" gap={1}><Chip label={`최근 운동 ${recentWorkout.title}`} /><Chip label={formatDaysAgo(recentWorkout.daysAgo)} variant="outlined" /></Stack> : <Typography color="text.secondary" variant="body2">최근 운동 기록이 없습니다.</Typography>}
+                  {intelligenceStatus === "loading" ? <Stack alignItems="center" direction="row" spacing={1}><CircularProgress size={16} /><Typography color="text.secondary" variant="body2">최근 운동 기록을 확인하고 있습니다.</Typography></Stack> : null}
+                  {intelligenceStatus === "ready" && recentWorkout ? <Stack direction="row" flexWrap="wrap" gap={1}><Chip label={`최근 운동 ${recentWorkout.title}`} /><Chip label={formatDaysAgo(recentWorkout.daysAgo)} variant="outlined" /></Stack> : null}
+                  {intelligenceStatus === "ready" && !recentWorkout ? <Typography color="text.secondary" variant="body2">최근 운동 기록이 없습니다.</Typography> : null}
+                  {intelligenceStatus === "error" ? <Typography color="error.main" variant="body2">최근 운동 기록을 불러오지 못했습니다.</Typography> : null}
+                  {intelligenceStatus === "idle" ? <Typography color="text.secondary" variant="body2">컨디션을 선택하면 최근 운동 기록을 확인합니다.</Typography> : null}
                 </Stack>
                 <Button startIcon={<ArrowBackIcon />} variant="outlined" onClick={() => setCurrentStep(1)}>회원 선택</Button>
               </Stack>

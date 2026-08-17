@@ -274,7 +274,6 @@
 }
 
 .handwrite-grid {
-  align-items: end;
   display: grid;
   gap: 0;
   grid-template-columns: repeat(3, 1fr);
@@ -282,12 +281,23 @@
 }
 
 .handwrite-grid span {
-  border-bottom: 0.2mm solid #777;
   border-right: 0.2mm solid #aaa;
   color: #777;
+  display: flex;
   font-size: 4.8pt;
-  padding-bottom: 0.6mm;
+  justify-content: center;
+  padding-top: 0.45mm;
+  position: relative;
   text-align: center;
+}
+
+.handwrite-grid span::after {
+  border-bottom: 0.2mm solid #999;
+  bottom: 0.55mm;
+  content: "";
+  left: 0.7mm;
+  position: absolute;
+  right: 0.7mm;
 }
 
 .handwrite-grid span:last-child {
@@ -300,8 +310,8 @@
   font-size: 7pt;
   line-height: 1.35;
   margin-top: 1mm;
-  max-height: 8mm;
-  min-height: 7mm;
+  max-height: 15mm;
+  min-height: 13mm;
   overflow: hidden;
   padding: 1.8mm;
 }
@@ -309,7 +319,7 @@
 .print-memo-section {
   border-bottom: 0;
   flex: 1;
-  min-height: 10mm;
+  min-height: 16mm;
   overflow: hidden;
 }
 
@@ -317,6 +327,8 @@
   align-items: center;
   display: flex;
   font-size: 6.4pt;
-  justify-content: space-between;
+  justify-content: center;
   margin-top: 1mm;
+  text-align: center;
+  width: 100%;
 }

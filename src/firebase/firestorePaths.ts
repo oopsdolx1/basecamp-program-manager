@@ -17,6 +17,9 @@ export const programsCollectionPath = (appId: AppId): string =>
 export const printHistoryCollectionPath = (appId: AppId): string =>
   `artifacts/${requireAppId(appId)}/public/data/printHistory`;
 
+export const workoutLogsCollectionPath = (appId: AppId): string =>
+  `artifacts/${requireAppId(appId)}/public/data/logs`;
+
 export const workoutSessionsCollectionPath = (appId: AppId): string =>
   `artifacts/${requireAppId(appId)}/public/data/workoutSessions`;
 

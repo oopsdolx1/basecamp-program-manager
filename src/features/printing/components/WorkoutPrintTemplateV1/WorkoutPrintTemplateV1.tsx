@@ -61,7 +61,7 @@ export const WorkoutPrintTemplateV1 = ({ document }: WorkoutPrintTemplateV1Props
       </table>
 
       <section className="print-section print-memo-section"><div className="print-section-title">메모</div><div className="print-memo" /></section>
-      <footer className="print-footer"><span>BASECAMP CONDITION LAB</span><span>A5 가로 운동 일지</span></footer>
+      <footer className="print-footer">BASECAMP CONDITION LAB</footer>
     </article>
   );
 };

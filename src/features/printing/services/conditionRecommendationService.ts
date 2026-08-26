@@ -1,4 +1,7 @@
 import { getCategoryLabel } from "../../programs/config/programOptions";
+import type { ExerciseCatalogItem } from "../../exercise-catalog";
+import { resolveExercise } from "../../exercise-resolver/services/exerciseResolverService";
+import type { WorkoutHistoryRecord } from "../providers/workoutHistoryProvider";
 import { sanitizeProgramForm } from "../../programs/services/programService";
 import type { Program, ProgramCategory, ProgramDifficulty, ProgramFormValues } from "../../programs/types/program.types";
 import type {
@@ -169,6 +172,46 @@ const scoreRecentWorkout = (recentWorkout: RecentWorkoutSummary | null, program:
   };
 };
 
+const scoreRecentExerciseOverlap = (
+  workoutHistory: WorkoutHistoryRecord[],
+  program: Program,
+  catalog: ExerciseCatalogItem[],
+): ScoreResult => {
+  const recentHistory = workoutHistory.slice(0, 3);
+  if (recentHistory.length === 0 || program.exercises.length === 0) return { score: 0, reasons: [], factors: [] };
+
+  const exerciseKey = (name: string, catalogExerciseId?: string): string => {
+    if (catalogExerciseId) return catalogExerciseId;
+    const resolved = resolveExercise({ text: name, catalog });
+    return resolved.exercise?.id ?? resolved.normalizedText;
+  };
+  const recentKeys = new Set(recentHistory.flatMap((entry) => entry.exercises.map((exercise) => exerciseKey(exercise.name))));
+  const candidateKeys = program.exercises.map((exercise) => exerciseKey(exercise.name, exercise.catalogExerciseId));
+  const overlapCount = candidateKeys.filter((key) => recentKeys.has(key)).length;
+  const overlapRatio = overlapCount / candidateKeys.length;
+  const latestDaysAgo = Math.max(0, Math.floor((Date.now() - recentHistory[0].workoutDate.getTime()) / 86_400_000));
+  let delta = 0;
+  if (overlapRatio >= 0.5) delta = latestDaysAgo <= 1 ? -28 : latestDaysAgo <= 2 ? -20 : -10;
+  else if (overlapCount > 0) delta = latestDaysAgo <= 2 ? -8 : -4;
+
+  const immediateRepeat = recentHistory[0]?.programId === program.id;
+  const repeatCount = recentHistory.filter((entry) => entry.programId === program.id).length;
+  if (immediateRepeat) delta -= 16;
+  else if (repeatCount >= 2) delta -= 10;
+  if (delta === 0) return { score: 0, reasons: [], factors: [] };
+
+  const details = [
+    overlapCount > 0 ? `최근 3회 운동과 종목 ${overlapCount}개 중복` : null,
+    immediateRepeat ? "직전과 동일한 프로그램" : repeatCount >= 2 ? `최근 3회 중 동일 프로그램 ${repeatCount}회` : null,
+  ].filter(Boolean).join(", ");
+  const reason = `${details}을 반영해 반복 자극 우선순위를 낮췄습니다.`;
+  return {
+    score: delta,
+    reasons: [reason],
+    factors: [createFactor({ key: "exerciseOverlap", label: "Exercise Overlap", score: delta, reason })],
+  };
+};
+
 const scoreIntelligence = (
   intelligence: MemberIntelligenceSummary | null,
   program: Program,
@@ -316,6 +359,8 @@ const scoreProgram = (
   recentWorkout: RecentWorkoutSummary | null,
   intelligence: MemberIntelligenceSummary | null,
   periodization: PeriodizationSummary | null,
+  workoutHistory: WorkoutHistoryRecord[],
+  catalog: ExerciseCatalogItem[],
 ): RecommendationResult => {
   let score = 100;
   const reasons: string[] = [];
@@ -330,6 +375,11 @@ const scoreProgram = (
   score += recentResult.score;
   reasons.push(...recentResult.reasons);
   factors.push(...recentResult.factors);
+
+  const overlapResult = scoreRecentExerciseOverlap(workoutHistory, program, catalog);
+  score += overlapResult.score;
+  reasons.push(...overlapResult.reasons);
+  factors.push(...overlapResult.factors);
 
   const intelligenceResult = scoreIntelligence(intelligence, program);
   score += intelligenceResult.score;
@@ -375,10 +425,12 @@ export const recommendProgram = (
   recentWorkout: RecentWorkoutSummary | null,
   intelligence: MemberIntelligenceSummary | null,
   periodization: PeriodizationSummary | null,
+  workoutHistory: WorkoutHistoryRecord[] = [],
+  catalog: ExerciseCatalogItem[] = [],
 ): RecommendationResult | null => {
   const candidates = programs
     .filter((program) => !program.isArchived)
-    .map((program) => scoreProgram(program, condition, recentWorkout, intelligence, periodization));
+    .map((program) => scoreProgram(program, condition, recentWorkout, intelligence, periodization, workoutHistory, catalog));
 
   candidates.sort((left, right) => {
     if (right.score !== left.score) return right.score - left.score;

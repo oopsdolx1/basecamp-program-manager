@@ -77,6 +77,8 @@ export const PrintPreviewPage = (): JSX.Element => {
   if (state.status === "loading") return <Box sx={{ bgcolor: colors.neutral.black, minHeight: "100vh", p: `${spacing[6]}px` }}><Card><Loading label="A5 가로 미리보기를 준비하고 있습니다." progress={75} /></Card></Box>;
   if (state.status === "error") return <Box sx={{ bgcolor: colors.neutral.black, minHeight: "100vh", p: `${spacing[6]}px` }}><Card><Stack spacing={`${spacing[4]}px`}><EmptyState title="미리보기를 만들 수 없습니다." description={state.message} /><Button variant="secondary" startIcon={<ArrowBackIcon />} onClick={goWorkspace}>프로그램으로 돌아가기</Button></Stack></Card></Box>;
 
+  if (completedPrints > 0) return <Box sx={{ bgcolor: colors.neutral.black, minHeight: "100vh", p: { md: `${spacing[8]}px`, xs: `${spacing[4]}px` } }}><Card sx={{ margin: "0 auto", maxWidth: 720 }}><Stack alignItems="center" spacing={`${spacing[4]}px`} textAlign="center"><CheckCircleIcon sx={{ color: colors.semantic.success, fontSize: 64 }} /><Box><Typography variant="h4">출력이 완료되었습니다.</Typography><Typography color={colors.neutral.gray400} sx={{ mt: `${spacing[2]}px` }}>동일한 운동 세션과 QR로 다시 출력할 수 있습니다.</Typography></Box><Stack direction={{ sm: "row", xs: "column" }} spacing={`${spacing[2]}px`} sx={{ width: "100%" }}><Button fullWidth startIcon={<PrintIcon />} loading={printRequest.saving || markingPrinted} onClick={() => void requestPrint()}>한 번 더 출력하기</Button><Button fullWidth variant="secondary" onClick={goWorkspace}>메인 페이지로 돌아가기</Button></Stack></Stack></Card><Box className="print-only-root" sx={{ display: "none", displayPrint: "block" }}><WorkoutPrintTemplateV1 document={state.document} /></Box></Box>;
+
   const checklist = [
     ["회원 선택", Boolean(state.member.memberId)],
     ["프로그램 선택", Boolean(state.program.id)],

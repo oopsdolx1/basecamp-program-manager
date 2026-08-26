@@ -3,11 +3,8 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import FitnessCenterIcon from "@mui/icons-material/FitnessCenter";
-import HistoryIcon from "@mui/icons-material/History";
 import PrintIcon from "@mui/icons-material/Print";
-import RedoIcon from "@mui/icons-material/Redo";
 import SmartToyIcon from "@mui/icons-material/SmartToy";
-import UndoIcon from "@mui/icons-material/Undo";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import { Alert, Box, Button, Card, CardActionArea, CardContent, Chip, CircularProgress, FormControlLabel, Grid, LinearProgress, Slider, Stack, Switch, Typography } from "@mui/material";
 import { useEffect, useMemo, useState } from "react";
@@ -29,6 +26,7 @@ import { sanitizeProgramForm, validateProgramForm } from "../../../programs/serv
 import type { Program, ProgramFormValues } from "../../../programs/types/program.types";
 import type { MemberProvider } from "../../providers/memberProvider";
 import type { RecommendationProvider } from "../../providers/recommendationProvider";
+import type { WorkoutHistoryRecord } from "../../providers/workoutHistoryProvider";
 import { applyAiRecommendationToSnapshot, requestAiRecommendation } from "../../services/aiRecommendationService";
 import { analyzeMemberIntelligence } from "../../services/memberIntelligenceService";
 import { analyzePeriodization } from "../../services/periodizationEngine";
@@ -36,7 +34,6 @@ import { buildRecommendationReason, recommendProgram } from "../../services/cond
 import { savePrintSnapshot } from "../../services/printSnapshotSession";
 import { createSnapshotBuilderHistory, snapshotBuilderService, type SnapshotBuilderExercise, type SnapshotBuilderHistory } from "../../services/snapshotBuilderService";
 import type { AiRecommendationResult, AlcoholStatus, ConditionInput, ConditionStatus, FatigueArea, MemberIntelligenceMetadata, MemberIntelligenceSummary, PeriodizationSummary, RecommendationResult, RecommendationTrace, RecentWorkoutSummary, SleepQuality } from "../../types/condition.types";
-import { SnapshotExerciseBuilderRow } from "../SnapshotExerciseBuilderRow/SnapshotExerciseBuilderRow";
 import { palette } from "../../../../theme/palette";
 import { createWorkoutSession } from "../../../workout-sessions/services/workoutSessionService";
 
@@ -51,7 +48,7 @@ interface QuickPrintFlowProps {
   recommendationProvider: RecommendationProvider;
 }
 
-const stepLabels = ["회원 선택", "컨디션 확인", "AI 추천 · 프로그램 선택", "프로그램 편집"];
+const stepLabels = ["회원 선택", "컨디션 확인", "추천 프로그램 선택", "프로그램 미리보기"];
 const conditionOptions: Array<{ value: ConditionStatus; label: string; icon: string; description: string }> = [
   { value: "GOOD", label: "좋음", icon: "😊", description: "최상의 컨디션입니다." },
   { value: "NORMAL", label: "보통", icon: "🙂", description: "평소와 비슷합니다." },
@@ -162,6 +159,7 @@ const formatSignedScore = (value: number): string => `${value >= 0 ? "+" : ""}${
 const factorDisplayLabel = (factor: RecommendationTrace["decisionFactors"][number]): string => ({
   condition: "컨디션 적합",
   recentWorkout: "최근 운동",
+  exerciseOverlap: "최근 운동 중복",
   recovery: "회복 상태",
   risk: "운동 위험도",
   programRepeat: "프로그램 반복",
@@ -211,8 +209,9 @@ const RecommendationTraceCard = ({
 export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }: QuickPrintFlowProps): JSX.Element => {
   const navigate = useNavigate();
   const { programState, programs } = usePrograms(appId);
-  const { catalogState, options: catalogOptions } = useExerciseCatalog(appId);
-  const runtimePrograms = useMemo(() => hydrateProgramExerciseKnowledge(programs), [programs, catalogOptions]);
+  const { catalogState } = useExerciseCatalog(appId);
+  const runtimePrograms = useMemo(() => hydrateProgramExerciseKnowledge(programs), [programs, catalogState.data]);
+  const [started, setStarted] = useState(false);
   const [memberStatus, setMemberStatus] = useState<MemberLoadStatus>("loading");
   const [memberError, setMemberError] = useState("");
   const [members, setMembers] = useState<MemberSelectionItem[]>([]);
@@ -222,6 +221,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
   const [selectedMember, setSelectedMember] = useState<MemberSelectionItem | null>(null);
   const [condition, setCondition] = useState<ConditionInput>(defaultCondition);
   const [recentWorkout, setRecentWorkout] = useState<RecentWorkoutSummary | null>(null);
+  const [workoutHistory, setWorkoutHistory] = useState<WorkoutHistoryRecord[]>([]);
   const [intelligenceStatus, setIntelligenceStatus] = useState<IntelligenceStatus>("idle");
   const [intelligence, setIntelligence] = useState<MemberIntelligenceSummary | null>(null);
   const [intelligenceMetadata, setIntelligenceMetadata] = useState<MemberIntelligenceMetadata | null>(null);
@@ -271,8 +271,9 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
   }, [memberProvider]);
 
   useEffect(() => {
-    if (!selectedMember || !condition.condition || !condition.sleep || !condition.alcohol) {
+    if (!selectedMember) {
       setRecentWorkout(null);
+      setWorkoutHistory([]);
       setIntelligence(null);
       setIntelligenceMetadata(null);
       setPeriodization(null);
@@ -281,17 +282,22 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
     }
     let active = true;
     setIntelligenceStatus("loading");
-    void recommendationProvider.getRecommendationContext(selectedMember.memberId, condition).then((context) => {
+    const contextCondition: ConditionInput = condition.condition && condition.sleep && condition.alcohol
+      ? condition
+      : { ...condition, condition: "NORMAL", sleep: "NORMAL", alcohol: "NO" };
+    void recommendationProvider.getRecommendationContext(selectedMember.memberId, contextCondition).then((context) => {
       if (!active) return;
       setRecentWorkout(context.recentWorkout);
+      setWorkoutHistory(context.workoutHistory);
       setIntelligence(context.intelligence);
       setIntelligenceMetadata(context.metadata);
-      const analysisSource = analyzeMemberIntelligence(context.workoutHistory, condition);
-      setPeriodization(context.periodization ?? analyzePeriodization({ intelligence: context.intelligence, history: analysisSource.history, condition }));
+      const analysisSource = analyzeMemberIntelligence(context.workoutHistory, contextCondition);
+      setPeriodization(context.periodization ?? analyzePeriodization({ intelligence: context.intelligence, history: analysisSource.history, condition: contextCondition }));
       setIntelligenceStatus("ready");
     }).catch(() => {
       if (!active) return;
       setRecentWorkout(null);
+      setWorkoutHistory([]);
       setIntelligence(null);
       setIntelligenceMetadata(null);
       setPeriodization(null);
@@ -301,24 +307,6 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
       active = false;
     };
   }, [condition, recommendationProvider, selectedMember]);
-
-  useEffect(() => {
-    if (currentStep !== 4) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      const isUndo = event.ctrlKey && event.key.toLowerCase() === "z" && !event.shiftKey;
-      const isRedo = event.ctrlKey && (event.key.toLowerCase() === "y" || (event.shiftKey && event.key.toLowerCase() === "z"));
-      if (isUndo) {
-        event.preventDefault();
-        setBuilderHistory((current) => (current ? snapshotBuilderService.undo(current) : current));
-      }
-      if (isRedo) {
-        event.preventDefault();
-        setBuilderHistory((current) => (current ? snapshotBuilderService.redo(current) : current));
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [currentStep]);
 
   const resetRecommendationState = () => {
     setRecommendation(null);
@@ -335,11 +323,11 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
     setSelectedMember(member);
     setCondition(defaultCondition);
     setRecentWorkout(null);
+    setWorkoutHistory([]);
     setIntelligence(null);
     setIntelligenceMetadata(null);
     setPeriodization(null);
     resetRecommendationState();
-    setCurrentStep(2);
   };
 
   const toggleFatigue = (area: FatigueArea) => {
@@ -361,7 +349,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
   };
 
   const runRecommendation = async () => {
-    const next = recommendProgram(runtimePrograms, condition, recentWorkout, intelligence, periodization);
+    const next = recommendProgram(runtimePrograms, condition, recentWorkout, intelligence, periodization, workoutHistory, catalogState.data);
     if (!next) {
       setRecommendation(null);
       setRecommendationReason("추천 가능한 프로그램을 찾을 수 없습니다.");
@@ -458,6 +446,9 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
     if (!aiRecommendation) return null;
     return <Grid container spacing={2}>{[{ title: "추천 이유", value: aiRecommendation.reason }, { title: "회원 코칭", value: aiRecommendation.coach }, { title: "주의 사항", value: aiRecommendation.warning }].map((item) => <Grid item key={item.title} md={4} xs={12}><Card sx={infoCardSx}><CardContent><Stack spacing={1}><Stack alignItems="center" direction="row" spacing={1}><Chip color="primary" icon={<SmartToyIcon />} label="AI" size="small" /><Typography variant="h2">{item.title}</Typography></Stack><Typography color="text.secondary">{item.value}</Typography></Stack></CardContent></Card></Grid>)}</Grid>;
   };
+  if (!started) {
+    return <Card sx={centeredCardSx(880)}><CardContent sx={{ p: { md: 6, xs: 3 } }}><Stack alignItems="center" spacing={3} textAlign="center"><FitnessCenterIcon color="primary" sx={{ fontSize: 56 }} /><Box><Typography color="primary.main" fontWeight={900} variant="overline">BASECAMP PROGRAM MANAGER</Typography><Typography variant="h1">오늘의 프로그램을 시작하세요</Typography><Typography color="text.secondary" sx={{ mt: 1 }}>회원 상태를 확인하고 가장 적합한 프로그램을 선택해 출력합니다.</Typography></Box><Stack direction={{ sm: "row", xs: "column" }} spacing={1.5} sx={{ maxWidth: 560, width: "100%" }}><Button fullWidth variant="contained" onClick={() => setStarted(true)} sx={{ minHeight: 56 }}>프로그램 시작</Button><Button fullWidth variant="outlined" onClick={() => navigate(routeBuilder.master("history"))} sx={{ minHeight: 56 }}>출력 내역</Button></Stack></Stack></CardContent></Card>;
+  }
   return (
     <Stack alignItems="center" spacing={3}>
       <StepIndicator currentStep={currentStep} />
@@ -508,9 +499,9 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
                         sx={{
                           bgcolor: palette.surfaceInteractive,
                           border: 1,
-                          borderColor: "divider",
+                          borderColor: selectedMember?.memberId === member.memberId ? "primary.main" : "divider",
                           borderRadius: `${palette.radiusMd}px`,
-                          boxShadow: "none",
+                          boxShadow: selectedMember?.memberId === member.memberId ? palette.shadowAccent : "none",
                           minHeight: 88,
                           p: 1.75,
                           transition: "border-color 150ms ease, background-color 150ms ease, transform 150ms ease",
@@ -528,6 +519,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
                 <Typography color="text.secondary" fontWeight={700} variant="body2">직접 이름 또는 전화번호 검색</Typography>
                 <SearchField label="회원 이름 또는 전화번호 검색" value={memberQuery} onChange={setMemberQuery} />
               </Stack>
+              <Button disabled={!selectedMember} variant="contained" onClick={() => setCurrentStep(2)} sx={{ minHeight: 52 }}>다음 단계로</Button>
             </Stack>
           </CardContent>
         </Card>
@@ -561,7 +553,11 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
 
               <Stack spacing={1}><Typography fontWeight={900}>음주 여부</Typography><Grid container spacing={1.5}>{alcoholOptions.map((option) => <Grid item key={option.value} md={6} xs={12}><CardActionArea aria-label={`음주 여부 ${option.label}`} aria-pressed={condition.alcohol === option.value} onClick={() => setCondition((current) => ({ ...current, alcohol: option.value }))} sx={{ ...largeChoiceCardSx(condition.alcohol === option.value), minHeight: 78 }}><Stack alignItems="center" direction="row" spacing={1.5}><Typography aria-hidden="true" fontSize={26}>{option.icon}</Typography><Typography fontWeight={900}>{option.label}</Typography></Stack></CardActionArea></Grid>)}</Grid></Stack>
 
+              <Card sx={{ ...infoCardSx, height: "auto" }}><CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}><Typography color="text.secondary" variant="caption">오늘 상태 요약</Typography><Typography fontWeight={800}>{condition.sleep ? `수면 ${sleepOptions.find((item) => item.value === condition.sleep)?.label}` : "수면 미선택"} · {condition.fatigueAreas.length > 0 ? `${condition.fatigueAreas.map((area) => fatigueOptions.find((item) => item.value === area)?.label ?? area).join(", ")} 피로` : "근육 피로 없음"} · {condition.alcohol === "NO" ? "음주 없음" : condition.alcohol === "YES" ? "음주 있음" : "음주 미선택"} · {condition.condition ? `컨디션 ${conditionOptions.find((item) => item.value === condition.condition)?.label}` : "컨디션 미선택"}</Typography></CardContent></Card>
+
               <Card sx={{ ...infoCardSx, height: "auto" }}><CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}><Stack alignItems={{ sm: "center", xs: "stretch" }} direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1.5}><Box><FormControlLabel control={<Switch checked={useAiRecommendation} onChange={(event) => setUseAiRecommendation(event.target.checked)} />} label="AI 추천 사용" /><Typography color="text.secondary" variant="body2">회원 상태와 최근 운동 기록을 함께 반영합니다.</Typography></Box><Button disabled={!canRecommend || programState.status !== "ready"} startIcon={<AutoAwesomeIcon />} variant="contained" onClick={() => void runRecommendation()} sx={{ minHeight: 48, minWidth: 180, transition: "transform 120ms ease", "&:hover": { transform: "translateY(-2px)" } }}>추천 확인</Button></Stack></CardContent></Card>
+              {programState.status === "error" ? <Alert severity="error">{programState.message}</Alert> : null}
+              {programState.status === "ready" && runtimePrograms.length === 0 ? <EmptyState title="현재 조건에 맞는 추천 프로그램이 없습니다." description="컨디션을 조정하거나 Condition Lab에서 프로그램을 추가해 주세요." /> : null}
             </Stack>
           </CardContent>
         </Card>
@@ -608,21 +604,20 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
             <Stack spacing={3}>
               <Stack direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1.5}>
                 <Stack spacing={0.75}>
-                  <Stack alignItems="center" direction="row" spacing={1}><Typography variant="h1">Program 편집</Typography>{aiStatus === "ready" ? <Chip color="primary" icon={<SmartToyIcon />} label="AI Snapshot" size="small" /> : null}</Stack>
-                  <Typography color="text.secondary">Program 메타데이터는 읽기 전용입니다. 운동 순서·교체·메모만 출력 Snapshot에 반영됩니다.</Typography>
+                  <Stack alignItems="center" direction="row" spacing={1}><Typography variant="h1">프로그램 미리보기</Typography>{aiStatus === "ready" ? <Chip color="primary" icon={<SmartToyIcon />} label="AI Snapshot" size="small" /> : null}</Stack>
+                  <Typography color="text.secondary">선택한 Firebase 프로그램과 출력 운동 구성을 최종 확인하세요.</Typography>
                 </Stack>
-                <Stack direction={{ sm: "row", xs: "column" }} spacing={1}><Button startIcon={<ArrowBackIcon />} variant="outlined" onClick={() => setCurrentStep(3)}>Program 다시 선택</Button><Button disabled={!snapshotValidation.valid || !selectedMember || !snapshotSourceProgram || !snapshotValues} startIcon={<PrintIcon />} variant="contained" onClick={goPrintPreview}>출력 미리보기</Button></Stack>
+                <Stack direction={{ sm: "row", xs: "column" }} spacing={1}><Button startIcon={<ArrowBackIcon />} variant="outlined" onClick={() => setCurrentStep(3)}>프로그램 다시 선택</Button><Button disabled={!snapshotValidation.valid || !selectedMember || !snapshotSourceProgram || !snapshotValues} startIcon={<PrintIcon />} variant="contained" onClick={goPrintPreview}>출력하기</Button></Stack>
               </Stack>
               <Card sx={infoCardSx}><CardContent><Stack direction={{ md: "row", xs: "column" }} justifyContent="space-between" spacing={2}><Box><Typography color="text.secondary" variant="body2">선택한 Program</Typography><Typography variant="h2">{builderState?.title}</Typography></Box><Stack direction="row" flexWrap="wrap" gap={1}><Chip label={builderState ? getCategoryLabel(builderState.category) : ""} /><Chip label={builderState ? getDifficultyLabel(builderState.difficulty) : ""} variant="outlined" /><Chip label={`${builderState?.exercises.length ?? 0}개 운동`} variant="outlined" /></Stack></Stack></CardContent></Card>
-              <MemberIntelligenceCard intelligence={intelligence} status={intelligenceStatus} />
+              <Card sx={infoCardSx}><CardContent><Typography color="text.secondary" variant="caption">회원 · 오늘 상태</Typography><Typography fontWeight={900}>{selectedMember?.displayName} · {conditionOptions.find((item) => item.value === condition.condition)?.label ?? "미선택"} · 수면 {sleepOptions.find((item) => item.value === condition.sleep)?.label ?? "미선택"}</Typography></CardContent></Card>
               {recommendationReason ? <Alert severity="info">{recommendationReason}</Alert> : null}
               {!snapshotValidation.valid ? <Alert severity="warning">{snapshotValidation.errors[0]}</Alert> : null}
               {renderAiCards()}
-              <Card sx={infoCardSx}><CardContent><Stack direction="row" flexWrap="wrap" gap={1}><Button startIcon={<UndoIcon />} variant="outlined" disabled={!builderHistory || !snapshotBuilderService.canUndo(builderHistory)} onClick={() => setBuilderHistory((current) => (current ? snapshotBuilderService.undo(current) : current))}>실행 취소</Button><Button startIcon={<RedoIcon />} variant="outlined" disabled={!builderHistory || !snapshotBuilderService.canRedo(builderHistory)} onClick={() => setBuilderHistory((current) => (current ? snapshotBuilderService.redo(current) : current))}>다시 실행</Button><Chip icon={<HistoryIcon />} label="Ctrl+Z / Ctrl+Y" variant="outlined" /></Stack></CardContent></Card>
               {catalogState.status === "loading" ? <LoadingState message="Exercise Catalog를 불러오는 중입니다." /> : null}
               {catalogState.status === "error" ? <Alert severity="warning">{catalogState.message}</Alert> : null}
               <Typography variant="h2">운동 목록</Typography>
-              <Stack spacing={1.5}>{(builderState?.exercises ?? []).map((exercise, index, array) => <SnapshotExerciseBuilderRow guided key={exercise.id} exercise={exercise} index={index} total={array.length} catalogOptions={catalogOptions} onPatch={(patch) => setBuilderHistory((current) => (current ? snapshotBuilderService.patchExercise(current, exercise.id, patch) : current))} onMoveUp={() => setBuilderHistory((current) => (current ? snapshotBuilderService.move(current, exercise.id, "up") : current))} onMoveDown={() => setBuilderHistory((current) => (current ? snapshotBuilderService.move(current, exercise.id, "down") : current))} onDuplicate={() => undefined} onDelete={() => undefined} onPreset={() => undefined} />)}</Stack>
+              <Stack spacing={1.5}>{(builderState?.exercises ?? []).map((exercise) => <Box key={exercise.id} sx={{ bgcolor: palette.surfaceInteractive, border: 1, borderColor: "divider", borderRadius: `${palette.radiusMd}px`, p: 2 }}><Stack direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1}><Box><Typography fontWeight={900}>{exercise.order}. {exercise.name}</Typography>{exercise.memo ? <Typography color="text.secondary" variant="body2">{exercise.memo}</Typography> : null}</Box><Chip label={`${exercise.sets}세트`} variant="outlined" /></Stack></Box>)}</Stack>
             </Stack>
           </CardContent>
         </Card>

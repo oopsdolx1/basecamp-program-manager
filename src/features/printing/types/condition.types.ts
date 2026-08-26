@@ -85,6 +85,7 @@ export interface PeriodizationSummary {
 export type RecommendationTraceFactorKey =
   | "condition"
   | "recentWorkout"
+  | "exerciseOverlap"
   | "recovery"
   | "risk"
   | "programRepeat"

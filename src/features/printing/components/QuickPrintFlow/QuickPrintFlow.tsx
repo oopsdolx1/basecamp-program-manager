@@ -51,7 +51,7 @@ interface QuickPrintFlowProps {
   recommendationProvider: RecommendationProvider;
 }
 
-const stepLabels = ["회원 선택", "컨디션 확인", "추천 프로그램 선택", "프로그램 미리보기"];
+const stepLabels = ["회원 선택", "컨디션", "프로그램 추천", "미리보기"];
 const conditionOptions: Array<{ value: ConditionStatus; label: string; icon: string; description: string }> = [
   { value: "GOOD", label: "좋음", icon: "😊", description: "최상의 컨디션입니다." },
   { value: "NORMAL", label: "보통", icon: "🙂", description: "평소와 비슷합니다." },
@@ -154,7 +154,7 @@ const historyToProgram = (source: Program, values: ProgramFormValues): Program =
   }),
 });
 
-const StepIndicator = ({ currentStep }: { currentStep: PrintStep }): JSX.Element => <Box sx={{ maxWidth: 820, px: { sm: 2, xs: 0 }, width: "100%" }}><Stack alignItems="flex-start" direction="row">{stepLabels.map((label, index) => { const step = (index + 1) as PrintStep; const active = currentStep === step; const complete = currentStep > step; return <Stack key={label} alignItems="center" direction="row" sx={{ flex: 1, minWidth: 0 }}><Stack alignItems="center" spacing={0.75} sx={{ minWidth: { sm: 104, xs: 64 } }}><Box sx={{ alignItems: "center", bgcolor: active ? "primary.main" : complete ? palette.primaryGoldMuted : palette.surfaceRaised, border: 1, borderColor: active || complete ? "primary.main" : "divider", borderRadius: 999, boxShadow: active ? palette.shadowAccent : "none", color: active ? "primary.contrastText" : complete ? "primary.main" : "text.secondary", display: "flex", fontWeight: 900, height: 44, justifyContent: "center", transition: "all 150ms ease", width: 44 }}>{complete ? "✓" : step}</Box><Typography color={active ? "text.primary" : "text.secondary"} fontWeight={active ? 900 : 700} sx={{ fontSize: { sm: 13, xs: 11 }, textAlign: "center" }}>{label}</Typography></Stack>{index < stepLabels.length - 1 ? <Box sx={{ bgcolor: complete ? "primary.main" : "divider", flex: 1, height: 1, mt: "22px", mx: { sm: 0.5, xs: -0.5 } }} /> : null}</Stack>; })}</Stack></Box>;
+const StepIndicator = ({ currentStep }: { currentStep: PrintStep }): JSX.Element => <Box sx={{ maxWidth: 680, px: { sm: 2, xs: 0 }, width: "100%" }}><Stack alignItems="flex-start" direction="row">{stepLabels.map((label, index) => { const step = (index + 1) as PrintStep; const active = currentStep === step; const complete = currentStep > step; return <Stack key={label} alignItems="center" direction="row" sx={{ flex: 1, minWidth: 0 }}><Stack alignItems="center" spacing={0.5} sx={{ minWidth: { sm: 88, xs: 58 } }}><Box sx={{ alignItems: "center", bgcolor: active ? "primary.main" : complete ? palette.primaryGoldMuted : palette.surfaceRaised, border: 1, borderColor: active || complete ? "primary.main" : "divider", borderRadius: 999, color: active ? "primary.contrastText" : complete ? "primary.main" : "text.secondary", display: "flex", fontSize: 13, fontWeight: 900, height: 32, justifyContent: "center", transition: "all 150ms ease", width: 32 }}>{complete ? "✓" : step}</Box><Typography color={active ? "primary.main" : "text.secondary"} fontWeight={active ? 900 : 700} sx={{ fontSize: { sm: 12, xs: 10 }, lineHeight: 1.2, textAlign: "center" }}>{label}</Typography></Stack>{index < stepLabels.length - 1 ? <Box sx={{ bgcolor: complete ? "primary.main" : "divider", flex: 1, height: 1, mt: "16px", mx: { sm: 0.5, xs: -0.5 } }} /> : null}</Stack>; })}</Stack></Box>;
 const MemberIntelligenceCard = ({ intelligence, status }: { intelligence: MemberIntelligenceSummary | null; status: IntelligenceStatus }): JSX.Element => <Card sx={infoCardSx}><CardContent><Stack spacing={2}><Stack direction="row" justifyContent="space-between" spacing={1}><Typography variant="h2">Member Intelligence</Typography>{status === "loading" ? <Chip label="분석 중" size="small" /> : null}</Stack>{status === "loading" ? <LinearProgress /> : null}{!intelligence ? <Typography color="text.secondary">운동 이력을 분석하면 회복, 위험, 빈도, 운동 부위 정보를 표시합니다.</Typography> : <Grid container spacing={1.5}><Grid item md={3} xs={6}><Chip color={scoreColor(intelligence.recoveryScore, true)} label={`Recovery ${intelligence.recoveryScore}`} /></Grid><Grid item md={3} xs={6}><Chip color={scoreColor(intelligence.riskScore, false)} icon={<WarningAmberIcon />} label={`Risk ${intelligence.riskScore}`} /></Grid><Grid item md={3} xs={6}><Chip label={`최근 7일 ${intelligence.frequency7}회`} variant="outlined" /></Grid><Grid item md={3} xs={6}><Chip label={`최근 30일 ${intelligence.frequency30}회`} variant="outlined" /></Grid><Grid item md={3} xs={6}><Typography color="text.secondary">최근 운동</Typography><Typography fontWeight={900}>{formatDaysAgo(intelligence.recentWorkoutDaysAgo)}</Typography></Grid><Grid item md={3} xs={6}><Typography color="text.secondary">운동 간격</Typography><Typography fontWeight={900}>{intelligence.gapDays === null ? "없음" : `${intelligence.gapDays}일`}</Typography></Grid><Grid item md={3} xs={6}><Typography color="text.secondary">Program 반복</Typography><Typography fontWeight={900}>{intelligence.repeatedProgramCount}회</Typography></Grid><Grid item md={3} xs={6}><Typography color="text.secondary">다양성</Typography><Typography fontWeight={900}>P {intelligence.diversity10.programCount} / C {intelligence.diversity10.categoryCount}</Typography></Grid><Grid item xs={12}><Typography color="text.secondary">운동 부위</Typography><Stack direction="row" flexWrap="wrap" gap={1} sx={{ mt: 0.5 }}>{intelligence.bodyPartBias.length > 0 ? intelligence.bodyPartBias.slice(0, 4).map((item) => <Chip key={item.category} label={`${getCategoryLabel(item.category)} ${formatRatio(item.ratio)}`} size="small" />) : <Chip label="운동 기록이 없습니다" size="small" variant="outlined" />}</Stack></Grid></Grid>}</Stack></CardContent></Card>;
 const TrainingTrendCard = ({ periodization, status }: { periodization: PeriodizationSummary | null; status: IntelligenceStatus }): JSX.Element => <Card sx={infoCardSx}><CardContent><Stack spacing={2}><Stack direction="row" justifyContent="space-between" spacing={1}><Typography variant="h2">Training Trend</Typography>{status === "loading" ? <Chip label="분석 중" size="small" /> : null}</Stack>{status === "loading" ? <LinearProgress /> : null}{!periodization ? <Typography color="text.secondary">최근 운동 흐름을 분석하면 Cycle, Plateau, Deload, 다음 추천을 표시합니다.</Typography> : <Grid container spacing={1.5}><Grid item md={3} xs={6}><Typography color="text.secondary">현재 Cycle</Typography><Typography fontWeight={900}>{periodization.currentCycle}</Typography></Grid><Grid item md={3} xs={6}><Typography color="text.secondary">Recovery</Typography><Typography fontWeight={900}>{recoveryTrendLabel(periodization.recoveryTrend)}</Typography></Grid><Grid item md={3} xs={6}><Typography color="text.secondary">Plateau</Typography><Typography fontWeight={900}>{periodization.plateau ? "Yes" : "No"}</Typography></Grid><Grid item md={3} xs={6}><Typography color="text.secondary">다음 추천</Typography><Typography fontWeight={900}>{periodization.nextProgramHint ?? "없음"}</Typography></Grid><Grid item md={3} xs={6}><Chip color="primary" label={modeLabel(periodization.recommendedMode)} /></Grid><Grid item md={3} xs={6}><Chip color={periodization.deload ? "warning" : "default"} label={periodization.deload ? "Deload" : "Normal Load"} variant={periodization.deload ? "filled" : "outlined"} /></Grid><Grid item md={3} xs={6}><Chip label={`주간 운동 ${periodization.weeklyFrequency}회`} variant="outlined" /></Grid><Grid item md={3} xs={6}><Chip label={`반복 ${periodization.repeatedProgramCount}회`} variant="outlined" /></Grid><Grid item xs={12}><Typography color="text.secondary">최근 Program</Typography><Stack direction="row" flexWrap="wrap" gap={1} sx={{ mt: 0.5 }}>{periodization.recentProgramSequence.length > 0 ? periodization.recentProgramSequence.map((title) => <Chip key={title} label={title} size="small" />) : <Chip label="기록 없음" size="small" variant="outlined" />}</Stack></Grid></Grid>}</Stack></CardContent></Card>;
 
@@ -459,17 +459,16 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
       {sessionSaving ? <Alert icon={<CircularProgress size={20} />} severity="info" sx={{ maxWidth: 1180, width: "100%" }}>운동 세션을 저장하고 있습니다.</Alert> : null}
 
       {currentStep === 1 ? (
-        <Card sx={centeredCardSx(900)}>
-          <CardContent sx={{ p: { md: 4, xs: 2.5 } }}>
-            <Stack spacing={3}>
+        <Box sx={{ maxWidth: 820, mx: "auto", width: "100%" }}>
+            <Stack spacing={{ md: 4, xs: 3 }}>
               <Stack alignItems="center" spacing={1} textAlign="center">
-                <FitnessCenterIcon color="primary" fontSize="large" />
-                <Typography variant="h1">회원 선택</Typography>
+                <FitnessCenterIcon color="primary" sx={{ fontSize: 32 }} />
+                <Typography sx={{ fontSize: { md: 36, xs: 30 }, fontWeight: 900 }}>회원 선택</Typography>
                  <Typography color="text.secondary">본인 이름을 선택해 주세요.</Typography>
               </Stack>
               <Stack spacing={1.25}>
                 <Typography fontWeight={900}>초성 선택</Typography>
-                <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: "repeat(auto-fit, minmax(48px, 1fr))" }}>
+                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, justifyContent: "center" }}>
                   {([...KOREAN_INITIALS.map((initial) => ({ value: initial, label: initial })), { value: "OTHER", label: "기타" }] as Array<{ value: MemberInitialFilter; label: string }>).map((option) => (
                     <Button
                       key={option.value}
@@ -477,7 +476,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
                       color={!hasSearchQuery && memberInitial === option.value ? "primary" : "inherit"}
                       variant={!hasSearchQuery && memberInitial === option.value ? "contained" : "outlined"}
                       onClick={() => { setMemberInitial(option.value); setMemberQuery(""); }}
-                      sx={{ minHeight: 52, minWidth: 48, px: 1 }}
+                      sx={{ height: 48, minWidth: option.value === "OTHER" ? 64 : 48, p: 0, width: option.value === "OTHER" ? 64 : 48 }}
                     >
                       {option.label}
                     </Button>
@@ -505,14 +504,14 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
                           borderColor: selectedMember?.memberId === member.memberId ? "primary.main" : "divider",
                           borderRadius: `${palette.radiusMd}px`,
                           boxShadow: selectedMember?.memberId === member.memberId ? palette.shadowAccent : "none",
-                          minHeight: 88,
+                          minHeight: 80,
                           p: 1.75,
                           transition: "border-color 150ms ease, background-color 150ms ease, transform 150ms ease",
                           "&:hover": { borderColor: "primary.main", bgcolor: palette.surfaceRaised, transform: "translateY(-1px)" },
                           "&:active": { bgcolor: palette.primaryGoldMuted, transform: "none" },
                         }}
                       >
-                        <Stack alignItems="center" direction="row" spacing={1.5}><AccountCircleIcon color={selectedMember?.memberId === member.memberId ? "primary" : "disabled"} sx={{ fontSize: 36 }} /><Box><Typography fontWeight={900}>{member.displayName}</Typography><Typography color="text.secondary" variant="caption">회원</Typography></Box></Stack>
+                        <Stack alignItems="center" direction="row" spacing={1.25}><AccountCircleIcon color={selectedMember?.memberId === member.memberId ? "primary" : "disabled"} sx={{ fontSize: 34 }} /><Box sx={{ flex: 1 }}><Typography fontWeight={900}>{member.displayName}</Typography><Typography color="text.secondary" variant="caption">회원</Typography></Box>{selectedMember?.memberId === member.memberId ? <CheckCircleIcon color="primary" fontSize="small" /> : null}</Stack>
                       </CardActionArea>
                     </Grid>
                   ))}
@@ -520,12 +519,12 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
               ) : null}
               <Stack spacing={1}>
                 <Typography color="text.secondary" fontWeight={700} variant="body2">직접 이름 또는 전화번호 검색</Typography>
-                <SearchField label="회원 이름 또는 전화번호 검색" value={memberQuery} onChange={setMemberQuery} />
+                <SearchField label="회원 이름 또는 전화번호 검색" showLabel={false} value={memberQuery} onChange={setMemberQuery} />
               </Stack>
-              <Button disabled={!selectedMember} endIcon={<ArrowForwardIcon />} fullWidth variant="contained" onClick={() => setCurrentStep(2)} sx={{ minHeight: 54 }}>다음 단계로</Button>
+              {memberStatus === "ready" && !hasSearchQuery && !memberInitial ? <Typography color="text.secondary" textAlign="center" variant="body2">초성을 선택하거나 이름을 검색해 주세요.</Typography> : null}
+              <Button disabled={!selectedMember} endIcon={<ArrowForwardIcon />} variant="contained" onClick={() => setCurrentStep(2)} sx={{ alignSelf: "center", minHeight: 54, width: { sm: 260, xs: "100%" } }}>다음 단계로</Button>
             </Stack>
-          </CardContent>
-        </Card>
+        </Box>
       ) : null}
 
       {currentStep === 2 ? (

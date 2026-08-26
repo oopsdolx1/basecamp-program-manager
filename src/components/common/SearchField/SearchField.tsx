@@ -7,12 +7,14 @@ interface SearchFieldProps {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  showLabel?: boolean;
 }
 
-export const SearchField = ({ label, value, onChange }: SearchFieldProps): JSX.Element => (
+export const SearchField = ({ label, value, onChange, showLabel = true }: SearchFieldProps): JSX.Element => (
   <TextField
+    inputProps={{ "aria-label": label }}
     fullWidth
-    label={label}
+    label={showLabel ? label : undefined}
     placeholder={label}
     value={value}
     onChange={(event) => onChange(event.target.value)}

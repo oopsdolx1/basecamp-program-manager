@@ -6,7 +6,7 @@ import { Alert, Box, Stack, Typography } from "@mui/material";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { routeBuilder } from "../../../app/routeBuilder";
-import { Button, Card, EmptyState, Loading, colors, motion, radius, shadows, spacing } from "../../../design-system";
+import { Button, Card, EmptyState, Loading, colors, kiosk, motion, radius, shadows, spacing } from "../../../design-system";
 import { toAppId, toProfileId, toProgramId } from "../../../types/brandedIds";
 import { useCreatePrintRequest, type PrintRequestRecord } from "../../print-history";
 import { getPrintRequestsByIds } from "../../print-history/services/printRequestService";
@@ -71,7 +71,7 @@ export const PrintPreviewPage = (): JSX.Element => {
   if (state.status === "loading") return <Box sx={{ bgcolor: colors.neutral.black, minHeight: "100vh", p: `${spacing[6]}px` }}><Card><Loading label="A5 가로 미리보기를 준비하고 있습니다." progress={75} /></Card></Box>;
   if (state.status === "error") return <Box sx={{ bgcolor: colors.neutral.black, minHeight: "100vh", p: `${spacing[6]}px` }}><Card><Stack spacing={`${spacing[4]}px`}><EmptyState title="미리보기를 만들 수 없습니다." description={state.message} /><Button variant="secondary" startIcon={<ArrowBackIcon />} onClick={goWorkspace}>프로그램으로 돌아가기</Button></Stack></Card></Box>;
 
-  if (completedPrints > 0) return <Box sx={{ bgcolor: colors.neutral.black, minHeight: "100vh", p: { md: `${spacing[8]}px`, xs: `${spacing[4]}px` } }}><Card sx={{ margin: "0 auto", maxWidth: 720 }}><Stack alignItems="center" spacing={`${spacing[4]}px`} textAlign="center"><CheckCircleIcon sx={{ color: colors.semantic.success, fontSize: 64 }} /><Box><Typography variant="h4">출력이 완료되었습니다.</Typography><Typography color={colors.neutral.gray400} sx={{ mt: `${spacing[2]}px` }}>동일한 운동 세션과 QR로 다시 출력할 수 있습니다.</Typography></Box><Stack direction={{ sm: "row", xs: "column" }} spacing={`${spacing[2]}px`} sx={{ width: "100%" }}><Button fullWidth startIcon={<PrintIcon />} loading={printRequest.saving || markingPrinted} onClick={() => void requestPrint()}>한 번 더 출력하기</Button><Button fullWidth variant="secondary" onClick={goWorkspace}>메인 페이지로 돌아가기</Button></Stack></Stack></Card><Box className="print-only-root" sx={{ display: "none", displayPrint: "block" }}><WorkoutPrintTemplateV1 document={state.document} /></Box></Box>;
+  if (completedPrints > 0) return <Box sx={{ bgcolor: colors.neutral.black, minHeight: "100vh", p: { md: `${spacing[8]}px`, xs: `${spacing[4]}px` } }}><Card sx={{ margin: "0 auto", maxWidth: 760 }}><Stack alignItems="center" spacing={`${spacing[4]}px`} textAlign="center"><CheckCircleIcon sx={{ color: colors.semantic.success, fontSize: 80 }} /><Box><Typography fontSize={{ md: kiosk.pageTitle, xs: 28 }} fontWeight={900}>출력이 완료되었습니다.</Typography><Typography color={colors.neutral.gray400} fontSize={kiosk.secondaryText} sx={{ mt: `${spacing[2]}px` }}>동일한 운동 세션과 QR로 다시 출력할 수 있습니다.</Typography></Box><Stack direction={{ sm: "row", xs: "column" }} spacing={`${spacing[2]}px`} sx={{ width: "100%" }}><Button fullWidth startIcon={<PrintIcon />} loading={printRequest.saving || markingPrinted} onClick={() => void requestPrint()} sx={{ minHeight: kiosk.primaryActionHeight }}>한 번 더 출력하기</Button><Button fullWidth variant="secondary" onClick={goWorkspace} sx={{ minHeight: kiosk.standardControlHeight }}>메인 페이지로 돌아가기</Button></Stack></Stack></Card><Box className="print-only-root" sx={{ display: "none", displayPrint: "block" }}><WorkoutPrintTemplateV1 document={state.document} /></Box></Box>;
 
   const checklist = [
     ["회원 선택", Boolean(state.member.memberId)],
@@ -85,14 +85,14 @@ export const PrintPreviewPage = (): JSX.Element => {
 
   return (
     <Box sx={{ bgcolor: colors.neutral.black, minHeight: "100vh" }}>
-      <Box className="no-print" sx={{ margin: "0 auto", maxWidth: 1560, p: { lg: `${spacing[6]}px`, md: `${spacing[4]}px`, xs: `${spacing[3]}px` } }}>
+      <Box className="no-print" sx={{ margin: "0 auto", maxWidth: 1660, p: { lg: `${spacing[6]}px`, md: `${spacing[4]}px`, xs: `${spacing[3]}px` }, "@media (orientation: portrait)": { maxWidth: kiosk.portraitContentWidth } }}>
         <Stack spacing={`${spacing[3]}px`}>
           {printRequest.error ? <Alert severity="error">{printRequest.error}</Alert> : null}
           {sessionError ? <Alert severity="error">{sessionError}</Alert> : null}
 
           <Stack alignItems="center" spacing={`${spacing[2]}px`} textAlign="center"><Box sx={{ alignItems: "center", bgcolor: colors.alpha.goldMuted, border: `1px solid ${colors.primary.gold}`, borderRadius: `${radius.full}px`, color: colors.primary.gold, display: "flex", height: 52, justifyContent: "center", width: 52 }}><PrintIcon /></Box><Box><Typography color={colors.primary.gold} fontWeight={800} variant="overline">4 · 출력</Typography><Typography fontFamily="inherit" fontWeight={800} letterSpacing="-0.02em" lineHeight={1.3} variant="h4">출력 준비 완료</Typography><Typography color={colors.neutral.gray400} sx={{ mt: `${spacing[1]}px` }}>{state.document.member.name} · {state.document.program.title}</Typography></Box></Stack>
 
-          <Box sx={{ display: "grid", gap: `${spacing[3]}px`, gridTemplateColumns: { lg: "minmax(0, 1fr) 300px", xs: "1fr" }, minWidth: 0 }}>
+          <Box sx={{ display: "grid", gap: `${spacing[3]}px`, gridTemplateColumns: { lg: "minmax(0, 1fr) 360px", xs: "1fr" }, minWidth: 0, "@media (orientation: portrait)": { gridTemplateColumns: "1fr" } }}>
             <Card sx={{ minWidth: 0, overflow: "hidden", p: `${spacing[3]}px` }}>
               <Stack alignItems="center" spacing={`${spacing[2]}px`}>
                 <Box sx={{ alignItems: "center", bgcolor: colors.neutral.gray800, border: `1px dashed ${colors.neutral.gray600}`, borderRadius: `${radius.sm}px`, display: "flex", justifyContent: "center", overflow: "auto", p: { md: `${spacing[3]}px`, xs: `${spacing[2]}px` }, width: "100%" }}>

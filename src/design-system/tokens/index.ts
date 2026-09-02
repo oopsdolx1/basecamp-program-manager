@@ -4,3 +4,4 @@ export { spacing } from "./spacing";
 export { radius } from "./radius";
 export { shadows } from "./shadows";
 export { motion } from "./motion";
+export { kiosk } from "./kiosk";

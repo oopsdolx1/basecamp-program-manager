@@ -108,7 +108,7 @@ const scoreCondition = (condition: ConditionInput, program: Program): ScoreResul
     if (program.category === "RECOVERY") delta += 22;
     if (program.difficulty === "ADVANCED") delta -= 16;
     score += delta;
-    const reason = "스트레스가 높아 회복 중심 프로그램 우선순위를 높였습니다.";
+    const reason = "선택 부위의 피로도가 높아 강도를 보수적으로 조정했습니다.";
     reasons.push(reason);
     if (delta !== 0) factors.push(createFactor({ key: "condition", label: "Today's Condition", score: delta, reason }));
   } else if (condition.stress >= 4) {
@@ -117,7 +117,7 @@ const scoreCondition = (condition: ConditionInput, program: Program): ScoreResul
     delta -= 4;
     score += delta;
     if (delta !== 0) {
-      const reason = "스트레스 수준을 반영해 강도를 보수적으로 조정했습니다.";
+      const reason = "선택 부위의 피로도를 반영해 강도를 보수적으로 조정했습니다.";
       reasons.push(reason);
       factors.push(createFactor({ key: "condition", label: "Today's Condition", score: delta, reason }));
     }
@@ -212,6 +212,18 @@ const scoreRecentExerciseOverlap = (
   };
 };
 
+const scoreTargetHistory = (workoutHistory: WorkoutHistoryRecord[], program: Program): ScoreResult => {
+  const targetHistory = workoutHistory.filter((entry) => entry.category === program.category || entry.categories?.includes(program.category));
+  if (targetHistory.length === 0) {
+    const reason = `최근 기록에서 ${getCategoryLabel(program.category)} 운동 이력이 없어 충분한 운동 간격으로 판단했습니다.`;
+    return { score: 4, reasons: [reason], factors: [createFactor({ key: "history", label: "Target History", score: 4, reason })] };
+  }
+  const daysAgo = Math.max(0, Math.floor((Date.now() - targetHistory[0].workoutDate.getTime()) / 86_400_000));
+  const recentFrequency = targetHistory.filter((entry) => Date.now() - entry.workoutDate.getTime() <= 30 * 86_400_000).length;
+  const delta = daysAgo <= 1 ? -10 : daysAgo >= 7 ? 4 : 0;
+  const reason = `최근 ${getCategoryLabel(program.category)} 운동은 ${daysAgo}일 전이며 최근 30일 ${recentFrequency}회 수행했습니다.`;
+  return { score: delta, reasons: [reason], factors: [createFactor({ key: "history", label: "Target History", score: delta, reason })] };
+};
 const scoreIntelligence = (
   intelligence: MemberIntelligenceSummary | null,
   program: Program,
@@ -326,9 +338,9 @@ const scorePeriodization = (periodization: PeriodizationSummary | null, program:
 
   if (periodization.recommendedMode === "RESTART") {
     let delta = 0;
-    if (program.difficulty === "BEGINNER" || program.difficulty === "GENERAL") delta += 16;
+    if (program.difficulty === "BEGINNER" || program.difficulty === "GENERAL") delta += 6;
     if (program.category === "RECOVERY") delta += 12;
-    if (program.difficulty === "ADVANCED") delta -= 20;
+    if (program.difficulty === "ADVANCED") delta -= 6;
     score += delta;
     const reason = "운동 재시작 구간으로 판단해 재적응형 Program을 우선했습니다.";
     reasons.push(reason);
@@ -375,6 +387,11 @@ const scoreProgram = (
   score += recentResult.score;
   reasons.push(...recentResult.reasons);
   factors.push(...recentResult.factors);
+
+  const targetHistoryResult = scoreTargetHistory(workoutHistory, program);
+  score += targetHistoryResult.score;
+  reasons.push(...targetHistoryResult.reasons);
+  factors.push(...targetHistoryResult.factors);
 
   const overlapResult = scoreRecentExerciseOverlap(workoutHistory, program, catalog);
   score += overlapResult.score;
@@ -428,8 +445,9 @@ export const recommendProgram = (
   workoutHistory: WorkoutHistoryRecord[] = [],
   catalog: ExerciseCatalogItem[] = [],
 ): RecommendationResult | null => {
+  if (!condition.workoutTarget) return null;
   const candidates = programs
-    .filter((program) => !program.isArchived)
+    .filter((program) => !program.isArchived && program.category === condition.workoutTarget)
     .map((program) => scoreProgram(program, condition, recentWorkout, intelligence, periodization, workoutHistory, catalog));
 
   candidates.sort((left, right) => {
@@ -498,21 +516,24 @@ export const buildRecommendationReason = (
     summary.push(`최근 ${getCategoryLabel(recentWorkout.category)} 운동을 진행했고`);
   }
 
-  if (condition.fatigueAreas.length > 0) {
-    summary.push(`오늘 ${condition.fatigueAreas.map((area) => areaLabel(area)).join(", ")} 피로를 선택해`);
+  if (condition.workoutTarget) {
+    summary.push(`오늘 ${getCategoryLabel(condition.workoutTarget)} 운동을 선택했고`);
   }
 
-  if (intelligence) {
-    summary.push(`회복 점수 ${intelligence.recoveryScore}점, 위험 점수 ${intelligence.riskScore}점을 반영해`);
+  if (condition.targetFatigue) {
+    const fatigueLabel = condition.targetFatigue === "LOW" ? "낮은" : condition.targetFatigue === "HIGH" ? "높은" : "보통";
+    summary.push(`선택 부위의 ${fatigueLabel} 피로도를 반영해`);
   }
 
-  if (periodization) {
-    summary.push(`주기 분석 결과 ${periodization.recommendedMode} 모드와 ${periodization.currentCycle} 흐름을 고려해`);
-  }
+  const factorKeys = new Set(result.trace.decisionFactors.map((factor) => factor.key));
+  if (factorKeys.has("history")) summary.push("최근 해당 부위의 운동 간격과 빈도를 확인하고");
+  if (factorKeys.has("exerciseOverlap") || factorKeys.has("programRepeat")) summary.push("최근 수행 운동과 종목 중복을 줄이며");
+  if (factorKeys.has("condition") || factorKeys.has("recovery") || factorKeys.has("risk")) summary.push("현재 컨디션에 맞는 강도를 고려해");
+  if (factorKeys.has("periodization") || factorKeys.has("plateau") || factorKeys.has("weeklyFrequency")) summary.push("최근 운동 흐름을 함께 반영해");
 
   summary.push(`${getCategoryLabel(result.program.category)} 프로그램을 추천했습니다.`);
 
-  return [...summary, ...result.reasons.slice(0, 4)].join(" ");
+  return summary.join(" ");
 };
 
 export const programToSnapshotFormValues = (program: Program): ProgramFormValues =>
@@ -532,8 +553,3 @@ export const programToSnapshotFormValues = (program: Program): ProgramFormValues
       displayName: exercise.displayName ?? exercise.name,
     })),
   });
-
-
-
-
-

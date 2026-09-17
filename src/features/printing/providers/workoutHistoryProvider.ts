@@ -13,6 +13,7 @@ export interface WorkoutHistoryRecord {
   programId: string;
   programTitle: string;
   category: ProgramCategory | null;
+  categories?: ProgramCategory[];
   workoutDate: Date;
   durationMinutes?: number;
   completion?: boolean;

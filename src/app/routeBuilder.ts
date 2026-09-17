@@ -10,8 +10,9 @@ export const routeBuilder = {
   newProgram: (): AppRoute => routes.newProgram,
   programDetail: (id: string): string => `/program-manager/programs/${id}`,
   editProgram: (id: string): string => `/program-manager/programs/${id}/edit`,
-  printPreview: (programId: string, memberId: string, sessionId: string): string => {
+  printPreview: (programId: string, memberId: string, sessionId: string, autoPrint = false): string => {
     const params = new URLSearchParams({ memberId, sessionId });
+    if (autoPrint) params.set("autoPrint", "1");
     return `/program-manager/print/${programId}?${params.toString()}`;
   },
   printHistory: (filters?: { memberId?: string; programId?: string; category?: string; search?: string }): string => {

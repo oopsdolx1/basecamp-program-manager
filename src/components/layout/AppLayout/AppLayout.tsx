@@ -17,7 +17,7 @@ export const AppLayout = ({ children }: PropsWithChildren): JSX.Element => {
         minHeight: "100vh",
       }}
     >
-      {isProgramWorkspace ? null : <AppHeader />}
+      <AppHeader />
       {children}
     </Box>
   );

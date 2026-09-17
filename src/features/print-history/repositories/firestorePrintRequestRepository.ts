@@ -84,11 +84,6 @@ export const firestorePrintRequestRepository: PrintRequestRepository = {
         createdBy: input.requestedBy,
         isArchived: false,
       });
-
-      transaction.update(programRef, {
-        usageCount: (program.usageCount ?? 0) + 1,
-        lastUsedAt: requestedAt,
-      });
     });
 
     return {

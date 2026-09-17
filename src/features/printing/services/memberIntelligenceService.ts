@@ -12,6 +12,7 @@ const toHistoryEntries = (history: WorkoutHistoryRecord[]): MemberHistoryEntry[]
     programId: entry.programId,
     programTitle: entry.programTitle,
     category: entry.category,
+    categories: entry.categories ?? (entry.category ? [entry.category] : []),
     exercises: entry.exercises.map((exercise) => ({ name: exercise.name, sets: exercise.sets })),
     completed: entry.completion ?? null,
     source: "logs",
@@ -30,8 +31,7 @@ const dedupeEntries = (entries: MemberHistoryEntry[]): MemberHistoryEntry[] => {
 const getBodyPartBias = (entries: MemberHistoryEntry[]): Array<{ category: ProgramCategory; ratio: number; count: number }> => {
   const counts = new Map<ProgramCategory, number>();
   entries.forEach((entry) => {
-    if (!entry.category) return;
-    counts.set(entry.category, (counts.get(entry.category) ?? 0) + 1);
+    entry.categories.forEach((category) => counts.set(category, (counts.get(category) ?? 0) + 1));
   });
   const total = [...counts.values()].reduce((sum, value) => sum + value, 0);
   return [...counts.entries()]

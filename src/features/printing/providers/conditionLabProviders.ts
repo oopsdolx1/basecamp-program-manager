@@ -1,4 +1,4 @@
-import { collection, doc, getDoc, getDocs, query, where, type DocumentData } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, limit, query, where, type DocumentData } from "firebase/firestore";
 import { getFirestoreClient } from "../../../firebase/firestoreClient";
 import { profilesCollectionPath, workoutLogsCollectionPath } from "../../../firebase/firestorePaths";
 import type { AppId, ProfileId } from "../../../types/brandedIds";
@@ -56,7 +56,12 @@ const asProgramCategory = (value: unknown): ProgramCategory | null => {
   return programCategories.find(({ value: category, label }) =>
     category.toLocaleLowerCase("ko-KR") === normalized || label === text)?.value ?? null;
 };
-const buildProfile = (memberId: ProfileId, raw: RawProfileDocument & Record<string, unknown>): MemberProfile | null => {
+const asProgramCategories = (value: unknown): ProgramCategory[] => {
+  const text = asText(value);
+  if (!text) return [];
+  const candidates = text.split(/[,/·+]/).map((part) => part.trim()).filter(Boolean);
+  return [...new Set(candidates.map(asProgramCategory).filter((item): item is ProgramCategory => Boolean(item)))];
+};const buildProfile = (memberId: ProfileId, raw: RawProfileDocument & Record<string, unknown>): MemberProfile | null => {
   const mapped = mapProfileDocument(String(memberId), raw);
   if (mapped.role !== "member" || !mapped.name) return null;
   return {
@@ -73,6 +78,7 @@ const buildProfile = (memberId: ProfileId, raw: RawProfileDocument & Record<stri
   };
 };
 const mapHistoryRecord = (memberId: ProfileId, data: DocumentData, id: string): WorkoutHistoryRecord | null => {
+  const categories = asProgramCategories(data.category ?? data.target);
   const exercises = Array.isArray(data.exercises) ? data.exercises : [];
   const workoutDate = asDate(data.date) ?? asDate(data.createdAt) ?? asDate(data.updatedAt);
   if (!workoutDate) return null;
@@ -80,10 +86,11 @@ const mapHistoryRecord = (memberId: ProfileId, data: DocumentData, id: string): 
     memberId,
     programId: asText(data.programId) ?? asText(data.workoutSessionId) ?? id,
     programTitle: asText(data.programName) ?? asText(data.title) ?? asText(data.target) ?? "운동 기록",
-    category: asProgramCategory(data.category ?? data.target),
+    category: categories.length === 1 ? categories[0] : null,
+    categories,
     workoutDate,
     durationMinutes: asNumber(data.durationMinutes ?? data.duration ?? data.totalMinutes),
-    completion: typeof data.completion === "boolean" ? data.completion : true,
+    completion: typeof data.completion === "boolean" ? data.completion : undefined,
     exercises: exercises.map((exercise) => ({
       name: typeof exercise?.name === "string" ? exercise.name : "운동 없음",
       sets: Array.isArray(exercise?.sets) ? exercise.sets.length : asNumber(exercise?.sets) ?? null,
@@ -156,6 +163,7 @@ export const createConditionLabWorkoutHistoryProvider = (appId: AppId): WorkoutH
       const snapshot = await getDocs(query(
         collection(getFirestoreClient(), workoutLogsCollectionPath(appId)),
         where("memberId", "==", memberId),
+        limit(Math.min(100, Math.max(requestedLimit, requestedLimit * 4))),
       ));
       const records = snapshot.docs
         .map((item) => mapHistoryRecord(memberId, item.data(), item.id))

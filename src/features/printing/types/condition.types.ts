@@ -3,11 +3,16 @@ import type { Program, ProgramCategory, ProgramFormValues } from "../../programs
 export type ConditionStatus = "GOOD" | "NORMAL" | "BAD";
 export type SleepQuality = "ENOUGH" | "NORMAL" | "LACK";
 export type FatigueArea = "CHEST" | "BACK" | "SHOULDER" | "ARMS" | "LOWER_BODY";
+export type WorkoutTarget = FatigueArea | "FULL_BODY" | "RECOVERY";
+export type TargetFatigue = "LOW" | "NORMAL" | "HIGH";
 export type AlcoholStatus = "YES" | "NO";
 
 export interface ConditionInput {
   condition: ConditionStatus | null;
   sleep: SleepQuality | null;
+  workoutTarget: WorkoutTarget | null;
+  targetFatigue: TargetFatigue | null;
+  /** Compatibility field for existing analysis envelopes. New UI uses workoutTarget. */
   fatigueAreas: FatigueArea[];
   stress: number;
   alcohol: AlcoholStatus | null;
@@ -25,6 +30,7 @@ export interface MemberHistoryEntry {
   programId: string;
   programTitle: string;
   category: ProgramCategory | null;
+  categories: ProgramCategory[];
   exercises: Array<{ name: string; sets: number | null }>;
   completed: boolean | null;
   source: "logs" | "print-history";
@@ -167,4 +173,3 @@ export interface ProgramSnapshotPayload {
   recentWorkout: RecentWorkoutSummary | null;
   formValues: ProgramFormValues;
 }
-

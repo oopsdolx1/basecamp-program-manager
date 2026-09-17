@@ -3,7 +3,7 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import PrintIcon from "@mui/icons-material/Print";
 import QrCode2Icon from "@mui/icons-material/QrCode2";
 import { Alert, Box, Stack, Typography } from "@mui/material";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { routeBuilder } from "../../../app/routeBuilder";
 import { Button, Card, EmptyState, Loading, colors, kiosk, motion, radius, shadows, spacing } from "../../../design-system";
@@ -25,9 +25,12 @@ export const PrintPreviewPage = (): JSX.Element => {
   const navigate = useNavigate();
   const memberId = searchParams.get("memberId");
   const workoutSessionId = searchParams.get("sessionId");
+  const autoPrint = searchParams.get("autoPrint") === "1";
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [markingPrinted, setMarkingPrinted] = useState(false);
   const [completedPrints, setCompletedPrints] = useState(0);
+  const [secondsRemaining, setSecondsRemaining] = useState(30);
+  const autoPrintStarted = useRef(false);
   const [history, setHistory] = useState<PrintRequestRecord[]>([]);
   const state = usePrintPreview({
     appId: conditionLabAppId,
@@ -53,7 +56,8 @@ export const PrintPreviewPage = (): JSX.Element => {
   const requestPrint = async () => {
     if (state.status !== "ready" || printRequest.saving || markingPrinted || !workoutSessionId) return;
     setSessionError(null);
-    const record = await printRequest.create(state.document, state.workoutSession.print.copyCount + completedPrints + 1);
+    const nextCopy = Math.max(state.workoutSession.print.copyCount, ...history.map((item) => item.copy), 0) + 1;
+    const record = await printRequest.create(state.document, nextCopy);
     if (!record) return;
     setMarkingPrinted(true);
     try {
@@ -68,11 +72,28 @@ export const PrintPreviewPage = (): JSX.Element => {
     }
   };
 
+  useEffect(() => {
+    if (!autoPrint || state.status !== "ready" || autoPrintStarted.current) return;
+    autoPrintStarted.current = true;
+    void requestPrint();
+  }, [autoPrint, state.status]);
+
+  useEffect(() => {
+    if (completedPrints === 0) return;
+    setSecondsRemaining(30);
+    const intervalId = window.setInterval(() => setSecondsRemaining((current) => Math.max(0, current - 1)), 1_000);
+    const timeoutId = window.setTimeout(() => navigate(routeBuilder.print(), { replace: true }), 30_000);
+    return () => {
+      window.clearInterval(intervalId);
+      window.clearTimeout(timeoutId);
+    };
+  }, [completedPrints, navigate]);
   if (state.status === "loading") return <Box sx={{ bgcolor: colors.neutral.black, minHeight: "100vh", p: `${spacing[6]}px` }}><Card><Loading label="A5 가로 미리보기를 준비하고 있습니다." progress={75} /></Card></Box>;
   if (state.status === "error") return <Box sx={{ bgcolor: colors.neutral.black, minHeight: "100vh", p: `${spacing[6]}px` }}><Card><Stack spacing={`${spacing[4]}px`}><EmptyState title="미리보기를 만들 수 없습니다." description={state.message} /><Button variant="secondary" startIcon={<ArrowBackIcon />} onClick={goWorkspace}>프로그램으로 돌아가기</Button></Stack></Card></Box>;
 
-  if (completedPrints > 0) return <Box sx={{ bgcolor: colors.neutral.black, minHeight: "100vh", p: { md: `${spacing[8]}px`, xs: `${spacing[4]}px` } }}><Card sx={{ margin: "0 auto", maxWidth: 760 }}><Stack alignItems="center" spacing={`${spacing[4]}px`} textAlign="center"><CheckCircleIcon sx={{ color: colors.semantic.success, fontSize: 80 }} /><Box><Typography fontSize={{ md: kiosk.pageTitle, xs: 28 }} fontWeight={900}>출력이 완료되었습니다.</Typography><Typography color={colors.neutral.gray400} fontSize={kiosk.secondaryText} sx={{ mt: `${spacing[2]}px` }}>동일한 운동 세션과 QR로 다시 출력할 수 있습니다.</Typography></Box><Stack direction={{ sm: "row", xs: "column" }} spacing={`${spacing[2]}px`} sx={{ width: "100%" }}><Button fullWidth startIcon={<PrintIcon />} loading={printRequest.saving || markingPrinted} onClick={() => void requestPrint()} sx={{ minHeight: kiosk.primaryActionHeight }}>한 번 더 출력하기</Button><Button fullWidth variant="secondary" onClick={goWorkspace} sx={{ minHeight: kiosk.standardControlHeight }}>메인 페이지로 돌아가기</Button></Stack></Stack></Card><Box className="print-only-root" sx={{ display: "none", displayPrint: "block" }}><WorkoutPrintTemplateV1 document={state.document} /></Box></Box>;
+  if (completedPrints > 0) return <Box sx={{ bgcolor: colors.neutral.black, minHeight: "100vh", p: { md: `${spacing[8]}px`, xs: `${spacing[4]}px` } }}><Card sx={{ margin: "0 auto", maxWidth: 760 }}><Stack alignItems="center" spacing={`${spacing[4]}px`} textAlign="center"><CheckCircleIcon sx={{ color: colors.semantic.success, fontSize: 80 }} /><Box><Typography fontSize={{ md: kiosk.pageTitle, xs: 28 }} fontWeight={900}>출력이 완료되었습니다.</Typography><Typography color={colors.neutral.gray400} fontSize={kiosk.secondaryText} sx={{ mt: `${spacing[2]}px` }}>동일한 운동 세션과 QR로 다시 출력할 수 있습니다. {secondsRemaining}초 후 처음 화면으로 돌아갑니다.</Typography></Box><Stack direction={{ sm: "row", xs: "column" }} spacing={`${spacing[2]}px`} sx={{ width: "100%" }}><Button fullWidth startIcon={<PrintIcon />} loading={printRequest.saving || markingPrinted} onClick={() => void requestPrint()} sx={{ minHeight: kiosk.primaryActionHeight }}>다시 출력</Button><Button fullWidth variant="secondary" onClick={goWorkspace} sx={{ minHeight: kiosk.standardControlHeight }}>메인 페이지로 돌아가기</Button></Stack></Stack></Card><Box className="print-only-root" sx={{ display: "none", displayPrint: "block" }}><WorkoutPrintTemplateV1 document={state.document} /></Box></Box>;
 
+  if (autoPrint) return <Box sx={{ bgcolor: colors.neutral.black, minHeight: "100vh", p: `${spacing[6]}px` }}><Card sx={{ margin: "0 auto", maxWidth: 760 }}><Loading label={printRequest.error || sessionError || "운동 세션과 QR을 확인하고 인쇄를 요청하고 있습니다."} progress={printRequest.error || sessionError ? undefined : 85} /></Card><Box className="print-only-root" sx={{ display: "none", displayPrint: "block" }}><WorkoutPrintTemplateV1 document={state.document} /></Box></Box>;
   const checklist = [
     ["회원 선택", Boolean(state.member.memberId)],
     ["프로그램 선택", Boolean(state.program.id)],

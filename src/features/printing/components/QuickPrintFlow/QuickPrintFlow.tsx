@@ -1,4 +1,4 @@
-﻿import AddIcon from "@mui/icons-material/Add";
+import AddIcon from "@mui/icons-material/Add";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
@@ -8,7 +8,7 @@ import FitnessCenterIcon from "@mui/icons-material/FitnessCenter";
 import PrintIcon from "@mui/icons-material/Print";
 import HistoryIcon from "@mui/icons-material/History";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
-import { Alert, Box, Button, Card, CardActionArea, CardContent, Chip, CircularProgress, Collapse, FormControlLabel, Grid, LinearProgress, Slider, Stack, Switch, Typography } from "@mui/material";
+import { Alert, Box, Button, Card, CardActionArea, CardContent, Chip, CircularProgress, Collapse, Grid, LinearProgress, Stack, Typography } from "@mui/material";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { routeBuilder } from "../../../../app/routeBuilder";
@@ -29,19 +29,17 @@ import type { Program, ProgramCategory, ProgramFormValues } from "../../../progr
 import type { MemberProvider } from "../../providers/memberProvider";
 import type { RecommendationProvider } from "../../providers/recommendationProvider";
 import type { WorkoutHistoryRecord } from "../../providers/workoutHistoryProvider";
-import { applyAiRecommendationToSnapshot, requestAiRecommendation } from "../../services/aiRecommendationService";
 import { analyzeMemberIntelligence } from "../../services/memberIntelligenceService";
 import { analyzePeriodization } from "../../services/periodizationEngine";
 import { buildRecommendationReason, recommendProgram } from "../../services/conditionRecommendationService";
 import { savePrintSnapshot } from "../../services/printSnapshotSession";
 import { createSnapshotBuilderHistory, snapshotBuilderService, type SnapshotBuilderExercise, type SnapshotBuilderHistory } from "../../services/snapshotBuilderService";
-import type { AiRecommendationResult, AlcoholStatus, ConditionInput, ConditionStatus, FatigueArea, MemberIntelligenceMetadata, MemberIntelligenceSummary, PeriodizationSummary, RecommendationResult, RecommendationTrace, RecentWorkoutSummary, SleepQuality } from "../../types/condition.types";
+import type { AlcoholStatus, ConditionInput, ConditionStatus, FatigueArea, MemberIntelligenceMetadata, MemberIntelligenceSummary, PeriodizationSummary, RecommendationResult, RecommendationTrace, RecentWorkoutSummary, SleepQuality, TargetFatigue, WorkoutTarget } from "../../types/condition.types";
 import { palette } from "../../../../theme/palette";
 import { createWorkoutSession } from "../../../workout-sessions/services/workoutSessionService";
 import { kiosk } from "../../../../design-system";
 
 type PrintStep = 1 | 2 | 3 | 4;
-type AiStatus = "idle" | "loading" | "ready" | "error" | "skipped";
 type IntelligenceStatus = "idle" | "loading" | "ready" | "error";
 type MemberLoadStatus = "loading" | "ready" | "error";
 
@@ -73,14 +71,12 @@ const fatigueOptions: Array<{ value: FatigueArea; label: string }> = [
   { value: "ARMS", label: "팔" },
   { value: "LOWER_BODY", label: "하체" },
 ];
-const fatigueScale = [
-  { value: 1, label: "매우 피곤", description: "회복이 가장 필요한 상태" },
-  { value: 2, label: "조금 피곤", description: "피로가 남아 있습니다." },
-  { value: 3, label: "보통", description: "평균적인 컨디션입니다." },
-  { value: 4, label: "상쾌", description: "몸 상태가 좋은 편입니다." },
-  { value: 5, label: "매우 상쾌", description: "최상의 컨디션입니다." },
-] as const;
-const defaultCondition: ConditionInput = { condition: null, sleep: null, fatigueAreas: [], stress: 3, alcohol: null };
+const targetFatigueOptions: Array<{ value: TargetFatigue; label: string; description: string; stress: number }> = [
+  { value: "LOW", label: "낮음", description: "운동하기 편안한 상태", stress: 1 },
+  { value: "NORMAL", label: "보통", description: "평균적인 피로 상태", stress: 3 },
+  { value: "HIGH", label: "높음", description: "강도 조절이 필요한 상태", stress: 5 },
+];
+const defaultCondition: ConditionInput = { condition: null, sleep: null, workoutTarget: null, targetFatigue: null, fatigueAreas: [], stress: 3, alcohol: null };
 const centeredCardSx = (maxWidth: number) => ({ maxWidth, mx: "auto", width: "100%" });
 const largeChoiceCardSx = (active: boolean) => ({
   bgcolor: active ? palette.primaryGoldMuted : palette.surfaceInteractive,
@@ -115,7 +111,7 @@ const MuscleSilhouette = ({ area, active, large = false }: { area: FatigueArea |
 const ConditionBodyMap = ({ areas, onSelect }: { areas: FatigueArea[]; onSelect: (area: FatigueArea) => void }): JSX.Element => {
   const selected = (area: FatigueArea) => areas.includes(area);
   const fill = (area: FatigueArea) => selected(area) ? palette.primaryGold : palette.surfaceRaised;
-  return <Box aria-label={areas.length > 0 ? `선택된 피로 부위: ${areas.map((area) => fatigueOptions.find((item) => item.value === area)?.label).join(", ")}` : "선택된 피로 부위 없음"} component="svg" role="img" viewBox="0 0 180 260" sx={{ filter: areas.length > 0 ? `drop-shadow(0 0 12px ${palette.primaryGoldGlowStrong})` : "none", height: { lg: 390, md: 320, xs: 220 }, width: "auto" }}>
+  return <Box aria-label={areas.length > 0 ? `선택한 운동 부위: ${areas.map((area) => fatigueOptions.find((item) => item.value === area)?.label).join(", ")}` : "선택한 운동 부위 없음"} component="svg" role="img" viewBox="0 0 180 260" sx={{ filter: areas.length > 0 ? `drop-shadow(0 0 12px ${palette.primaryGoldGlowStrong})` : "none", height: { lg: 390, md: 320, xs: 220 }, width: "auto" }}>
     <circle cx="90" cy="25" fill={palette.surfaceRaised} stroke={palette.borderStrong} strokeWidth="3" r="18" />
     <path d="M58 55 Q90 42 122 55 L129 137 Q111 154 90 154 Q69 154 51 137 Z" fill={selected("CHEST") || selected("BACK") ? palette.primaryGoldMuted : palette.surfaceRaised} stroke={palette.borderStrong} strokeWidth="3" />
     <path d="M58 59 L36 72 L19 142 L37 148 L58 92" fill={fill("ARMS")} stroke={palette.borderStrong} strokeWidth="3" />
@@ -138,7 +134,7 @@ const buildDisplayRecommendationSummary = (program: Program | null, input: Condi
   if (!program) return "선택한 회원 상태에 맞는 프로그램입니다.";
   const target = getCategoryLabel(program.category);
   const conditionLabel = conditionOptions.find((item) => item.value === input.condition)?.label ?? "현재";
-  if (!recent?.category) return `오늘 컨디션(${conditionLabel})과 선택한 피로 부위를 고려해 ${target} 중심 프로그램을 추천했습니다.`;
+  if (!recent?.category) return `오늘 컨디션(${conditionLabel})과 선택한 운동 부위와 피로도를 고려해 ${target} 중심 프로그램을 추천했습니다.`;
   const recentTarget = getCategoryLabel(recent.category);
   return recent.category === program.category
     ? `최근 ${recentTarget} 운동의 연속성과 오늘 컨디션(${conditionLabel})을 고려한 프로그램입니다.`
@@ -277,10 +273,6 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
   const [recommendationReason, setRecommendationReason] = useState("");
   const [snapshotSourceProgram, setSnapshotSourceProgram] = useState<Program | null>(null);
   const [builderHistory, setBuilderHistory] = useState<SnapshotBuilderHistory | null>(null);
-  const [useAiRecommendation, setUseAiRecommendation] = useState(false);
-  const [aiStatus, setAiStatus] = useState<AiStatus>("idle");
-  const [aiRecommendation, setAiRecommendation] = useState<AiRecommendationResult | null>(null);
-  const [aiError, setAiError] = useState("");
   const [showRecommendationBasis, setShowRecommendationBasis] = useState(false);
   const [sessionSaving, setSessionSaving] = useState(false);
   const [sessionError, setSessionError] = useState("");
@@ -298,7 +290,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
   const displayRecommendationReason = useMemo(() => buildDisplayRecommendationSummary(snapshotSourceProgram ?? recommendation?.program ?? null, condition, recentWorkout), [condition, recentWorkout, recommendation?.program, snapshotSourceProgram]);
   const snapshotValues = useMemo(() => (builderState ? snapshotBuilderService.toProgramFormValues(builderState) : null), [builderState]);
   const snapshotValidation = useMemo(() => (snapshotValues ? validateProgramForm(snapshotValues) : { valid: false, errors: ["Snapshot이 준비되지 않았습니다."] }), [snapshotValues]);
-  const canRecommend = Boolean(selectedMember && condition.condition && condition.sleep && condition.alcohol);
+  const canRecommend = Boolean(selectedMember && condition.workoutTarget && condition.targetFatigue && condition.condition && condition.sleep && condition.alcohol);
   useEffect(() => {
     let active = true;
     setMemberStatus("loading");
@@ -362,9 +354,6 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
     setRecommendationReason("");
     setSnapshotSourceProgram(null);
     setBuilderHistory(null);
-    setAiStatus("idle");
-    setAiRecommendation(null);
-    setAiError("");
   };
 
   const selectMember = (member: MemberSelectionItem) => {
@@ -378,10 +367,11 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
     resetRecommendationState();
   };
 
-  const toggleFatigue = (area: FatigueArea) => {
+  const selectWorkoutTarget = (target: WorkoutTarget) => {
     setCondition((current) => ({
       ...current,
-      fatigueAreas: current.fatigueAreas.includes(area) ? current.fatigueAreas.filter((item) => item !== area) : [...current.fatigueAreas, area],
+      workoutTarget: target,
+      fatigueAreas: [],
     }));
   };
 
@@ -393,7 +383,6 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
     setRecommendationReason(program.id === recommendation?.program.id
       ? recommendationReason
       : "차순위 추천에서 트레이너가 선택한 프로그램입니다.");
-    setCurrentStep(4);
   };
 
   const runRecommendation = async () => {
@@ -403,8 +392,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
       setRecommendationReason("추천 가능한 프로그램을 찾을 수 없습니다.");
       setSnapshotSourceProgram(null);
       setBuilderHistory(null);
-      setAiStatus("skipped");
-      setAiRecommendation(null);
+      setCurrentStep(3);
       return;
     }
     const ruleReason = buildRecommendationReason(next, condition, recentWorkout, intelligence, periodization);
@@ -414,30 +402,6 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
     setRecommendationReason(ruleReason);
     setSnapshotSourceProgram(next.program);
     setBuilderHistory(baseHistory);
-    setAiRecommendation(null);
-    setAiError("");
-    if (!useAiRecommendation || !selectedMember) {
-      setAiStatus("skipped");
-      setCurrentStep(3);
-      return;
-    }
-    setAiStatus("loading");
-    try {
-      const aiResult = await requestAiRecommendation({ member: selectedMember, condition, recentWorkout, intelligence, periodization, recommendedProgram: next.program, snapshot: snapshotBuilderService.toProgramFormValues(baseHistory.present), ruleReason, recommendationTrace: next.trace });
-      if (!aiResult) {
-        setAiStatus("skipped");
-        setCurrentStep(3);
-        return;
-      }
-      const patchedValues = applyAiRecommendationToSnapshot(snapshotBuilderService.toProgramFormValues(baseHistory.present), aiResult);
-      setAiRecommendation(aiResult);
-      setAiStatus("ready");
-      setBuilderHistory(createSnapshotBuilderHistory(historyToProgram(next.program, patchedValues)));
-    } catch (error) {
-      setAiStatus("error");
-      setAiError(error instanceof Error ? error.message : "AI Recommendation을 불러오지 못했습니다.");
-      setBuilderHistory(baseHistory);
-    }
     setCurrentStep(3);
   };
 
@@ -470,7 +434,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
       sourceProgramId: snapshotSourceProgram.id,
       sourceProgramTitle: snapshotSourceProgram.title,
       recommendationReasons: recommendationReason ? [recommendationReason] : [],
-      aiRecommendation,
+      aiRecommendation: null,
       intelligence,
       metadata: intelligenceMetadata,
       periodization,
@@ -479,7 +443,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
       recentWorkout,
         formValues: sanitized,
       });
-      navigate(routeBuilder.printPreview(snapshotProgramId, selectedMember.memberId, sessionId));
+      navigate(routeBuilder.printPreview(snapshotProgramId, selectedMember.memberId, sessionId, true));
     } catch (caught) {
       setSessionError(caught instanceof Error ? caught.message : "운동 세션을 생성하지 못했습니다.");
     } finally {
@@ -583,19 +547,19 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
                 <Button startIcon={<ArrowBackIcon />} variant="outlined" onClick={() => setCurrentStep(1)} sx={{ minHeight: kiosk.standardControlHeight }}>회원 선택</Button>
               </Stack>
 
+              <Stack spacing={1.5}><Box><Typography fontSize={22} fontWeight={900}>오늘 운동 부위</Typography><Typography color="text.secondary" fontSize={16}>오늘 어디를 운동할까요? 한 부위만 선택해 주세요.</Typography></Box><Box sx={{ alignItems: "center", bgcolor: palette.surfaceInteractive, border: 1, borderColor: "divider", borderRadius: `${palette.radiusMd}px`, display: "grid", gap: 3, gridTemplateColumns: { lg: "minmax(280px, .9fr) minmax(0, 1.1fr)", xs: "1fr" }, p: { md: 3, xs: 2 } }}><Stack alignItems="center"><ConditionBodyMap areas={condition.workoutTarget && condition.workoutTarget !== "FULL_BODY" && condition.workoutTarget !== "RECOVERY" ? [condition.workoutTarget] : []} onSelect={selectWorkoutTarget} /></Stack><Stack spacing={2}><Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>{fatigueOptions.map((option) => { const active = condition.workoutTarget === option.value; return <Button key={option.value} aria-pressed={active} color={active ? "primary" : "inherit"} variant={active ? "contained" : "outlined"} onClick={() => selectWorkoutTarget(option.value)} sx={{ fontSize: 18, minHeight: kiosk.standardControlHeight }}>{option.label}</Button>; })}<Button aria-pressed={condition.workoutTarget === "FULL_BODY"} color={condition.workoutTarget === "FULL_BODY" ? "primary" : "inherit"} variant={condition.workoutTarget === "FULL_BODY" ? "contained" : "outlined"} onClick={() => selectWorkoutTarget("FULL_BODY")} sx={{ fontSize: 18, minHeight: kiosk.standardControlHeight }}>전신</Button><Button aria-pressed={condition.workoutTarget === "RECOVERY"} color={condition.workoutTarget === "RECOVERY" ? "primary" : "inherit"} variant={condition.workoutTarget === "RECOVERY" ? "contained" : "outlined"} onClick={() => selectWorkoutTarget("RECOVERY")} sx={{ fontSize: 18, minHeight: kiosk.standardControlHeight }}>회복</Button></Box>{condition.workoutTarget ? <Chip color="primary" label={`오늘 운동 · ${getCategoryLabel(condition.workoutTarget)}`} sx={{ minHeight: 44 }} /> : <Typography color="text.secondary">운동 부위를 선택해 주세요.</Typography>}</Stack></Box></Stack>
+              <Stack spacing={1}><Typography fontSize={22} fontWeight={900}>{condition.workoutTarget === "FULL_BODY" ? "전신 피로도" : condition.workoutTarget === "RECOVERY" ? "현재 피로도" : condition.workoutTarget ? `${getCategoryLabel(condition.workoutTarget)} 피로도` : "선택한 운동 부위의 피로도"}</Typography><Grid container spacing={1.5}>{targetFatigueOptions.map((option) => { const active = condition.targetFatigue === option.value; return <Grid item key={option.value} md={4} xs={12}><CardActionArea aria-pressed={active} onClick={() => setCondition((current) => ({ ...current, targetFatigue: option.value, stress: option.stress }))} sx={{ ...largeChoiceCardSx(active), minHeight: 92 }}><Typography fontSize={20} fontWeight={900}>{option.label}</Typography><Typography color="text.secondary">{option.description}</Typography></CardActionArea></Grid>; })}</Grid></Stack>
               <Stack spacing={1}><Typography fontSize={22} fontWeight={900}>컨디션 상태</Typography><Grid container spacing={1.5}>{conditionOptions.map((option) => <Grid item key={option.value} md={4} xs={12}><CardActionArea aria-label={`컨디션 상태 ${option.label}`} aria-pressed={condition.condition === option.value} onClick={() => setCondition((current) => ({ ...current, condition: option.value }))} sx={largeChoiceCardSx(condition.condition === option.value)}><Stack alignItems="center" direction="row" spacing={1.5}><Typography aria-hidden="true" fontSize={40}>{option.icon}</Typography><Box><Typography fontSize={20} fontWeight={900}>{option.label}</Typography><Typography color="text.secondary" fontSize={16}>{option.description}</Typography></Box></Stack></CardActionArea></Grid>)}</Grid></Stack>
 
               <Stack spacing={1}><Typography fontSize={22} fontWeight={900}>수면 상태</Typography><Grid container spacing={1.5}>{sleepOptions.map((option) => <Grid item key={option.value} md={4} xs={12}><CardActionArea aria-label={`수면 상태 ${option.label}`} aria-pressed={condition.sleep === option.value} onClick={() => setCondition((current) => ({ ...current, sleep: option.value }))} sx={largeChoiceCardSx(condition.sleep === option.value)}><Stack alignItems="center" direction="row" spacing={1.5}><Typography aria-hidden="true" fontSize={38}>{option.icon}</Typography><Box><Typography fontSize={20} fontWeight={900}>{option.label}</Typography><Typography color="text.secondary" fontSize={16}>{option.description}</Typography></Box></Stack></CardActionArea></Grid>)}</Grid></Stack>
 
-              <Stack spacing={1.5}><Box><Typography fontSize={22} fontWeight={900}>피로 · 근육통 부위</Typography><Typography color="text.secondary" fontSize={16}>인체 그림 또는 부위 버튼을 눌러 모두 선택하세요.</Typography></Box><Box sx={{ alignItems: "center", bgcolor: palette.surfaceInteractive, border: 1, borderColor: "divider", borderRadius: `${palette.radiusMd}px`, display: "grid", gap: 3, gridTemplateColumns: { lg: "minmax(280px, .9fr) minmax(0, 1.1fr)", xs: "1fr" }, p: { md: 3, xs: 2 } }}><Stack alignItems="center"><ConditionBodyMap areas={condition.fatigueAreas} onSelect={toggleFatigue} /></Stack><Stack spacing={2}><Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>{fatigueOptions.map((option) => { const active = condition.fatigueAreas.includes(option.value); return <Button key={option.value} aria-pressed={active} color={active ? "primary" : "inherit"} variant={active ? "contained" : "outlined"} onClick={() => toggleFatigue(option.value)} sx={{ fontSize: 18, minHeight: kiosk.standardControlHeight }}>{option.label}</Button>; })}<Button aria-pressed={condition.fatigueAreas.length === 0} color={condition.fatigueAreas.length === 0 ? "primary" : "inherit"} variant={condition.fatigueAreas.length === 0 ? "contained" : "outlined"} onClick={() => setCondition((current) => ({ ...current, fatigueAreas: [] }))} sx={{ fontSize: 18, minHeight: kiosk.standardControlHeight }}>없음</Button></Box>{condition.fatigueAreas.length > 0 ? <Stack direction="row" flexWrap="wrap" gap={1}>{condition.fatigueAreas.map((area) => <Chip key={area} color="primary" label={`${fatigueOptions.find((item) => item.value === area)?.label} ×`} onClick={() => toggleFatigue(area)} sx={{ minHeight: 44 }} />)}</Stack> : <Typography color="text.secondary">선택된 부위가 없습니다.</Typography>}</Stack></Box></Stack>
 
-              <Stack spacing={1}><Stack alignItems="center" direction="row" justifyContent="space-between"><Typography fontSize={22} fontWeight={900}>피로도</Typography><Chip color="primary" label={fatigueScale[condition.stress - 1].label} sx={{ fontSize: 16, minHeight: 40 }} /></Stack><Box sx={{ px: 1 }}><Slider aria-label="피로도" marks={fatigueScale.map(({ value }) => ({ value }))} max={5} min={1} step={1} value={condition.stress} valueLabelDisplay="off" onChange={(_, value) => setCondition((current) => ({ ...current, stress: Number(value) }))} /><Box sx={{ display: "grid", gap: 0.5, gridTemplateColumns: "repeat(5, 1fr)" }}>{fatigueScale.map((level) => { const active = condition.stress === level.value; return <Box key={level.value} sx={{ color: active ? "primary.main" : "text.secondary", textAlign: "center" }}><Typography fontSize={active ? 17 : 15} fontWeight={active ? 900 : 700}>{level.label}</Typography><Typography sx={{ display: { md: "block", xs: "none" } }} variant="caption">{level.description}</Typography></Box>; })}</Box></Box></Stack>
 
               <Stack spacing={1}><Typography fontSize={22} fontWeight={900}>음주 여부</Typography><Grid container spacing={1.5}>{alcoholOptions.map((option) => <Grid item key={option.value} md={6} xs={12}><CardActionArea aria-label={`음주 여부 ${option.label}`} aria-pressed={condition.alcohol === option.value} onClick={() => setCondition((current) => ({ ...current, alcohol: option.value }))} sx={{ ...largeChoiceCardSx(condition.alcohol === option.value), minHeight: 92 }}><Stack alignItems="center" direction="row" spacing={1.5}><Typography aria-hidden="true" fontSize={34}>{option.icon}</Typography><Typography fontSize={20} fontWeight={900}>{option.label}</Typography></Stack></CardActionArea></Grid>)}</Grid></Stack>
 
-              <Card sx={{ ...infoCardSx, height: "auto" }}><CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}><Typography color="text.secondary" variant="caption">오늘 상태 요약</Typography><Typography fontWeight={800}>{condition.sleep ? `수면 ${sleepOptions.find((item) => item.value === condition.sleep)?.label}` : "수면 미선택"} · {condition.fatigueAreas.length > 0 ? `${condition.fatigueAreas.map((area) => fatigueOptions.find((item) => item.value === area)?.label ?? area).join(", ")} 피로` : "근육 피로 없음"} · {condition.alcohol === "NO" ? "음주 없음" : condition.alcohol === "YES" ? "음주 있음" : "음주 미선택"} · {condition.condition ? `컨디션 ${conditionOptions.find((item) => item.value === condition.condition)?.label}` : "컨디션 미선택"}</Typography></CardContent></Card>
+              <Card sx={{ ...infoCardSx, height: "auto" }}><CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}><Typography color="text.secondary" variant="caption">오늘 상태 요약</Typography><Typography fontWeight={800}>{condition.workoutTarget ? `오늘 ${getCategoryLabel(condition.workoutTarget)}` : "운동 부위 미선택"} · {condition.targetFatigue ? `피로도 ${targetFatigueOptions.find((item) => item.value === condition.targetFatigue)?.label}` : "피로도 미선택"} · {condition.sleep ? `수면 ${sleepOptions.find((item) => item.value === condition.sleep)?.label}` : "수면 미선택"} · {condition.alcohol === "NO" ? "음주 없음" : condition.alcohol === "YES" ? "음주 있음" : "음주 미선택"} · {condition.condition ? `컨디션 ${conditionOptions.find((item) => item.value === condition.condition)?.label}` : "컨디션 미선택"}</Typography></CardContent></Card>
 
-              <Card sx={{ ...infoCardSx, height: "auto" }}><CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}><Stack alignItems={{ sm: "center", xs: "stretch" }} direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1.5}><Box><FormControlLabel control={<Switch checked={useAiRecommendation} onChange={(event) => setUseAiRecommendation(event.target.checked)} />} label="AI 추천 사용" /><Typography color="text.secondary" variant="body2">회원 상태와 최근 운동 기록을 함께 반영합니다.</Typography></Box><Button disabled={!canRecommend || programState.status !== "ready"} endIcon={<ArrowForwardIcon />} startIcon={<AutoAwesomeIcon />} variant="contained" onClick={() => void runRecommendation()} sx={{ fontSize: 18, minHeight: kiosk.primaryActionHeight, minWidth: 280, transition: "transform 120ms ease", "&:hover": { transform: "translateY(-2px)" } }}>프로그램 추천 받기</Button></Stack></CardContent></Card>
+              <Card sx={{ ...infoCardSx, height: "auto" }}><CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}><Stack alignItems={{ sm: "center", xs: "stretch" }} direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1.5}><Box><Typography fontWeight={900}>실제 운동 이력 기반 추천</Typography><Typography color="text.secondary" variant="body2">저장된 Program만 대상으로 최근 수행 기록과 오늘 상태를 결정적으로 분석합니다.</Typography></Box><Button disabled={!canRecommend || programState.status !== "ready"} endIcon={<ArrowForwardIcon />} startIcon={<AutoAwesomeIcon />} variant="contained" onClick={() => void runRecommendation()} sx={{ fontSize: 18, minHeight: kiosk.primaryActionHeight, minWidth: 280 }}>프로그램 추천 받기</Button></Stack></CardContent></Card>
               {programState.status === "error" ? <Alert severity="error">{programState.message}</Alert> : null}
               {programState.status === "ready" && runtimePrograms.length === 0 ? <EmptyState title="현재 조건에 맞는 추천 프로그램이 없습니다." description="컨디션을 조정하거나 Condition Lab에서 프로그램을 추가해 주세요." /> : null}
             </Stack>
@@ -618,21 +582,23 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
               </Stack>
               {programState.status === "loading" ? <LoadingState message="운동 프로그램을 불러오는 중입니다." /> : null}
               {programState.status === "error" ? <ErrorState message={programState.message} /> : null}
-              {aiStatus === "error" ? <Alert severity="warning">AI 추천을 불러오지 못해 기본 추천 결과를 사용합니다. {aiError}</Alert> : null}
-              <Card sx={{ ...infoCardSx, height: "auto" }}><CardContent sx={{ py: 1.5 }}><Stack alignItems="center" direction={{ sm: "row", xs: "column" }} flexWrap="wrap" gap={1.25}><Typography color="text.secondary" fontWeight={800} variant="caption">TODAY CONTEXT</Typography><Chip label={selectedMember?.displayName ?? "회원"} size="small" /><Chip label={`수면 ${sleepOptions.find((item) => item.value === condition.sleep)?.label ?? "미선택"}`} size="small" variant="outlined" /><Chip label={condition.fatigueAreas.length > 0 ? `${condition.fatigueAreas.map((area) => fatigueOptions.find((item) => item.value === area)?.label).join(", ")} 피로` : "근육 피로 없음"} size="small" variant="outlined" /><Chip label={`컨디션 ${conditionOptions.find((item) => item.value === condition.condition)?.label ?? "미선택"}`} size="small" variant="outlined" /></Stack></CardContent></Card>
+
+              <Card sx={{ ...infoCardSx, height: "auto" }}><CardContent sx={{ py: 1.5 }}><Stack alignItems="center" direction={{ sm: "row", xs: "column" }} flexWrap="wrap" gap={1.25}><Typography color="text.secondary" fontWeight={800} variant="caption">TODAY CONTEXT</Typography><Chip label={selectedMember?.displayName ?? "회원"} size="small" /><Chip label={`운동 부위 ${condition.workoutTarget ? getCategoryLabel(condition.workoutTarget) : "미선택"}`} size="small" /><Chip label={`피로도 ${targetFatigueOptions.find((item) => item.value === condition.targetFatigue)?.label ?? "미선택"}`} size="small" variant="outlined" /><Chip label={`수면 ${sleepOptions.find((item) => item.value === condition.sleep)?.label ?? "미선택"}`} size="small" variant="outlined" /><Chip label={`컨디션 ${conditionOptions.find((item) => item.value === condition.condition)?.label ?? "미선택"}`} size="small" variant="outlined" /></Stack></CardContent></Card>
               {recommendation ? (
-                <Card sx={{ ...infoCardSx, borderColor: "primary.main", borderWidth: 2, boxShadow: palette.shadowAccent }}>
+                <Card role="button" tabIndex={0} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") selectProgramForBuilder(recommendation.program); }} onClick={() => selectProgramForBuilder(recommendation.program)} sx={{ cursor: "pointer", ...infoCardSx, borderColor: "primary.main", borderWidth: 2, boxShadow: palette.shadowAccent }}>
                   <CardContent sx={{ p: { md: 3.5, xs: 2.5 } }}><Stack spacing={2.5}>
                     <Stack direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={2.5} sx={{ "@media (orientation: portrait)": { alignItems: "center", flexDirection: "column" } }}>
                       <Stack direction="row" spacing={2}><Box sx={{ alignItems: "center", bgcolor: "primary.main", borderRadius: 999, color: "primary.contrastText", display: "flex", fontSize: 24, fontWeight: 900, height: 56, justifyContent: "center", minWidth: 56 }}>1</Box><Box><Chip color="primary" label="BEST" size="small" /><Typography sx={{ fontSize: { md: kiosk.heroTitle, xs: 30 }, mt: 1 }} variant="h2">{recommendation.program.title}</Typography><Stack direction="row" flexWrap="wrap" gap={1} sx={{ mt: 1 }}><Chip label={getCategoryLabel(recommendation.program.category)} /><Chip label={getDifficultyLabel(recommendation.program.difficulty)} variant="outlined" /><Chip label={`${recommendation.program.exercises.length}개 운동`} variant="outlined" /></Stack></Box></Stack>
-                      <Stack alignItems="center" spacing={1.5}><MuscleSilhouette active large area={categoryToBodyArea(recommendation.program.category)} /><Button endIcon={<ArrowForwardIcon />} variant="contained" onClick={() => selectProgramForBuilder(recommendation.program)} sx={{ fontSize: 18, minHeight: kiosk.primaryActionHeight }}>이 프로그램으로 진행하기</Button></Stack>
+                      <Stack alignItems="center" spacing={1.5}><MuscleSilhouette active large area={categoryToBodyArea(recommendation.program.category)} /><Chip color={snapshotSourceProgram?.id === recommendation.program.id ? "primary" : "default"} label={snapshotSourceProgram?.id === recommendation.program.id ? "선택됨" : "카드를 눌러 선택"} /></Stack>
                     </Stack>
                     <Box sx={{ bgcolor: palette.primaryGoldMuted, border: 1, borderColor: palette.primaryGoldBorder, borderRadius: `${palette.radiusMd}px`, p: 2 }}><Typography color="primary.main" fontWeight={900} variant="caption">💡 추천 이유</Typography><Typography sx={{ mt: 0.75 }}>{displayRecommendationReason}</Typography></Box>
                     <Stack direction="row" flexWrap="wrap" gap={1}>{recommendation.program.exercises.map((exercise) => <Chip key={exercise.id} label={`${exercise.order}. ${exercise.name} · ${exercise.sets}세트`} sx={{ fontSize: 16, minHeight: 52 }} variant="outlined" />)}</Stack>
                   </Stack></CardContent>
                 </Card>
               ) : null}
-              {rankedPrograms.filter(({ program }) => program.id !== recommendation?.program.id).length > 0 ? <Stack spacing={1.5}><Box><Typography variant="h2">다른 추천</Typography><Typography color="text.secondary">오늘 선택할 수 있는 차순위 프로그램입니다.</Typography></Box><Grid container spacing={1.5}>{rankedPrograms.filter(({ program }) => program.id !== recommendation?.program.id).slice(0, 2).map(({ candidate: _candidate, program }) => { const rank = (recommendationTrace?.candidatePrograms.findIndex((item) => item.programId === program.id) ?? 0) + 1; return <Grid item key={program.id} md={6} xs={12} sx={{ "@media (orientation: portrait)": { flexBasis: "100%", maxWidth: "100%" } }}><Card sx={{ ...infoCardSx, boxShadow: "none" }}><CardContent><Stack spacing={1.5}><Stack alignItems="center" direction="row" justifyContent="space-between"><Chip label={`${rank}순위`} size="small" variant="outlined" /><MuscleSilhouette active area={categoryToBodyArea(program.category)} /></Stack><Typography variant="h2">{program.title}</Typography><Stack direction="row" flexWrap="wrap" gap={1}><Chip label={getCategoryLabel(program.category)} size="small" /><Chip label={getDifficultyLabel(program.difficulty)} size="small" variant="outlined" /><Chip label={`${program.exercises.length}개 운동`} size="small" variant="outlined" /></Stack><Button variant="outlined" onClick={() => selectProgramForBuilder(program)} sx={{ minHeight: kiosk.standardControlHeight }}>이 프로그램 선택</Button></Stack></CardContent></Card></Grid>; })}</Grid></Stack> : null}
+              {!recommendation ? <EmptyState title={condition.workoutTarget === "RECOVERY" ? "현재 등록된 회복 프로그램이 없습니다." : "선택한 부위의 프로그램이 없습니다."} description="다른 운동 부위를 선택하거나 처음으로 돌아가 주세요." /> : null}
+              {rankedPrograms.filter(({ program }) => program.id !== recommendation?.program.id).length > 0 ? <Stack spacing={1.5}><Box><Typography variant="h2">다른 추천</Typography><Typography color="text.secondary">오늘 선택할 수 있는 차순위 프로그램입니다.</Typography></Box><Grid container spacing={1.5}>{rankedPrograms.filter(({ program }) => program.id !== recommendation?.program.id).slice(0, 2).map(({ candidate: _candidate, program }) => { const rank = (recommendationTrace?.candidatePrograms.findIndex((item) => item.programId === program.id) ?? 0) + 1; const selected = snapshotSourceProgram?.id === program.id; return <Grid item key={program.id} md={6} xs={12}><Card onClick={() => selectProgramForBuilder(program)} sx={{ ...infoCardSx, borderColor: selected ? "primary.main" : "divider", boxShadow: selected ? palette.shadowAccent : "none", cursor: "pointer" }}><CardContent><Stack spacing={1.5}><Stack alignItems="center" direction="row" justifyContent="space-between"><Chip label={`${rank}순위`} size="small" variant="outlined" /><MuscleSilhouette active={selected} area={categoryToBodyArea(program.category)} /></Stack><Typography variant="h2">{program.title}</Typography><Stack direction="row" flexWrap="wrap" gap={1}><Chip label={getCategoryLabel(program.category)} size="small" /><Chip label={getDifficultyLabel(program.difficulty)} size="small" variant="outlined" /><Chip label={`${program.exercises.length}개 운동`} size="small" variant="outlined" /></Stack>{selected ? <Chip color="primary" label="선택됨" /> : null}</Stack></CardContent></Card></Grid>; })}</Grid></Stack> : null}
+              <Button disabled={!snapshotSourceProgram} endIcon={<ArrowForwardIcon />} variant="contained" onClick={() => setCurrentStep(4)} sx={{ alignSelf: "center", fontSize: 18, minHeight: kiosk.primaryActionHeight, minWidth: { sm: 420, xs: "100%" } }}>선택한 프로그램으로 진행하기</Button>
               <Button endIcon={<ExpandMoreIcon sx={{ transform: showRecommendationBasis ? "rotate(180deg)" : "none", transition: "transform 150ms ease" }} />} variant="text" onClick={() => setShowRecommendationBasis((current) => !current)}>{showRecommendationBasis ? "추천 근거 닫기" : "추천 근거 보기"}</Button>
               <Collapse in={showRecommendationBasis}><RecommendationTraceCard recommendation={recommendation} trace={recommendationTrace} /></Collapse>
             </Stack>
@@ -650,7 +616,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
                 </Stack>
                 <Button startIcon={<ArrowBackIcon />} variant="outlined" onClick={() => setCurrentStep(3)}>다른 추천 프로그램 보기</Button>
               </Stack>
-              <Card sx={{ ...infoCardSx, height: "auto" }}><CardContent sx={{ py: 1.5 }}><Stack direction="row" flexWrap="wrap" gap={1}><Chip label={selectedMember?.displayName ?? "회원"} /><Chip label={recentWorkout ? `${formatDaysAgo(recentWorkout.daysAgo)} · ${recentWorkout.title}` : "최근 운동 없음"} variant="outlined" /><Chip label={condition.fatigueAreas.length > 0 ? `피로 ${condition.fatigueAreas.map((area) => fatigueOptions.find((item) => item.value === area)?.label).join(", ")}` : "피로 부위 없음"} variant="outlined" /><Chip label={`수면 ${sleepOptions.find((item) => item.value === condition.sleep)?.label ?? "미선택"}`} variant="outlined" /><Chip label={`컨디션 ${conditionOptions.find((item) => item.value === condition.condition)?.label ?? "미선택"}`} variant="outlined" /><Chip label={condition.alcohol === "YES" ? "음주 있음" : "음주 없음"} variant="outlined" /></Stack></CardContent></Card>
+              <Card sx={{ ...infoCardSx, height: "auto" }}><CardContent sx={{ py: 1.5 }}><Stack direction="row" flexWrap="wrap" gap={1}><Chip label={selectedMember?.displayName ?? "회원"} /><Chip label={recentWorkout ? `${formatDaysAgo(recentWorkout.daysAgo)} · ${recentWorkout.title}` : "최근 운동 없음"} variant="outlined" /><Chip label={`오늘 ${condition.workoutTarget ? getCategoryLabel(condition.workoutTarget) : "미선택"}`} variant="outlined" /><Chip label={`피로도 ${targetFatigueOptions.find((item) => item.value === condition.targetFatigue)?.label ?? "미선택"}`} variant="outlined" /><Chip label={`수면 ${sleepOptions.find((item) => item.value === condition.sleep)?.label ?? "미선택"}`} variant="outlined" /><Chip label={`컨디션 ${conditionOptions.find((item) => item.value === condition.condition)?.label ?? "미선택"}`} variant="outlined" /><Chip label={condition.alcohol === "YES" ? "음주 있음" : "음주 없음"} variant="outlined" /></Stack></CardContent></Card>
               {!snapshotValidation.valid ? <Alert severity="warning">{snapshotValidation.errors[0]}</Alert> : null}
               {catalogState.status === "loading" ? <LoadingState message="Exercise Catalog를 불러오는 중입니다." /> : null}
               {catalogState.status === "error" ? <Alert severity="warning">{catalogState.message}</Alert> : null}
@@ -663,14 +629,3 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
     </Stack>
   );
 };
-
-
-
-
-
-
-
-
-
-
-

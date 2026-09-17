@@ -13,6 +13,7 @@ import type { ConditionInput } from "../types/condition.types";
 import type { MemberProfile, MemberProvider } from "./memberProvider";
 import type { RecommendationContext, RecommendationProvider } from "./recommendationProvider";
 import type { WorkoutHistoryProvider, WorkoutHistoryRecord } from "./workoutHistoryProvider";
+import { parseWorkoutDate, validateWorkoutDate } from "./workoutDateIntegrity";
 
 const now = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
 const debugLog = (label: string, startedAt: number, detail: Record<string, unknown>) => {
@@ -40,14 +41,6 @@ const computeAge = (value: unknown): number | undefined => {
   const beforeBirthday = today.getMonth() < date.getMonth() || (today.getMonth() === date.getMonth() && today.getDate() < date.getDate());
   if (beforeBirthday) age -= 1;
   return age >= 0 ? age : undefined;
-};
-const asDate = (value: unknown): Date | null => {
-  const timestampDate = (value as { toDate?: () => unknown } | null)?.toDate?.();
-  if (timestampDate instanceof Date && !Number.isNaN(timestampDate.getTime())) return timestampDate;
-  if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
-  if (typeof value !== "string" && typeof value !== "number") return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
 };
 const asProgramCategory = (value: unknown): ProgramCategory | null => {
   const text = asText(value);
@@ -77,10 +70,11 @@ const asProgramCategories = (value: unknown): ProgramCategory[] => {
     status: mapped.status,
   };
 };
-const mapHistoryRecord = (memberId: ProfileId, data: DocumentData, id: string): WorkoutHistoryRecord | null => {
+export const mapWorkoutHistoryRecord = (memberId: ProfileId, data: DocumentData, id: string, nowAt = new Date()): WorkoutHistoryRecord | null => {
   const categories = asProgramCategories(data.category ?? data.target);
   const exercises = Array.isArray(data.exercises) ? data.exercises : [];
-  const workoutDate = asDate(data.date) ?? asDate(data.createdAt) ?? asDate(data.updatedAt);
+  // Workout occurrence is explicit only. Metadata is an integrity signal, never a fallback.
+  const workoutDate = validateWorkoutDate(parseWorkoutDate(data.date), data.createdAt, nowAt);
   if (!workoutDate) return null;
   return {
     memberId,
@@ -166,7 +160,7 @@ export const createConditionLabWorkoutHistoryProvider = (appId: AppId): WorkoutH
         limit(Math.min(100, Math.max(requestedLimit, requestedLimit * 4))),
       ));
       const records = snapshot.docs
-        .map((item) => mapHistoryRecord(memberId, item.data(), item.id))
+        .map((item) => mapWorkoutHistoryRecord(memberId, item.data(), item.id))
         .filter((item): item is WorkoutHistoryRecord => Boolean(item))
         .sort((left, right) => right.workoutDate.getTime() - left.workoutDate.getTime())
         .slice(0, requestedLimit);

@@ -64,7 +64,8 @@ export const PrintPreviewPage = (): JSX.Element => {
       await markWorkoutSessionPrinted(conditionLabAppId, workoutSessionId, record.id);
       setCompletedPrints((current) => current + 1);
       setHistory((current) => [record, ...current]);
-      browserPrintGateway.print();
+      const printResult = await browserPrintGateway.print({ jobId: record.id, document: state.document, copies: 1 });
+      if (printResult.status === "failed") setSessionError(printResult.reason ?? "인쇄 요청을 전송하지 못했습니다.");
     } catch (caught) {
       setSessionError(caught instanceof Error ? caught.message : "운동 세션 출력 상태를 저장하지 못했습니다.");
     } finally {

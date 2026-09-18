@@ -18,6 +18,7 @@
     ,"test:exercise-add-ui": "esbuild scripts/verify-exercise-add-ui.ts --bundle --platform=node --format=cjs --outfile=.exercise-add-ui-test.cjs && node .exercise-add-ui-test.cjs && node -e \"require('fs').unlinkSync('.exercise-add-ui-test.cjs')\""
     ,"test:a5-layout": "esbuild scripts/verify-a5-workout-layout.ts --bundle --platform=node --format=cjs --outfile=.a5-layout-test.cjs && node .a5-layout-test.cjs && node -e \"require('fs').unlinkSync('.a5-layout-test.cjs')\""
     ,"test:a5-css": "esbuild scripts/verify-a5-css.ts --bundle --platform=node --format=cjs --outfile=.a5-css-test.cjs && node .a5-css-test.cjs && node -e \"require('fs').unlinkSync('.a5-css-test.cjs')\""
+    ,"test:print-adapter": "esbuild scripts/verify-print-adapter.ts --bundle --platform=node --format=cjs --outfile=.print-adapter-test.cjs && node .print-adapter-test.cjs && node -e \"require('fs').unlinkSync('.print-adapter-test.cjs')\""
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

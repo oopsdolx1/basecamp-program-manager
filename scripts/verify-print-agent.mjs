@@ -1,0 +1,6 @@
+import assert from "node:assert/strict";
+import { createPrintAgent } from "../windows-print-agent/server.mjs";
+const calls = []; const agent = createPrintAgent({ port: 43128, allowedOrigins: ["https://allowed.example"], backend: { submit: async (job) => { calls.push(job); return { status: "submitted", jobId: job.jobId }; } } });
+await agent.listen();
+const post = (body, origin = "https://allowed.example") => fetch("http://127.0.0.1:43128/print", { method: "POST", headers: { "content-type": "application/json", origin }, body: JSON.stringify(body) });
+assert.deepEqual(await (await fetch("http://127.0.0.1:43128/health")).json(), { status: "ok" }); assert.equal((await post({ jobId: "a", document: {} }, "https://blocked.example")).status, 403); assert.equal((await post({ document: {} })).status, 400); assert.equal((await post({ jobId: "a" })).status, 400); assert.equal((await post({ jobId: "a", document: {}, copies: 0 })).status, 400); assert.equal((await post({ jobId: "a", document: {}, copies: 2 })).status, 200); assert.equal((await post({ jobId: "a", document: {}, copies: 2 })).status, 200); assert.equal(calls.length, 1); assert.equal((await post({ jobId: "b", document: {}, copies: 1 })).status, 200); assert.equal(calls.length, 2); await agent.close(); console.log("Windows Print Agent protocol checks: PASS");

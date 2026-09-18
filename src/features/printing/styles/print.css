@@ -79,7 +79,7 @@
   font-family: "Noto Sans KR", Arial, sans-serif;
   height: 148mm;
   overflow: hidden;
-  padding: 5mm;
+  padding: var(--a5-binding-safe-area) 5mm 5mm;
   page-break-after: avoid;
   page-break-before: avoid;
   page-break-inside: avoid;
@@ -95,6 +95,51 @@
   display: flex;
   justify-content: space-between;
   padding-bottom: 1.5mm;
+}
+
+.a5-workout-document[data-layout-density="relaxed"] .exercise-row {
+  min-height: 8.2mm;
+}
+
+.a5-workout-document[data-layout-density="compact"] .print-header {
+  padding-bottom: 1mm;
+}
+
+.a5-workout-document[data-layout-density="compact"] .exercise-row {
+  min-height: 7.2mm;
+}
+
+.a5-workout-document[data-layout-density="compact"] .exercise-name-cell {
+  padding: 0.8mm;
+}
+
+.a5-workout-document[data-layout-density="compact"] .exercise-cue {
+  margin-top: 0.25mm;
+}
+
+.a5-workout-document[data-layout-density="dense"] .print-header {
+  padding-bottom: 0.7mm;
+}
+
+.a5-workout-document[data-layout-density="dense"] .print-section {
+  padding-bottom: 0.5mm;
+  padding-top: 0.5mm;
+}
+
+.a5-workout-document[data-layout-density="dense"] .exercise-row {
+  min-height: 6.2mm;
+}
+
+.a5-workout-document[data-layout-density="dense"] .exercise-name-cell {
+  padding: 0.55mm;
+}
+
+.a5-workout-document[data-layout-density="dense"] .exercise-cue {
+  margin-top: 0.2mm;
+}
+
+.a5-workout-document[data-layout-density="dense"] .print-footer {
+  margin-top: 0.5mm;
 }
 
 .print-session-code {
@@ -231,7 +276,8 @@
 }
 
 .exercise-row {
-  height: 8.2mm;
+  height: auto;
+  min-height: 8.2mm;
   page-break-inside: avoid;
   break-inside: avoid;
 }

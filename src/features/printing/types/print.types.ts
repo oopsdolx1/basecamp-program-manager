@@ -1,5 +1,6 @@
 import type { ProfileId, ProgramId } from "../../../types/brandedIds";
 import type { ProgramCategory, ProgramDifficulty } from "../../programs/types/program.types";
+import type { A5WorkoutLayout } from "../services/a5WorkoutLayoutService";
 
 export interface PrintMemberSnapshot {
   memberId: ProfileId;
@@ -45,5 +46,6 @@ export interface WorkoutPrintDocument {
   bodyParts: string[];
   program: PrintProgramSnapshot;
   printDate: Date;
+  layout: A5WorkoutLayout;
   rows: PrintExerciseRow[];
 }

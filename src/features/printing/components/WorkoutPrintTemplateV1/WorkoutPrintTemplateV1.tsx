@@ -1,4 +1,5 @@
 import { QRCodeSVG } from "qrcode.react";
+import type { CSSProperties } from "react";
 import { PRINT_SET_COLUMN_COUNT } from "../../constants/print.constants";
 import type { WorkoutPrintDocument } from "../../types/print.types";
 import { formatPrintDate } from "../../utils/formatPrintDate";
@@ -17,7 +18,7 @@ export const WorkoutPrintTemplateV1 = ({ document }: WorkoutPrintTemplateV1Props
   };
 
   return (
-    <article className="a5-workout-document" aria-label="A5 가로 운동 일지">
+    <article className="a5-workout-document" aria-label="A5 가로 운동 일지" data-layout-density={document.layout.density} data-top-binding-safe-mm={document.layout.topBindingSafeAreaMm} style={{ "--a5-binding-safe-area": `${document.layout.topBindingSafeAreaMm}mm` } as CSSProperties}>
       <header className="print-header">
         <div className="print-brand-block">
           <div className="print-logo">BASECAMP</div>

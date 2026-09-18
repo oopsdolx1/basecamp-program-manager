@@ -2,13 +2,13 @@ import type { MemberSelectionItem } from "../../members/types/memberViewModel.ty
 import { getCategoryLabel, getDifficultyLabel } from "../../programs/config/programOptions";
 import type { Program } from "../../programs/types/program.types";
 import {
-  PRINT_EXERCISE_ROW_COUNT,
   PRINT_FORMAT,
   PRINT_TEMPLATE_KEY,
   PRINT_TEMPLATE_VERSION,
 } from "../constants/print.constants";
 import type { PrintExerciseRow, WorkoutPrintDocument } from "../types/print.types";
 import { resolveProgramExerciseKnowledge } from "../../../shared-knowledge/resolveProgramExercises";
+import { resolveA5WorkoutLayout } from "../services/a5WorkoutLayoutService";
 
 export class PrintMapperError extends Error {
   constructor(message: string) {
@@ -27,11 +27,7 @@ interface CreateWorkoutPrintDocumentParams {
 const truncateText = (value: string, maxLength: number): string =>
   value.length > maxLength ? `${value.slice(0, Math.max(0, maxLength - 1))}…` : value;
 
-const toRows = (program: Program): PrintExerciseRow[] => {
-  if (program.exercises.length > PRINT_EXERCISE_ROW_COUNT) {
-    throw new PrintMapperError("운동은 최대 8개까지만 출력할 수 있습니다.");
-  }
-
+const toRows = (program: Program, minimumRowCount: number): PrintExerciseRow[] => {
   const resolved = resolveProgramExerciseKnowledge(program);
   const rows: PrintExerciseRow[] = program.exercises
     .map((exercise) => ({
@@ -48,7 +44,7 @@ const toRows = (program: Program): PrintExerciseRow[] => {
     throw new PrintMapperError("운동명이 없는 운동은 출력할 수 없습니다.");
   }
 
-  while (rows.length < PRINT_EXERCISE_ROW_COUNT) {
+  while (rows.length < minimumRowCount) {
     rows.push({
       order: rows.length + 1,
       exerciseName: "",
@@ -84,7 +80,8 @@ export const createWorkoutPrintDocument = ({
     throw new PrintMapperError("Archive된 프로그램은 출력할 수 없습니다.");
   }
 
-  const rows = toRows(program);
+  const layout = resolveA5WorkoutLayout(program.exercises.length);
+  const rows = toRows(program, layout.minimumRowCount);
   const resolved = resolveProgramExerciseKnowledge(program);
 
   return {
@@ -120,6 +117,7 @@ export const createWorkoutPrintDocument = ({
         .sort((left, right) => left.order - right.order),
     },
     printDate: printDate ?? new Date(),
+    layout,
     rows,
   };
 };

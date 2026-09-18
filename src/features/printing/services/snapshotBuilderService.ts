@@ -1,5 +1,6 @@
 import type { Program, ProgramFormValues } from "../../programs/types/program.types";
 import type { ExerciseCatalogOption } from "../../exercise-catalog";
+import { normalizeText } from "../../../utils/normalizeText";
 
 export interface SnapshotBuilderExercise {
   id: string;
@@ -30,6 +31,9 @@ export interface SnapshotBuilderHistory {
   future: SnapshotBuilderState[];
 }
 
+export type ExerciseAddCandidate = Pick<ExerciseCatalogOption, "id" | "name" | "displayName"> | string;
+export type ExerciseAddEligibility = { allowed: true } | { allowed: false; reason: "duplicate" };
+
 const HISTORY_LIMIT = 10;
 const cloneState = (state: SnapshotBuilderState): SnapshotBuilderState => ({
   ...state,
@@ -52,6 +56,20 @@ const clampNonNegativeNumberString = (value: string): string => {
 
 const reorder = (exercises: SnapshotBuilderExercise[]): SnapshotBuilderExercise[] =>
   exercises.map((exercise, index) => ({ ...exercise, order: index + 1 }));
+
+const candidateIdentity = (candidate: ExerciseAddCandidate): { catalogExerciseId?: string; normalizedName: string } =>
+  typeof candidate === "string"
+    ? { normalizedName: normalizeText(candidate) }
+    : { catalogExerciseId: candidate.id, normalizedName: normalizeText(candidate.name) };
+
+export const evaluateExerciseAdd = (exercises: SnapshotBuilderExercise[], candidate: ExerciseAddCandidate): ExerciseAddEligibility => {
+  const identity = candidateIdentity(candidate);
+  const duplicate = exercises.some((exercise) => {
+    if (identity.catalogExerciseId && exercise.catalogExerciseId) return identity.catalogExerciseId === exercise.catalogExerciseId;
+    return !identity.catalogExerciseId && !exercise.catalogExerciseId && Boolean(identity.normalizedName) && identity.normalizedName === normalizeText(exercise.name);
+  });
+  return duplicate ? { allowed: false, reason: "duplicate" } : { allowed: true };
+};
 
 const pushHistory = (history: SnapshotBuilderHistory, next: SnapshotBuilderState): SnapshotBuilderHistory => ({
   past: [...history.past, cloneState(history.present)].slice(-HISTORY_LIMIT),
@@ -167,6 +185,16 @@ export const snapshotBuilderService = {
     });
     next.exercises = reorder(next.exercises);
     return pushHistory(history, next);
+  },
+  addExercise(history: SnapshotBuilderHistory, candidate: ExerciseAddCandidate): { history: SnapshotBuilderHistory; eligibility: ExerciseAddEligibility } {
+    const eligibility = evaluateExerciseAdd(history.present.exercises, candidate);
+    if (!eligibility.allowed) return { history, eligibility };
+    const next = snapshotBuilderService.addBlank(history);
+    const addedId = next.present.exercises[next.present.exercises.length - 1].id;
+    const patch = typeof candidate === "string"
+      ? { name: candidate, displayName: candidate, catalogExerciseId: undefined }
+      : { name: candidate.name, displayName: candidate.displayName, catalogExerciseId: candidate.id };
+    return { history: snapshotBuilderService.patchExercise(next, addedId, patch), eligibility };
   },
   applyPreset(history: SnapshotBuilderHistory, exerciseId: string, preset: string): SnapshotBuilderHistory {
     const presets: Record<string, (exercise: SnapshotBuilderExercise) => SnapshotBuilderExercise> = {

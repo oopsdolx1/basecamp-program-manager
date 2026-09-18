@@ -12,6 +12,10 @@
     "test:print-authority": "esbuild scripts/verify-print-preview-authority.ts --bundle --platform=node --format=cjs --outfile=.print-authority-test.cjs && node .print-authority-test.cjs && node -e \"require('fs').unlinkSync('.print-authority-test.cjs')\""
     ,"test:workout-builder": "esbuild scripts/verify-snapshot-builder.ts --bundle --platform=node --format=cjs --outfile=.workout-builder-test.cjs && node .workout-builder-test.cjs && node -e \"require('fs').unlinkSync('.workout-builder-test.cjs')\""
     ,"test:session-prescription": "esbuild scripts/verify-session-prescription-mapper.ts --bundle --platform=node --format=cjs --outfile=.session-prescription-test.cjs && node .session-prescription-test.cjs && node -e \"require('fs').unlinkSync('.session-prescription-test.cjs')\""
+    ,"test:workout-editor": "esbuild scripts/verify-workout-editor-regression.ts --bundle --platform=node --format=cjs --outfile=.workout-editor-test.cjs && node .workout-editor-test.cjs && node -e \"require('fs').unlinkSync('.workout-editor-test.cjs')\""
+    ,"test:exercise-add": "esbuild scripts/verify-exercise-add.ts --bundle --platform=node --format=cjs --outfile=.exercise-add-test.cjs && node .exercise-add-test.cjs && node -e \"require('fs').unlinkSync('.exercise-add-test.cjs')\""
+    ,"test:exercise-add-candidates": "esbuild scripts/verify-exercise-add-candidates.ts --bundle --platform=node --format=cjs --outfile=.exercise-add-candidates-test.cjs && node .exercise-add-candidates-test.cjs && node -e \"require('fs').unlinkSync('.exercise-add-candidates-test.cjs')\""
+    ,"test:exercise-add-ui": "esbuild scripts/verify-exercise-add-ui.ts --bundle --platform=node --format=cjs --outfile=.exercise-add-ui-test.cjs && node .exercise-add-ui-test.cjs && node -e \"require('fs').unlinkSync('.exercise-add-ui-test.cjs')\""
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

@@ -7,6 +7,9 @@ import { normalizeText } from "../../../../utils/normalizeText";
 interface ExercisePickerProps {
   open: boolean;
   exercises: ExerciseCatalogOption[];
+  loading?: boolean;
+  errorMessage?: string;
+  disabledExerciseIds?: ReadonlySet<string>;
   onClose: () => void;
   onSelect: (exercise: ExerciseCatalogOption) => void;
 }
@@ -14,7 +17,7 @@ interface ExercisePickerProps {
 const ALL = "전체";
 const unique = (values: string[]) => [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b, "ko-KR"));
 
-export const ExercisePicker = ({ open, exercises, onClose, onSelect }: ExercisePickerProps): JSX.Element => {
+export const ExercisePicker = ({ open, exercises, loading = false, errorMessage, disabledExerciseIds, onClose, onSelect }: ExercisePickerProps): JSX.Element => {
   const theme = useTheme();
   const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
   const [bodyPart, setBodyPart] = useState(ALL);
@@ -61,13 +64,15 @@ export const ExercisePicker = ({ open, exercises, onClose, onSelect }: ExerciseP
           <Stack spacing={1}><Typography fontWeight={900}>기구 선택</Typography><Stack direction="row" flexWrap="wrap" gap={1}>{[ALL, ...equipmentOptions].map((value) => filterButton(value, equipment, () => setEquipment(value)))}</Stack></Stack>
           <TextField fullWidth label="운동명, 영문명, Alias 검색" value={query} onChange={(event) => setQuery(event.target.value)} />
           <Stack spacing={1}>
-            {filtered.map((exercise) => (
-              <CardActionArea key={exercise.id} aria-label={`${exercise.name} 운동 추가`} onClick={() => onSelect(exercise)} sx={{ border: 1, borderColor: "divider", borderRadius: 2, minHeight: 64, px: 2, py: 1.25 }}>
+            {loading ? <Typography color="text.secondary" sx={{ py: 3, textAlign: "center" }}>운동 목록을 불러오는 중입니다.</Typography> : null}
+            {errorMessage ? <Typography color="error.main" sx={{ py: 3, textAlign: "center" }}>{errorMessage}</Typography> : null}
+            {!loading && !errorMessage ? filtered.map((exercise) => (
+              <CardActionArea key={exercise.id} aria-label={`${exercise.name} 운동 추가`} disabled={disabledExerciseIds?.has(exercise.id)} onClick={() => onSelect(exercise)} sx={{ border: 1, borderColor: "divider", borderRadius: 2, minHeight: 64, px: 2, py: 1.25 }}>
                 <Typography fontWeight={900}>{exercise.name}</Typography>
-                <Typography color="text.secondary" variant="body2">{[exercise.bodyPart, exercise.equipment, exercise.englishName].filter(Boolean).join(" · ")}</Typography>
+                <Typography color="text.secondary" variant="body2">{[exercise.bodyPart, exercise.equipment, exercise.englishName].filter(Boolean).join(" · ")}</Typography>{disabledExerciseIds?.has(exercise.id) ? <Typography color="text.secondary" variant="caption">이미 포함됨</Typography> : null}
               </CardActionArea>
-            ))}
-            {filtered.length === 0 ? <Typography color="text.secondary" sx={{ py: 3, textAlign: "center" }}>선택한 조건의 운동이 없습니다.</Typography> : null}
+            )) : null}
+            {!loading && !errorMessage && filtered.length === 0 ? <Typography color="text.secondary" sx={{ py: 3, textAlign: "center" }}>선택한 조건의 운동이 없습니다.</Typography> : null}
           </Stack>
         </Stack>
       </DialogContent>

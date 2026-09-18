@@ -18,6 +18,8 @@ import { LoadingState } from "../../../../components/common/LoadingState";
 import { SearchField } from "../../../../components/common/SearchField";
 import type { AppId } from "../../../../types/brandedIds";
 import { useExerciseCatalog } from "../../../exercise-catalog";
+import { toCatalogOptions } from "../../../exercise-catalog/services/exerciseCatalogService";
+import { ExercisePicker } from "../../../programs/components/ExercisePicker/ExercisePicker";
 import type { MemberSelectionItem } from "../../../members";
 import { filterMembers, sortMembersByName } from "../../../members/services/memberService";
 import { filterMembersByInitial, KOREAN_INITIALS, type MemberInitialFilter } from "../../../members/utils/koreanInitial";
@@ -39,8 +41,10 @@ import { palette } from "../../../../theme/palette";
 import { createWorkoutSession } from "../../../workout-sessions/services/workoutSessionService";
 import { mapSessionPrescriptionExercises } from "../../../workout-sessions/services/sessionPrescriptionMapper";
 import { kiosk } from "../../../../design-system";
+import { SnapshotExerciseBuilderRow } from "../SnapshotExerciseBuilderRow/SnapshotExerciseBuilderRow";
+import { buildExerciseAddCandidates } from "../../services/exerciseAddCandidateService";
 
-type PrintStep = 1 | 2 | 3 | 4;
+type PrintStep = 1 | 2 | 3 | 4 | 5;
 type IntelligenceStatus = "idle" | "loading" | "ready" | "error";
 type MemberLoadStatus = "loading" | "ready" | "error";
 
@@ -50,7 +54,7 @@ interface QuickPrintFlowProps {
   recommendationProvider: RecommendationProvider;
 }
 
-const stepLabels = ["회원 선택", "컨디션 확인", "프로그램 추천", "출력"];
+const stepLabels = ["회원 선택", "컨디션 확인", "프로그램 추천", "운동 구성", "출력"];
 const conditionOptions: Array<{ value: ConditionStatus; label: string; icon: string; description: string }> = [
   { value: "GOOD", label: "좋음", icon: "😊", description: "최상의 컨디션입니다." },
   { value: "NORMAL", label: "보통", icon: "🙂", description: "평소와 비슷합니다." },
@@ -254,6 +258,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
   const { programState, programs } = usePrograms(appId);
   const { catalogState } = useExerciseCatalog(appId);
   const runtimePrograms = useMemo(() => hydrateProgramExerciseKnowledge(programs), [programs, catalogState.data]);
+  const catalogOptions = useMemo(() => toCatalogOptions(catalogState.data), [catalogState.data]);
   const [started, setStarted] = useState(false);
   const [memberStatus, setMemberStatus] = useState<MemberLoadStatus>("loading");
   const [memberError, setMemberError] = useState("");
@@ -277,6 +282,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
   const [showRecommendationBasis, setShowRecommendationBasis] = useState(false);
   const [sessionSaving, setSessionSaving] = useState(false);
   const [sessionError, setSessionError] = useState("");
+  const [addPickerOpen, setAddPickerOpen] = useState(false);
   const hasSearchQuery = memberQuery.trim().length > 0;
   const filteredMembers = useMemo(() => {
     if (hasSearchQuery) return sortMembersByName(filterMembers(members, memberQuery));
@@ -288,6 +294,8 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
     .filter((item): item is { candidate: RecommendationTrace["candidatePrograms"][number]; program: Program } => Boolean(item.program))
     .slice(0, 3), [recommendationTrace, runtimePrograms]);
   const builderState = builderHistory?.present ?? null;
+  const addCandidates = useMemo(() => buildExerciseAddCandidates(catalogOptions, builderState?.exercises ?? []), [builderState?.exercises, catalogOptions]);
+  const duplicateCatalogIds = useMemo(() => new Set(addCandidates.filter(({ eligibility }) => !eligibility.allowed).map(({ candidate }) => candidate.id)), [addCandidates]);
   const displayRecommendationReason = useMemo(() => buildDisplayRecommendationSummary(snapshotSourceProgram ?? recommendation?.program ?? null, condition, recentWorkout), [condition, recentWorkout, recommendation?.program, snapshotSourceProgram]);
   const snapshotValues = useMemo(() => (builderState ? snapshotBuilderService.toProgramFormValues(builderState) : null), [builderState]);
   const snapshotValidation = useMemo(() => (snapshotValues ? validateProgramForm(snapshotValues) : { valid: false, errors: ["Snapshot이 준비되지 않았습니다."] }), [snapshotValues]);
@@ -384,6 +392,13 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
     setRecommendationReason(program.id === recommendation?.program.id
       ? recommendationReason
       : "차순위 추천에서 트레이너가 선택한 프로그램입니다.");
+  };
+
+  const addExerciseToBuilder = (candidate: typeof catalogOptions[number]) => {
+    if (!builderHistory) return;
+    const result = snapshotBuilderService.addExercise(builderHistory, candidate);
+    setBuilderHistory(result.history);
+    if (result.eligibility.allowed) setAddPickerOpen(false);
   };
 
   const runRecommendation = async () => {
@@ -594,7 +609,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
               ) : null}
               {!recommendation ? <EmptyState title={condition.workoutTarget === "RECOVERY" ? "현재 등록된 회복 프로그램이 없습니다." : "선택한 부위의 프로그램이 없습니다."} description="다른 운동 부위를 선택하거나 처음으로 돌아가 주세요." /> : null}
               {rankedPrograms.filter(({ program }) => program.id !== recommendation?.program.id).length > 0 ? <Stack spacing={1.5}><Box><Typography variant="h2">다른 추천</Typography><Typography color="text.secondary">오늘 선택할 수 있는 차순위 프로그램입니다.</Typography></Box><Grid container spacing={1.5}>{rankedPrograms.filter(({ program }) => program.id !== recommendation?.program.id).slice(0, 2).map(({ candidate: _candidate, program }) => { const rank = (recommendationTrace?.candidatePrograms.findIndex((item) => item.programId === program.id) ?? 0) + 1; const selected = snapshotSourceProgram?.id === program.id; return <Grid item key={program.id} md={6} xs={12}><Card onClick={() => selectProgramForBuilder(program)} sx={{ ...infoCardSx, borderColor: selected ? "primary.main" : "divider", boxShadow: selected ? palette.shadowAccent : "none", cursor: "pointer" }}><CardContent><Stack spacing={1.5}><Stack alignItems="center" direction="row" justifyContent="space-between"><Chip label={`${rank}순위`} size="small" variant="outlined" /><MuscleSilhouette active={selected} area={categoryToBodyArea(program.category)} /></Stack><Typography variant="h2">{program.title}</Typography><Stack direction="row" flexWrap="wrap" gap={1}><Chip label={getCategoryLabel(program.category)} size="small" /><Chip label={getDifficultyLabel(program.difficulty)} size="small" variant="outlined" /><Chip label={`${program.exercises.length}개 운동`} size="small" variant="outlined" /></Stack>{selected ? <Chip color="primary" label="선택됨" /> : null}</Stack></CardContent></Card></Grid>; })}</Grid></Stack> : null}
-              <Button disabled={!snapshotSourceProgram} endIcon={<ArrowForwardIcon />} variant="contained" onClick={() => setCurrentStep(4)} sx={{ alignSelf: "center", fontSize: 18, minHeight: kiosk.primaryActionHeight, minWidth: { sm: 420, xs: "100%" } }}>선택한 프로그램으로 진행하기</Button>
+              <Button disabled={!snapshotSourceProgram} endIcon={<ArrowForwardIcon />} variant="contained" onClick={() => setCurrentStep(4)} sx={{ alignSelf: "center", fontSize: 18, minHeight: kiosk.primaryActionHeight, minWidth: { sm: 420, xs: "100%" } }}>운동 구성 편집하기</Button>
               <Button endIcon={<ExpandMoreIcon sx={{ transform: showRecommendationBasis ? "rotate(180deg)" : "none", transition: "transform 150ms ease" }} />} variant="text" onClick={() => setShowRecommendationBasis((current) => !current)}>{showRecommendationBasis ? "추천 근거 닫기" : "추천 근거 보기"}</Button>
               <Collapse in={showRecommendationBasis}><RecommendationTraceCard recommendation={recommendation} trace={recommendationTrace} /></Collapse>
             </Stack>
@@ -602,6 +617,54 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
         </Card>
       ) : null}
       {currentStep === 4 ? (
+        <Card sx={{ ...centeredCardSx(980), "@media (orientation: portrait)": { maxWidth: kiosk.portraitContentWidth } }}>
+          <CardContent sx={{ p: { md: 4, xs: 2.5 } }}>
+            <Stack spacing={3}>
+              <Stack direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1.5}>
+                <Stack spacing={0.75}>
+                  <Typography variant="h1">오늘 할 운동 구성</Typography>
+                  <Typography color="text.secondary">오늘의 컨디션에 맞춰 운동 순서와 세트 수를 조정하세요.</Typography>
+                </Stack>
+                <Button startIcon={<ArrowBackIcon />} variant="outlined" onClick={() => setCurrentStep(3)}>다른 프로그램 보기</Button>
+              </Stack>
+              <Card sx={{ ...infoCardSx, height: "auto" }}>
+                <CardContent sx={{ py: 1.5 }}>
+                  <Stack alignItems={{ sm: "center", xs: "flex-start" }} direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1}>
+                    <Box>
+                      <Typography color="primary.main" fontWeight={900} variant="caption">TODAY'S WORKOUT</Typography>
+                      <Typography fontWeight={900}>{builderState?.title}</Typography>
+                    </Box>
+                    <Chip label={(builderState?.exercises.length ?? 0) + "개 운동"} variant="outlined" />
+                  </Stack>
+                </CardContent>
+              </Card>
+              <Button startIcon={<AddIcon />} variant="outlined" onClick={() => setAddPickerOpen(true)} sx={{ alignSelf: "center", minHeight: kiosk.standardControlHeight }}>운동 추가</Button>
+              <Stack spacing={1.5} sx={{ maxHeight: { md: "calc(100vh - 360px)", xs: "none" }, overflowY: { md: "auto", xs: "visible" }, pr: { md: 1, xs: 0 } }}>
+                {(builderState?.exercises ?? []).map((exercise, index, exercises) => (
+                  <SnapshotExerciseBuilderRow
+                    catalogOptions={catalogOptions}
+                    exercise={exercise}
+                    guided
+                    index={index}
+                    key={exercise.id}
+                    onDelete={() => setBuilderHistory((current) => (current ? snapshotBuilderService.remove(current, exercise.id) : current))}
+                    onDuplicate={() => undefined}
+                    onMoveDown={() => setBuilderHistory((current) => (current ? snapshotBuilderService.move(current, exercise.id, "down") : current))}
+                    onMoveUp={() => setBuilderHistory((current) => (current ? snapshotBuilderService.move(current, exercise.id, "up") : current))}
+                    onPatch={(patch) => setBuilderHistory((current) => (current ? snapshotBuilderService.patchExercise(current, exercise.id, patch) : current))}
+                    onPreset={() => undefined}
+                    prescription
+                    total={exercises.length}
+                  />
+                ))}
+              </Stack>
+              <Button disabled={!builderState?.exercises.length} endIcon={<ArrowForwardIcon />} variant="contained" onClick={() => setCurrentStep(5)} sx={{ alignSelf: "center", fontSize: 18, minHeight: kiosk.primaryActionHeight, minWidth: { sm: 420, xs: "100%" } }}>이 구성으로 운동하기</Button>
+              <ExercisePicker disabledExerciseIds={duplicateCatalogIds} errorMessage={catalogState.status === "error" ? catalogState.message : undefined} exercises={catalogOptions} loading={catalogState.status === "loading"} open={addPickerOpen} onClose={() => setAddPickerOpen(false)} onSelect={addExerciseToBuilder} />
+            </Stack>
+          </CardContent>
+        </Card>
+      ) : null}
+      {currentStep === 5 ? (
         <Card sx={{ ...centeredCardSx(kiosk.contentMaxWidth), "@media (orientation: portrait)": { maxWidth: kiosk.portraitContentWidth } }}>
           <CardContent sx={{ p: { md: 4, xs: 2.5 } }}>
             <Stack spacing={3}>
@@ -610,14 +673,14 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
                   <Typography variant="h1">추천 분석</Typography>
                   <Typography color="text.secondary">현재 상태와 실제 프로그램 구성을 함께 확인하세요.</Typography>
                 </Stack>
-                <Button startIcon={<ArrowBackIcon />} variant="outlined" onClick={() => setCurrentStep(3)}>다른 추천 프로그램 보기</Button>
+                <Button startIcon={<ArrowBackIcon />} variant="outlined" onClick={() => setCurrentStep(4)}>운동 구성 편집하기</Button>
               </Stack>
               <Card sx={{ ...infoCardSx, height: "auto" }}><CardContent sx={{ py: 1.5 }}><Stack direction="row" flexWrap="wrap" gap={1}><Chip label={selectedMember?.displayName ?? "회원"} /><Chip label={recentWorkout ? `${formatDaysAgo(recentWorkout.daysAgo)} · ${recentWorkout.title}` : "최근 운동 없음"} variant="outlined" /><Chip label={`오늘 ${condition.workoutTarget ? getCategoryLabel(condition.workoutTarget) : "미선택"}`} variant="outlined" /><Chip label={`피로도 ${targetFatigueOptions.find((item) => item.value === condition.targetFatigue)?.label ?? "미선택"}`} variant="outlined" /><Chip label={`수면 ${sleepOptions.find((item) => item.value === condition.sleep)?.label ?? "미선택"}`} variant="outlined" /><Chip label={`컨디션 ${conditionOptions.find((item) => item.value === condition.condition)?.label ?? "미선택"}`} variant="outlined" /><Chip label={condition.alcohol === "YES" ? "음주 있음" : "음주 없음"} variant="outlined" /></Stack></CardContent></Card>
               {!snapshotValidation.valid ? <Alert severity="warning">{snapshotValidation.errors[0]}</Alert> : null}
               {catalogState.status === "loading" ? <LoadingState message="Exercise Catalog를 불러오는 중입니다." /> : null}
               {catalogState.status === "error" ? <Alert severity="warning">{catalogState.message}</Alert> : null}
-              <Grid container spacing={2.5}><Grid item lg={4} xs={12}><Stack spacing={2}><Card sx={infoCardSx}><CardContent><Stack spacing={1.5}><Typography variant="h2">확인 사항</Typography>{(recommendationTrace?.decisionFactors ?? []).filter((factor) => factor.score > 0).slice(0, 4).map((factor) => <Stack key={`${factor.key}-${factor.reason}`} direction="row" spacing={1.25}><CheckCircleIcon color="success" fontSize="small" /><Box><Typography fontWeight={800}>{factorDisplayLabel(factor)}</Typography><Typography color="text.secondary" variant="body2">{factorDisplayReason(factor)}</Typography></Box></Stack>)}</Stack></CardContent></Card><Card sx={infoCardSx}><CardContent><Stack spacing={1.5}><Typography variant="h2">주의 사항</Typography>{(recommendationTrace?.decisionFactors ?? []).filter((factor) => factor.score < 0).slice(0, 3).map((factor) => <Stack key={`${factor.key}-${factor.reason}`} direction="row" spacing={1.25}><WarningAmberIcon color="warning" fontSize="small" /><Box><Typography fontWeight={800}>{factorDisplayLabel(factor)}</Typography><Typography color="text.secondary" variant="body2">{factorDisplayReason(factor)}</Typography></Box></Stack>)}{(recommendationTrace?.decisionFactors ?? []).every((factor) => factor.score >= 0) ? <Typography color="text.secondary">특별한 주의 사항이 없습니다.</Typography> : null}{builderState?.memo ? <Typography color="text.secondary" variant="body2">{builderState.memo}</Typography> : null}</Stack></CardContent></Card></Stack></Grid><Grid item lg={8} xs={12}><Card sx={{ ...infoCardSx, borderColor: "primary.main", borderWidth: 2, boxShadow: palette.shadowAccent }}><CardContent sx={{ p: { md: 3, xs: 2 } }}><Stack spacing={2.5}><Stack direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={2}><Stack direction="row" spacing={1.5}><MuscleSilhouette active area={builderState ? categoryToBodyArea(builderState.category) : "NONE"} /><Box><Chip color="primary" label="BEST" size="small" /><Typography sx={{ fontSize: { md: 28, xs: 22 }, mt: 1 }} variant="h2">{builderState?.title}</Typography><Typography color="text.secondary">{builderState ? getCategoryLabel(builderState.category) : ""} · {builderState ? getDifficultyLabel(builderState.difficulty) : ""}</Typography></Box></Stack><Stack direction="row" flexWrap="wrap" gap={1}><Chip label={`${builderState?.exercises.length ?? 0}개 운동`} /><Chip label={`${builderState?.exercises.reduce((sum, item) => sum + item.sets, 0) ?? 0}세트`} variant="outlined" /></Stack></Stack><Box sx={{ bgcolor: palette.primaryGoldMuted, borderRadius: `${palette.radiusMd}px`, p: 2 }}><Typography color="primary.main" fontWeight={900} variant="caption">추천 포인트</Typography><Typography sx={{ mt: 0.75 }}>{displayRecommendationReason}</Typography></Box><Box sx={{ border: 1, borderColor: "divider", borderRadius: `${palette.radiusMd}px`, overflow: "hidden" }}>{(builderState?.exercises ?? []).map((exercise) => <Box key={exercise.id} sx={{ alignItems: "center", bgcolor: palette.surfaceInteractive, borderTop: exercise.order > 1 ? 1 : 0, borderColor: "divider", display: "grid", gap: 1.5, gridTemplateColumns: { sm: "42px minmax(0, 1fr) auto", xs: "36px minmax(0, 1fr)" }, px: 2, py: 1.5 }}><Typography color="primary.main" fontWeight={900}>{String(exercise.order).padStart(2, "0")}</Typography><Box><Typography fontWeight={900}>{exercise.name}</Typography><Typography color="text.secondary" variant="body2">{exercise.memo || "운동 목표에 맞춰 정확한 자세로 진행하세요."}</Typography></Box><Chip label={`${exercise.sets} SET`} size="small" sx={{ gridColumn: { sm: "auto", xs: "2" } }} variant="outlined" /></Box>)}</Box></Stack></CardContent></Card></Grid></Grid>
-              <Stack direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1.5}><Button startIcon={<ArrowBackIcon />} variant="text" onClick={() => setCurrentStep(3)} sx={{ minHeight: kiosk.standardControlHeight }}>이전 단계로</Button><Button disabled={!snapshotValidation.valid || !selectedMember || !snapshotSourceProgram || !snapshotValues} endIcon={<ArrowForwardIcon />} startIcon={<PrintIcon />} variant="contained" onClick={goPrintPreview} sx={{ fontSize: 18, minHeight: kiosk.primaryActionHeight, minWidth: 300 }}>이 프로그램으로 진행하기</Button></Stack>
+              <Grid container spacing={2.5}><Grid item lg={4} xs={12}><Stack spacing={2}><Card sx={infoCardSx}><CardContent><Stack spacing={1.5}><Typography variant="h2">확인 사항</Typography>{(recommendationTrace?.decisionFactors ?? []).filter((factor) => factor.score > 0).slice(0, 4).map((factor) => <Stack key={`${factor.key}-${factor.reason}`} direction="row" spacing={1.25}><CheckCircleIcon color="success" fontSize="small" /><Box><Typography fontWeight={800}>{factorDisplayLabel(factor)}</Typography><Typography color="text.secondary" variant="body2">{factorDisplayReason(factor)}</Typography></Box></Stack>)}</Stack></CardContent></Card><Card sx={infoCardSx}><CardContent><Stack spacing={1.5}><Typography variant="h2">주의 사항</Typography>{(recommendationTrace?.decisionFactors ?? []).filter((factor) => factor.score < 0).slice(0, 3).map((factor) => <Stack key={`${factor.key}-${factor.reason}`} direction="row" spacing={1.25}><WarningAmberIcon color="warning" fontSize="small" /><Box><Typography fontWeight={800}>{factorDisplayLabel(factor)}</Typography><Typography color="text.secondary" variant="body2">{factorDisplayReason(factor)}</Typography></Box></Stack>)}{(recommendationTrace?.decisionFactors ?? []).every((factor) => factor.score >= 0) ? <Typography color="text.secondary">특별한 주의 사항이 없습니다.</Typography> : null}{builderState?.memo ? <Typography color="text.secondary" variant="body2">{builderState.memo}</Typography> : null}</Stack></CardContent></Card></Stack></Grid><Grid item lg={8} xs={12}><Card sx={{ ...infoCardSx, borderColor: "primary.main", borderWidth: 2, boxShadow: palette.shadowAccent }}><CardContent sx={{ p: { md: 3, xs: 2 } }}><Stack spacing={2.5}><Stack direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={2}><Stack direction="row" spacing={1.5}><MuscleSilhouette active area={builderState ? categoryToBodyArea(builderState.category) : "NONE"} /><Box><Chip color="primary" label="BEST" size="small" /><Typography sx={{ fontSize: { md: 28, xs: 22 }, mt: 1 }} variant="h2">{builderState?.title}</Typography><Typography color="text.secondary">{builderState ? getCategoryLabel(builderState.category) : ""} · {builderState ? getDifficultyLabel(builderState.difficulty) : ""}</Typography></Box></Stack><Stack direction="row" flexWrap="wrap" gap={1}><Chip label={`${builderState?.exercises.length ?? 0}개 운동`} /><Chip label={`${builderState?.exercises.reduce((sum, item) => sum + item.plannedSets, 0) ?? 0}세트`} variant="outlined" /></Stack></Stack><Box sx={{ bgcolor: palette.primaryGoldMuted, borderRadius: `${palette.radiusMd}px`, p: 2 }}><Typography color="primary.main" fontWeight={900} variant="caption">추천 포인트</Typography><Typography sx={{ mt: 0.75 }}>{displayRecommendationReason}</Typography></Box><Box sx={{ border: 1, borderColor: "divider", borderRadius: `${palette.radiusMd}px`, overflow: "hidden" }}>{(builderState?.exercises ?? []).map((exercise) => <Box key={exercise.id} sx={{ alignItems: "center", bgcolor: palette.surfaceInteractive, borderTop: exercise.order > 1 ? 1 : 0, borderColor: "divider", display: "grid", gap: 1.5, gridTemplateColumns: { sm: "42px minmax(0, 1fr) auto", xs: "36px minmax(0, 1fr)" }, px: 2, py: 1.5 }}><Typography color="primary.main" fontWeight={900}>{String(exercise.order).padStart(2, "0")}</Typography><Box><Typography fontWeight={900}>{exercise.name}</Typography><Typography color="text.secondary" variant="body2">{exercise.memo || "운동 목표에 맞춰 정확한 자세로 진행하세요."}</Typography></Box><Chip label={`${exercise.plannedSets} SET`} size="small" sx={{ gridColumn: { sm: "auto", xs: "2" } }} variant="outlined" /></Box>)}</Box></Stack></CardContent></Card></Grid></Grid>
+              <Stack direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1.5}><Button startIcon={<ArrowBackIcon />} variant="text" onClick={() => setCurrentStep(4)} sx={{ minHeight: kiosk.standardControlHeight }}>운동 구성 편집하기</Button><Button disabled={!snapshotValidation.valid || !selectedMember || !snapshotSourceProgram || !snapshotValues} endIcon={<ArrowForwardIcon />} startIcon={<PrintIcon />} variant="contained" onClick={goPrintPreview} sx={{ fontSize: 18, minHeight: kiosk.primaryActionHeight, minWidth: 300 }}>이 프로그램으로 진행하기</Button></Stack>
             </Stack>
           </CardContent>
         </Card>

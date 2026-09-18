@@ -7,6 +7,7 @@ export interface SnapshotBuilderExercise {
   displayName: string;
   catalogExerciseId?: string;
   sets: number;
+  plannedSets: number;
   reps: string;
   weight: string;
   restSeconds: number;
@@ -35,7 +36,14 @@ const cloneState = (state: SnapshotBuilderState): SnapshotBuilderState => ({
   exercises: state.exercises.map((exercise) => ({ ...exercise })),
 });
 
-const clampSets = (value: number): number => Math.max(1, Math.floor(value));
+const clampSets = (value: number): number => Math.max(1, Math.min(5, Math.floor(value)));
+export const recommendPlannedSets = (input: { targetFatigue?: "LOW" | "NORMAL" | "HIGH" | null; condition?: "GOOD" | "NORMAL" | "BAD" | null; sleep?: "ENOUGH" | "NORMAL" | "LACK" | null; alcohol?: "YES" | "NO" | null }): number => {
+  let sets = 3;
+  if (input.condition === "GOOD" && input.sleep === "ENOUGH" && input.alcohol !== "YES" && input.targetFatigue !== "HIGH") sets += 1;
+  if (input.targetFatigue === "HIGH") sets -= 1;
+  if (input.condition === "BAD" || input.sleep === "LACK" || input.alcohol === "YES") sets -= 1;
+  return Math.max(2, Math.min(5, sets));
+};
 const clampNonNegativeNumberString = (value: string): string => {
   if (!value.trim()) return "0";
   const parsed = Number(value);
@@ -56,7 +64,7 @@ const patchExerciseMemo = (exercise: SnapshotBuilderExercise, text: string): Sna
   memo: [exercise.memo.trim(), text].filter(Boolean).join(" | "),
 });
 
-export const createSnapshotBuilderState = (program: Program): SnapshotBuilderState => ({
+export const createSnapshotBuilderState = (program: Program, prescriptionInput?: Parameters<typeof recommendPlannedSets>[0]): SnapshotBuilderState => ({
   title: program.title,
   category: program.category,
   difficulty: program.difficulty ?? "GENERAL",
@@ -69,6 +77,7 @@ export const createSnapshotBuilderState = (program: Program): SnapshotBuilderSta
       displayName: exercise.displayName ?? exercise.name,
       catalogExerciseId: exercise.catalogExerciseId,
       sets: clampSets(exercise.sets),
+      plannedSets: recommendPlannedSets(prescriptionInput ?? {}),
       reps: "",
       weight: "0",
       restSeconds: 60,
@@ -78,9 +87,9 @@ export const createSnapshotBuilderState = (program: Program): SnapshotBuilderSta
   ),
 });
 
-export const createSnapshotBuilderHistory = (program: Program): SnapshotBuilderHistory => ({
+export const createSnapshotBuilderHistory = (program: Program, prescriptionInput?: Parameters<typeof recommendPlannedSets>[0]): SnapshotBuilderHistory => ({
   past: [],
-  present: createSnapshotBuilderState(program),
+  present: createSnapshotBuilderState(program, prescriptionInput),
   future: [],
 });
 
@@ -107,6 +116,7 @@ export const snapshotBuilderService = {
             ...exercise,
             ...patch,
             sets: patch.sets !== undefined ? clampSets(patch.sets) : exercise.sets,
+            plannedSets: patch.plannedSets !== undefined ? clampSets(patch.plannedSets) : exercise.plannedSets,
             weight: patch.weight !== undefined ? clampNonNegativeNumberString(patch.weight) : exercise.weight,
             restSeconds: patch.restSeconds !== undefined ? Math.max(0, Math.floor(patch.restSeconds)) : exercise.restSeconds,
           }
@@ -148,6 +158,7 @@ export const snapshotBuilderService = {
       name: "",
       displayName: "",
       sets: 1,
+      plannedSets: 3,
       reps: "",
       weight: "0",
       restSeconds: 60,

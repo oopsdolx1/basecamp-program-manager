@@ -15,7 +15,7 @@ export const createWorkoutSessionId = (date = new Date()): string =>
 
 export const createWorkoutSession = async (input: CreateWorkoutSessionInput): Promise<string> => {
   if (input.exercises.length < 1) throw new Error("출력할 운동이 없습니다.");
-  if (input.exercises.length > 8) throw new Error("운동이 8개를 초과하여 출력할 수 없습니다.");
+  if (input.exercises.length > 9) throw new Error("운동은 최대 9개까지 가능합니다.");
 
   const user = await ensureFirebaseAuth();
   const sessionId = createWorkoutSessionId();
@@ -31,6 +31,7 @@ export const createWorkoutSession = async (input: CreateWorkoutSessionInput): Pr
     memberSnapshot: { name: input.memberName },
     programSnapshot: { title: input.programTitle },
     exercises,
+    prescription: { sourceProgramId: input.programId, sourceProgramName: input.programTitle, exercises },
     print: {
       format: PRINT_FORMAT,
       templateKey: PRINT_TEMPLATE_KEY,

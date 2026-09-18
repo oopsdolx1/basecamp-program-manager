@@ -13,6 +13,8 @@ export interface WorkoutSessionExerciseSnapshot {
   programExerciseId: string;
   name: string;
   order: number;
+  plannedSets?: number;
+  memo?: string;
 }
 
 export interface WorkoutSessionRecord {
@@ -26,6 +28,7 @@ export interface WorkoutSessionRecord {
   memberSnapshot: { name: string };
   programSnapshot: { title: string };
   exercises: WorkoutSessionExerciseSnapshot[];
+  prescription?: { sourceProgramId: string; sourceProgramName: string; exercises: WorkoutSessionExerciseSnapshot[] };
   print: {
     format: "A5-portrait" | "A5-landscape";
     templateKey: "basecamp-workout-log-v1";

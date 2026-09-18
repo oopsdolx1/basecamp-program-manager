@@ -1,0 +1,17 @@
+import assert from "node:assert/strict";
+import { createSnapshotBuilderHistory, snapshotBuilderService } from "../src/features/printing/services/snapshotBuilderService";
+import type { Program } from "../src/features/programs/types/program.types";
+const program: Program = { id: "program" as Program["id"], schemaVersion: 1, title: "Fixture", category: "BACK", difficulty: "GENERAL", memo: "", favorite: false, usageCount: 0, createdAt: new Date(), updatedAt: new Date(), isArchived: false, exercises: Array.from({ length: 9 }, (_, i) => ({ id: `e${i}`, name: `Exercise ${i}`, displayName: `Exercise ${i}`, catalogExerciseId: `c${i}`, order: i + 1, sets: 1, memo: i === 0 ? "keep memo" : "" })) };
+const original = JSON.stringify(program);
+let history = createSnapshotBuilderHistory(program, { condition: "NORMAL", sleep: "NORMAL", alcohol: "NO", targetFatigue: "NORMAL" });
+assert.equal(history.present.exercises.length, 9); assert(history.present.exercises.every(x => x.plannedSets >= 2 && x.plannedSets <= 5));
+const removedId = history.present.exercises[0].id;
+const movedId = history.present.exercises[1].id;
+const firstMemo = history.present.exercises[0].memo;
+history = snapshotBuilderService.remove(history, removedId); assert.equal(history.present.exercises.length, 8);
+history = snapshotBuilderService.addBlank(history); assert.equal(history.present.exercises.length, 9);
+const added = history.present.exercises.at(-1)!; history = snapshotBuilderService.patchExercise(history, added.id, { name: "Added", displayName: "Added", catalogExerciseId: "added", memo: "added memo" });
+history = snapshotBuilderService.move(history, movedId, "down"); assert.equal(history.present.exercises[1].id, movedId);
+history = snapshotBuilderService.patchExercise(history, movedId, { plannedSets: 1 }); const fiveId = history.present.exercises[2].id; history = snapshotBuilderService.patchExercise(history, fiveId, { plannedSets: 5 });
+assert.equal(history.present.exercises.find(x => x.id === movedId)?.plannedSets, 1); assert.equal(history.present.exercises.find(x => x.id === fiveId)?.plannedSets, 5); assert.equal(firstMemo, "keep memo"); assert.equal(JSON.stringify(program), original);
+console.log("snapshotBuilderService checks: PASS");

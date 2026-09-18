@@ -12,6 +12,7 @@ import type { WorkoutPrintDocument } from "../types/print.types";
 import { programManagerRuntime } from "../../../shared-knowledge/programManagerRuntime";
 import { getWorkoutSession } from "../../workout-sessions/services/workoutSessionService";
 import type { WorkoutSessionRecord } from "../../workout-sessions/domain/workoutSession.types";
+import { resolvePrintPreviewSource } from "../services/printPreviewAuthorityResolver";
 
 type PreviewState =
   | { status: "loading" }
@@ -54,22 +55,17 @@ export const usePrintPreview = ({ appId, memberId, programId, workoutSessionId }
 
       try {
         await ensureFirebaseAuth();
-        const [member, program, workoutSession] = await Promise.all([
-          getMemberById(appId, memberId),
-          isSnapshotProgramId(programId)
-            ? Promise.resolve(createSnapshotProgram(programId))
-            : programRepository.getProgram(appId, programId),
-          getWorkoutSession(appId, workoutSessionId),
-        ]);
+        const [member, workoutSession] = await Promise.all([getMemberById(appId, memberId), getWorkoutSession(appId, workoutSessionId)]);
 
         if (!active) return;
 
         if (!workoutSession) throw new PrintMapperError("Workout Session을 찾지 못했습니다.");
-        if (workoutSession.memberId !== memberId || workoutSession.programId !== program?.id) {
+        if (workoutSession.memberId !== memberId || workoutSession.programId !== programId) {
           throw new PrintMapperError("Workout Session의 회원 또는 프로그램이 Preview와 일치하지 않습니다.");
         }
-        const document = createWorkoutPrintDocument({ member, program, workoutSessionId });
-        setState({ status: "ready", document, member: member as MemberSelectionItem, program: program as Program, workoutSession });
+        const authoritativeProgram = await resolvePrintPreviewSource(workoutSession, () => isSnapshotProgramId(programId) ? Promise.resolve(createSnapshotProgram(programId)) : programRepository.getProgram(appId, programId) as Promise<Program>);
+        const document = createWorkoutPrintDocument({ member, program: authoritativeProgram, workoutSessionId });
+        setState({ status: "ready", document, member: member as MemberSelectionItem, program: authoritativeProgram, workoutSession });
       } catch (caught) {
         if (!active) return;
         const message =

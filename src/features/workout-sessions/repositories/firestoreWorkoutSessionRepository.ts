@@ -18,6 +18,7 @@ const mapRecord = (id: string, data: DocumentData): WorkoutSessionRecord => ({
   memberSnapshot: data.memberSnapshot,
   programSnapshot: data.programSnapshot,
   exercises: Array.isArray(data.exercises) ? data.exercises : [],
+  prescription: data.prescription && Array.isArray(data.prescription.exercises) ? { sourceProgramId: String(data.prescription.sourceProgramId), sourceProgramName: String(data.prescription.sourceProgramName), exercises: data.prescription.exercises } : undefined,
   print: {
     format: "A5-landscape",
     templateKey: "basecamp-workout-log-v1",

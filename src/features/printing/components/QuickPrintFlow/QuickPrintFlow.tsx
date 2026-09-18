@@ -37,6 +37,7 @@ import { createSnapshotBuilderHistory, snapshotBuilderService, type SnapshotBuil
 import type { AlcoholStatus, ConditionInput, ConditionStatus, FatigueArea, MemberIntelligenceMetadata, MemberIntelligenceSummary, PeriodizationSummary, RecommendationResult, RecommendationTrace, RecentWorkoutSummary, SleepQuality, TargetFatigue, WorkoutTarget } from "../../types/condition.types";
 import { palette } from "../../../../theme/palette";
 import { createWorkoutSession } from "../../../workout-sessions/services/workoutSessionService";
+import { mapSessionPrescriptionExercises } from "../../../workout-sessions/services/sessionPrescriptionMapper";
 import { kiosk } from "../../../../design-system";
 
 type PrintStep = 1 | 2 | 3 | 4;
@@ -378,7 +379,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
   const selectProgramForBuilder = (program: Program) => {
     setSnapshotSourceProgram(program);
     if (program.id !== recommendation?.program.id || !builderHistory) {
-      setBuilderHistory(createSnapshotBuilderHistory(program));
+      setBuilderHistory(createSnapshotBuilderHistory(program, condition));
     }
     setRecommendationReason(program.id === recommendation?.program.id
       ? recommendationReason
@@ -396,7 +397,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
       return;
     }
     const ruleReason = buildRecommendationReason(next, condition, recentWorkout, intelligence, periodization);
-    const baseHistory = createSnapshotBuilderHistory(next.program);
+    const baseHistory = createSnapshotBuilderHistory(next.program, condition);
     setRecommendation(next);
     setRecommendationTrace(next.trace);
     setRecommendationReason(ruleReason);
@@ -408,8 +409,8 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
   const goPrintPreview = async () => {
     if (!selectedMember || !snapshotSourceProgram || !snapshotValues || sessionSaving) return;
     const sanitized = sanitizeProgramForm(snapshotValues);
-    if (sanitized.exercises.length > 8) {
-      setSessionError("운동이 8개를 초과하여 이번 Sprint에서는 출력할 수 없습니다.");
+    if (sanitized.exercises.length > 9) {
+      setSessionError("운동은 최대 9개까지 가능합니다.");
       return;
     }
     setSessionSaving(true);
@@ -423,12 +424,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
         memberName: selectedMember.displayName,
         programId: snapshotSourceProgram.id,
         programTitle: sanitized.title,
-        exercises: sessionProgram.exercises.map((exercise) => ({
-          exerciseId: resolved.get(exercise.id)?.id ?? exercise.catalogExerciseId ?? exercise.id,
-          programExerciseId: exercise.id,
-          name: resolved.get(exercise.id)?.name ?? exercise.name,
-          order: exercise.order,
-        })),
+        exercises: mapSessionPrescriptionExercises(builderState?.exercises ?? [], resolved),
       });
       const snapshotProgramId = savePrintSnapshot({
       sourceProgramId: snapshotSourceProgram.id,

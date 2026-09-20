@@ -1,0 +1,15 @@
+import assert from "node:assert/strict";
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { createWindowsPrintSystem, createWindowsPrinterBackend } from "../windows-print-agent/windows-printer-backend.mjs";
+const root = await mkdtemp(join(tmpdir(), "basecamp-print-agent-test-")); const pdfPath = join(root, "document.pdf");
+const calls = []; const backend = createWindowsPrinterBackend({ controlledRoot: root, printSystem: { getDefaultPrinter: async () => "Test printer", submitPdf: async (job) => { calls.push(job); } } });
+assert.deepEqual(await backend.submit({ jobId: "job-1", copies: 2, pdfPath }), { status: "submitted" }); assert.equal(calls[0].copies, 2);
+assert.deepEqual(await createWindowsPrinterBackend({ controlledRoot: root, printSystem: { getDefaultPrinter: async () => null } }).submit({ jobId: "job-2", copies: 1, pdfPath }), { status: "failed", reason: "default_printer_unavailable" });
+assert.deepEqual(await createWindowsPrinterBackend({ controlledRoot: root, printSystem: { getDefaultPrinter: async () => "Test", submitPdf: async () => { throw new Error("printer_submission_failed"); } } }).submit({ jobId: "job-3", copies: 1, pdfPath }), { status: "failed", reason: "printer_submission_failed" });
+assert.deepEqual(await backend.submit({ jobId: "job-4", copies: 1, pdfPath: "C:\\untrusted.pdf" }), { status: "failed", reason: "invalid_job" });
+assert.deepEqual(await backend.submit({ jobId: "job-5", copies: 0, pdfPath }), { status: "failed", reason: "invalid_job" });
+const runs = []; const system = createWindowsPrintSystem({ platform: "win32", rendererPath: "C:\\agent\\SumatraPDF.exe", run: async (file, args) => { runs.push({ file, args }); return { stdout: "Canon E489" }; }, ensureReadable: async () => undefined });
+assert.equal(await system.getDefaultPrinter(), "Canon E489"); await system.submitPdf({ path: "C:\\agent\\job.pdf", copies: 3 }); assert.deepEqual(runs[1].args, ["-print-to-default", "-silent", "-print-settings", "3x,landscape,noscale", "C:\\agent\\job.pdf"]);
+console.log("Windows PrinterBackend checks: PASS");

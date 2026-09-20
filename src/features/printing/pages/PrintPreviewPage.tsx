@@ -12,7 +12,7 @@ import { useCreatePrintRequest, type PrintRequestRecord } from "../../print-hist
 import { getPrintRequestsByIds } from "../../print-history/services/printRequestService";
 import { markWorkoutSessionPrinted } from "../../workout-sessions/services/workoutSessionService";
 import { WorkoutPrintTemplateV1 } from "../components/WorkoutPrintTemplateV1/WorkoutPrintTemplateV1";
-import { browserPrintGateway } from "../gateways/browserPrintGateway";
+import { configuredPrintAdapter } from "../gateways/configuredPrintAdapter";
 import { usePrintPreview } from "../hooks/usePrintPreview";
 import "../styles/print.css";
 
@@ -64,7 +64,7 @@ export const PrintPreviewPage = (): JSX.Element => {
       await markWorkoutSessionPrinted(conditionLabAppId, workoutSessionId, record.id);
       setCompletedPrints((current) => current + 1);
       setHistory((current) => [record, ...current]);
-      const printResult = await browserPrintGateway.print({ jobId: record.id, document: state.document, copies: 1 });
+      const printResult = await configuredPrintAdapter.print({ jobId: record.id, document: state.document, copies: 1 });
       if (printResult.status === "failed") setSessionError(printResult.reason ?? "인쇄 요청을 전송하지 못했습니다.");
     } catch (caught) {
       setSessionError(caught instanceof Error ? caught.message : "운동 세션 출력 상태를 저장하지 못했습니다.");

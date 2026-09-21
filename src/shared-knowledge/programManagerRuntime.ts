@@ -182,4 +182,4 @@ export const programManagerRuntime = Object.freeze({
   resolveHistory: select,
 });
 
-void start();
+if (import.meta.env.MODE !== "test") void start();

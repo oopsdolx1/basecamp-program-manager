@@ -12,7 +12,7 @@ import type { WorkoutPrintDocument } from "../types/print.types";
 import { programManagerRuntime } from "../../../shared-knowledge/programManagerRuntime";
 import { getWorkoutSession } from "../../workout-sessions/services/workoutSessionService";
 import type { WorkoutSessionRecord } from "../../workout-sessions/domain/workoutSession.types";
-import { resolvePrintPreviewSource } from "../services/printPreviewAuthorityResolver";
+import { assertPrintPreviewSessionContext, resolvePrintPreviewSource } from "../services/printPreviewAuthorityResolver";
 
 type PreviewState =
   | { status: "loading" }
@@ -60,9 +60,8 @@ export const usePrintPreview = ({ appId, memberId, programId, workoutSessionId }
         if (!active) return;
 
         if (!workoutSession) throw new PrintMapperError("Workout Session을 찾지 못했습니다.");
-        if (workoutSession.memberId !== memberId || workoutSession.programId !== programId) {
-          throw new PrintMapperError("Workout Session의 회원 또는 프로그램이 Preview와 일치하지 않습니다.");
-        }
+        assertPrintPreviewSessionContext(workoutSession, memberId, programId);
+
         const authoritativeProgram = await resolvePrintPreviewSource(workoutSession, () => isSnapshotProgramId(programId) ? Promise.resolve(createSnapshotProgram(programId)) : programRepository.getProgram(appId, programId) as Promise<Program>);
         const document = createWorkoutPrintDocument({ member, program: authoritativeProgram, workoutSessionId });
         setState({ status: "ready", document, member: member as MemberSelectionItem, program: authoritativeProgram, workoutSession });

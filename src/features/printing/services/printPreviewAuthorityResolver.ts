@@ -1,6 +1,33 @@
 import type { Program } from "../../programs/types/program.types";
 import type { ProgramId } from "../../../types/brandedIds";
 import type { WorkoutSessionRecord } from "../../workout-sessions/domain/workoutSession.types";
+import { createSnapshotProgramId } from "./printSnapshotSession";
+
+type PrintPreviewSessionContext = Pick<WorkoutSessionRecord, "memberId" | "programId" | "prescription">;
+
+export const assertPrintPreviewSessionContext = (
+  session: PrintPreviewSessionContext,
+  memberId: string,
+  routeProgramId: string,
+): void => {
+  if (session.memberId !== memberId) {
+    throw new Error("Workout Session의 회원이 Preview와 일치하지 않습니다.");
+  }
+
+  if (session.prescription) {
+    if (session.programId !== session.prescription.sourceProgramId) {
+      throw new Error("Workout Session의 원본 프로그램 정보가 일치하지 않습니다.");
+    }
+    if (routeProgramId !== session.programId && routeProgramId !== createSnapshotProgramId(session.programId)) {
+      throw new Error("Workout Session의 프로그램이 Preview와 일치하지 않습니다.");
+    }
+    return;
+  }
+
+  if (session.programId !== routeProgramId) {
+    throw new Error("Workout Session의 프로그램이 Preview와 일치하지 않습니다.");
+  }
+};
 
 export const programFromSessionPrescription = (session: WorkoutSessionRecord): Program => {
   const prescription = session.prescription;

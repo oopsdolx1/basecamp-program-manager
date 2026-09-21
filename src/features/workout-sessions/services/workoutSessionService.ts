@@ -1,6 +1,6 @@
 import { ensureFirebaseAuth } from "../../../firebase/firebaseAuth";
-import { PRINT_FORMAT, PRINT_TEMPLATE_KEY, PRINT_TEMPLATE_VERSION } from "../../printing/constants/print.constants";
 import type { CreateWorkoutSessionInput, WorkoutSessionRecord } from "../domain/workoutSession.types";
+import { buildWorkoutSessionRecord } from "./workoutSessionRecordBuilder";
 import { firestoreWorkoutSessionRepository } from "../repositories/firestoreWorkoutSessionRepository";
 
 const formatDateKey = (date: Date): string => {
@@ -19,28 +19,8 @@ export const createWorkoutSession = async (input: CreateWorkoutSessionInput): Pr
 
   const user = await ensureFirebaseAuth();
   const sessionId = createWorkoutSessionId();
-  const exercises = [...input.exercises].sort((left, right) => left.order - right.order);
-  await firestoreWorkoutSessionRepository.create(input.appId, {
-    sessionId,
-    schemaVersion: 1,
-    memberId: input.memberId,
-    programId: input.programId,
-    trainerId: user.uid,
-    status: "created",
-    exerciseIds: exercises.map((exercise) => exercise.exerciseId),
-    memberSnapshot: { name: input.memberName },
-    programSnapshot: { title: input.programTitle },
-    exercises,
-    prescription: { sourceProgramId: input.programId, sourceProgramName: input.programTitle, exercises },
-    print: {
-      format: PRINT_FORMAT,
-      templateKey: PRINT_TEMPLATE_KEY,
-      templateVersion: PRINT_TEMPLATE_VERSION,
-      printHistoryId: null,
-      historyIds: [],
-      copyCount: 0,
-    },
-  });
+  await firestoreWorkoutSessionRepository.create(input.appId, buildWorkoutSessionRecord(input, user.uid, sessionId));
+
   return sessionId;
 };
 

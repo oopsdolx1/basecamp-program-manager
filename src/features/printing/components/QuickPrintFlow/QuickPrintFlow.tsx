@@ -205,6 +205,7 @@ const factorDisplayLabel = (factor: RecommendationTrace["decisionFactors"][numbe
   weeklyFrequency: "주간 빈도",
   favorite: "즐겨찾기",
   usageCount: "최근 사용 이력",
+  capacity: "수행 기록",
 })[factor.key] ?? factor.label;
 const factorDisplayReason = (factor: RecommendationTrace["decisionFactors"][number]): string => ({
   condition: "오늘 컨디션에 맞는 강도를 고려했습니다.",
@@ -220,6 +221,7 @@ const factorDisplayReason = (factor: RecommendationTrace["decisionFactors"][numb
   weeklyFrequency: "이번 주 운동 빈도를 고려했습니다.",
   favorite: "자주 선택한 프로그램을 참고했습니다.",
   usageCount: "최근 프로그램 사용 이력을 참고했습니다.",
+  capacity: "최근 확인된 수행 기록을 참고했습니다.",
 })[factor.key] ?? factor.reason;
 
 const RecommendationTraceCard = ({

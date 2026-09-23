@@ -101,7 +101,8 @@ export type RecommendationTraceFactorKey =
   | "plateau"
   | "weeklyFrequency"
   | "favorite"
-  | "usageCount";
+  | "usageCount"
+  | "capacity";
 
 export interface RecommendationTraceFactor {
   key: RecommendationTraceFactorKey;

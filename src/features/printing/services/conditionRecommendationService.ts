@@ -3,6 +3,8 @@ import type { ExerciseCatalogItem } from "../../exercise-catalog";
 import { resolveExercise } from "../../exercise-resolver/services/exerciseResolverService";
 import type { WorkoutHistoryRecord } from "../providers/workoutHistoryProvider";
 import { sanitizeProgramForm } from "../../programs/services/programService";
+import { buildMemberCapacityProfile } from "./memberCapacityProfileService";
+import { buildProgramDemandProfile, evaluateCapacityFit } from "./programDemandCapacityFitService";
 import type { Program, ProgramCategory, ProgramDifficulty, ProgramFormValues } from "../../programs/types/program.types";
 import type {
   ConditionInput,
@@ -373,6 +375,7 @@ const scoreProgram = (
   periodization: PeriodizationSummary | null,
   workoutHistory: WorkoutHistoryRecord[],
   catalog: ExerciseCatalogItem[],
+  capacity: ReturnType<typeof buildMemberCapacityProfile>,
 ): RecommendationResult => {
   let score = 100;
   const reasons: string[] = [];
@@ -402,6 +405,10 @@ const scoreProgram = (
   score += intelligenceResult.score;
   reasons.push(...intelligenceResult.reasons);
   factors.push(...intelligenceResult.factors);
+
+  const capacityFit = evaluateCapacityFit(capacity, buildProgramDemandProfile(program, capacity));
+  score += capacityFit.score;
+  if (capacityFit.reason) { reasons.push(capacityFit.reason); factors.push(createFactor({ key: "capacity", label: "Capacity", score: capacityFit.score, reason: capacityFit.reason })); }
 
   const periodizationResult = scorePeriodization(periodization, program);
   score += periodizationResult.score;
@@ -446,9 +453,10 @@ export const recommendProgram = (
   catalog: ExerciseCatalogItem[] = [],
 ): RecommendationResult | null => {
   if (!condition.workoutTarget) return null;
+  const capacity = buildMemberCapacityProfile(workoutHistory, catalog, { target: condition.workoutTarget });
   const candidates = programs
     .filter((program) => !program.isArchived && program.category === condition.workoutTarget)
-    .map((program) => scoreProgram(program, condition, recentWorkout, intelligence, periodization, workoutHistory, catalog));
+    .map((program) => scoreProgram(program, condition, recentWorkout, intelligence, periodization, workoutHistory, catalog, capacity));
 
   candidates.sort((left, right) => {
     if (right.score !== left.score) return right.score - left.score;

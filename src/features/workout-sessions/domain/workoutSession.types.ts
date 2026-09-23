@@ -8,6 +8,8 @@ export type WorkoutSessionStatus =
   | "ai_completed"
   | "confirmed";
 
+export type WorkoutSource = { type: "program"; programId: string } | { type: "manual" };
+
 export interface WorkoutSessionExerciseSnapshot {
   exerciseId: string;
   programExerciseId: string;
@@ -21,14 +23,15 @@ export interface WorkoutSessionRecord {
   sessionId: string;
   schemaVersion: 1;
   memberId: string;
-  programId: string;
+  programId?: string;
+  source?: WorkoutSource;
   trainerId: string;
   status: WorkoutSessionStatus;
   exerciseIds: string[];
   memberSnapshot: { name: string };
   programSnapshot: { title: string };
   exercises: WorkoutSessionExerciseSnapshot[];
-  prescription?: { sourceProgramId: string; sourceProgramName: string; exercises: WorkoutSessionExerciseSnapshot[] };
+  prescription?: { source?: WorkoutSource; sourceProgramId?: string; sourceProgramName: string; exercises: WorkoutSessionExerciseSnapshot[] };
   print: {
     format: "A5-portrait" | "A5-landscape";
     templateKey: "basecamp-workout-log-v1";
@@ -47,7 +50,8 @@ export interface CreateWorkoutSessionInput {
   appId: AppId;
   memberId: string;
   memberName: string;
-  programId: string;
+  programId?: string;
+  source?: WorkoutSource;
   programTitle: string;
   exercises: WorkoutSessionExerciseSnapshot[];
 }

@@ -33,6 +33,7 @@ export const AppRouter = (): JSX.Element => (
     <Route path={routes.programDetail} element={<Navigate replace to={routeBuilder.print()} />} />
     <Route path={routes.editProgram} element={<Navigate replace to={routeBuilder.print()} />} />
     <Route path={routes.printPreview} element={<PrintPreviewPage />} />
+    <Route path={routes.printPreviewSession} element={<PrintPreviewPage />} />
     <Route path={routes.printHistory} element={<LegacyPrintHistoryRedirect />} />
     <Route path={routes.workoutSessions} element={<WorkoutSessionsPage />} />
     <Route path={routes.workoutSessionDetail} element={<WorkoutSessionDetailPage />} />

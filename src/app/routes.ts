@@ -9,6 +9,7 @@ export const routes = {
   programDetail: "/program-manager/programs/:id",
   editProgram: "/program-manager/programs/:id/edit",
   printPreview: "/program-manager/print/:programId",
+  printPreviewSession: "/program-manager/print/session/:workoutSessionId",
   printHistory: "/program-manager/print-history",
   workoutSessions: "/program-manager/workout-sessions",
   workoutSessionDetail: "/program-manager/workout-sessions/:sessionId",

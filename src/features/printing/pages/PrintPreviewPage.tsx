@@ -20,11 +20,11 @@ const conditionLabAppId = toAppId(import.meta.env.VITE_CONDITION_LAB_APP_ID ?? "
 const formatDateTime = (date: Date): string => new Intl.DateTimeFormat("ko-KR", { dateStyle: "short", timeStyle: "short" }).format(date);
 
 export const PrintPreviewPage = (): JSX.Element => {
-  const { programId } = useParams();
+  const { programId, workoutSessionId: routeWorkoutSessionId } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const memberId = searchParams.get("memberId");
-  const workoutSessionId = searchParams.get("sessionId");
+  const workoutSessionId = routeWorkoutSessionId ?? searchParams.get("sessionId");
   const autoPrint = searchParams.get("autoPrint") === "1";
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [markingPrinted, setMarkingPrinted] = useState(false);

@@ -13,11 +13,13 @@ import type {
 const STORAGE_KEY = "basecamp.quick-print.snapshot";
 
 export const createSnapshotProgramId = (sourceProgramId: string): string => `snapshot--${sourceProgramId}`;
+export const createSnapshotSessionId = (workoutSessionId: string): string => `snapshot--session--${workoutSessionId}`;
 
 export const isSnapshotProgramId = (programId: string | null | undefined): boolean =>
   typeof programId === "string" && programId.startsWith("snapshot--");
 
 export const savePrintSnapshot = (input: {
+  workoutSessionId?: string;
   sourceProgramId: string;
   sourceProgramTitle: string;
   recommendationReasons: string[];
@@ -45,7 +47,7 @@ export const savePrintSnapshot = (input: {
   };
 
   sessionStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-  return createSnapshotProgramId(input.sourceProgramId);
+  return input.workoutSessionId ? createSnapshotSessionId(input.workoutSessionId) : createSnapshotProgramId(input.sourceProgramId);
 };
 
 export const loadPrintSnapshot = (): ProgramSnapshotPayload | null => {

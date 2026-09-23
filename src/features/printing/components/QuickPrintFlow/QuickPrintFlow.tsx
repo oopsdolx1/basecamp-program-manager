@@ -443,7 +443,8 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
         programTitle: sanitized.title,
         exercises: mapSessionPrescriptionExercises(builderState?.exercises ?? [], resolved),
       });
-      const snapshotProgramId = savePrintSnapshot({
+      savePrintSnapshot({
+      workoutSessionId: sessionId,
       sourceProgramId: snapshotSourceProgram.id,
       sourceProgramTitle: snapshotSourceProgram.title,
       recommendationReasons: recommendationReason ? [recommendationReason] : [],
@@ -456,7 +457,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
       recentWorkout,
         formValues: sanitized,
       });
-      navigate(routeBuilder.printPreview(snapshotProgramId, selectedMember.memberId, sessionId, true));
+      navigate(routeBuilder.printPreviewSession(selectedMember.memberId, sessionId, true));
     } catch (caught) {
       setSessionError(caught instanceof Error ? caught.message : "운동 세션을 생성하지 못했습니다.");
     } finally {

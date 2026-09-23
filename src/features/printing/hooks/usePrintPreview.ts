@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ensureFirebaseAuth } from "../../../firebase/firebaseAuth";
-import type { AppId, ProfileId, ProgramId } from "../../../types/brandedIds";
+import { toProgramId, type AppId, type ProfileId, type ProgramId } from "../../../types/brandedIds";
 import { getMemberById } from "../../members/repositories/profileRepository";
 import type { MemberSelectionItem } from "../../members/types/memberViewModel.types";
 import { sanitizeProgramForm } from "../../programs/services/programService";
@@ -13,6 +13,7 @@ import { programManagerRuntime } from "../../../shared-knowledge/programManagerR
 import { getWorkoutSession } from "../../workout-sessions/services/workoutSessionService";
 import type { WorkoutSessionRecord } from "../../workout-sessions/domain/workoutSession.types";
 import { assertPrintPreviewSessionContext, resolvePrintPreviewSource } from "../services/printPreviewAuthorityResolver";
+import { normalizeWorkoutSource } from "../../workout-sessions/services/workoutSessionSourceResolver";
 
 type PreviewState =
   | { status: "loading" }
@@ -41,11 +42,6 @@ export const usePrintPreview = ({ appId, memberId, programId, workoutSessionId }
         return;
       }
 
-      if (!programId) {
-        setState({ status: "error", message: "programId가 없습니다." });
-        return;
-      }
-
       if (!workoutSessionId) {
         setState({ status: "error", message: "Workout Session ID가 없습니다. Quick Print에서 다시 진행해 주세요." });
         return;
@@ -60,9 +56,14 @@ export const usePrintPreview = ({ appId, memberId, programId, workoutSessionId }
         if (!active) return;
 
         if (!workoutSession) throw new PrintMapperError("Workout Session을 찾지 못했습니다.");
-        assertPrintPreviewSessionContext(workoutSession, memberId, programId);
+        assertPrintPreviewSessionContext(workoutSession, memberId, programId ?? undefined);
 
-        const authoritativeProgram = await resolvePrintPreviewSource(workoutSession, () => isSnapshotProgramId(programId) ? Promise.resolve(createSnapshotProgram(programId)) : programRepository.getProgram(appId, programId) as Promise<Program>);
+        const workoutSource = normalizeWorkoutSource(workoutSession);
+        const fallbackProgramId = programId ?? (workoutSource.type === "program" ? toProgramId(workoutSource.programId) : null);
+        const authoritativeProgram = await resolvePrintPreviewSource(workoutSession, () => {
+          if (!fallbackProgramId) throw new PrintMapperError("Manual Workout Session에는 Prescription이 필요합니다.");
+          return isSnapshotProgramId(fallbackProgramId) ? Promise.resolve(createSnapshotProgram(fallbackProgramId)) : programRepository.getProgram(appId, fallbackProgramId) as Promise<Program>;
+        });
         const document = createWorkoutPrintDocument({ member, program: authoritativeProgram, workoutSessionId });
         setState({ status: "ready", document, member: member as MemberSelectionItem, program: authoritativeProgram, workoutSession });
       } catch (caught) {

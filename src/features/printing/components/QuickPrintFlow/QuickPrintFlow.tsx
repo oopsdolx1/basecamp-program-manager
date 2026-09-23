@@ -36,6 +36,7 @@ import { analyzePeriodization } from "../../services/periodizationEngine";
 import { buildRecommendationReason, recommendProgram } from "../../services/conditionRecommendationService";
 import { savePrintSnapshot } from "../../services/printSnapshotSession";
 import { createSnapshotBuilderHistory, snapshotBuilderService, type SnapshotBuilderExercise, type SnapshotBuilderHistory } from "../../services/snapshotBuilderService";
+import { createManualWorkoutBuilderHistory } from "../../services/manualWorkoutBuilderService";
 import type { AlcoholStatus, ConditionInput, ConditionStatus, FatigueArea, MemberIntelligenceMetadata, MemberIntelligenceSummary, PeriodizationSummary, RecommendationResult, RecommendationTrace, RecentWorkoutSummary, SleepQuality, TargetFatigue, WorkoutTarget } from "../../types/condition.types";
 import { palette } from "../../../../theme/palette";
 import { createWorkoutSession } from "../../../workout-sessions/services/workoutSessionService";
@@ -285,6 +286,8 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
   const [sessionSaving, setSessionSaving] = useState(false);
   const [sessionError, setSessionError] = useState("");
   const [addPickerOpen, setAddPickerOpen] = useState(false);
+  const [manualPickerOpen, setManualPickerOpen] = useState(false);
+  const [manualMode, setManualMode] = useState(false);
   const hasSearchQuery = memberQuery.trim().length > 0;
   const filteredMembers = useMemo(() => {
     if (hasSearchQuery) return sortMembersByName(filterMembers(members, memberQuery));
@@ -387,6 +390,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
   };
 
   const selectProgramForBuilder = (program: Program) => {
+    setManualMode(false);
     setSnapshotSourceProgram(program);
     if (program.id !== recommendation?.program.id || !builderHistory) {
       setBuilderHistory(createSnapshotBuilderHistory(program, condition));
@@ -394,6 +398,22 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
     setRecommendationReason(program.id === recommendation?.program.id
       ? recommendationReason
       : "차순위 추천에서 트레이너가 선택한 프로그램입니다.");
+  };
+
+  const beginManualWorkout = () => {
+    setManualMode(false);
+    setManualPickerOpen(true);
+  };
+  const selectManualFirstExercise = (exercise: typeof catalogOptions[number]) => {
+    setSnapshotSourceProgram(null);
+    setBuilderHistory(createManualWorkoutBuilderHistory(exercise, condition));
+    setManualMode(true);
+    setManualPickerOpen(false);
+    setCurrentStep(4);
+  };
+  const cancelManualWorkout = () => {
+    setManualPickerOpen(false);
+    setManualMode(false);
   };
 
   const addExerciseToBuilder = (candidate: typeof catalogOptions[number]) => {
@@ -418,6 +438,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
     setRecommendation(next);
     setRecommendationTrace(next.trace);
     setRecommendationReason(ruleReason);
+    setManualMode(false);
     setSnapshotSourceProgram(next.program);
     setBuilderHistory(baseHistory);
     setCurrentStep(3);
@@ -612,7 +633,8 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
               ) : null}
               {!recommendation ? <EmptyState title={condition.workoutTarget === "RECOVERY" ? "현재 등록된 회복 프로그램이 없습니다." : "선택한 부위의 프로그램이 없습니다."} description="다른 운동 부위를 선택하거나 처음으로 돌아가 주세요." /> : null}
               {rankedPrograms.filter(({ program }) => program.id !== recommendation?.program.id).length > 0 ? <Stack spacing={1.5}><Box><Typography variant="h2">다른 추천</Typography><Typography color="text.secondary">오늘 선택할 수 있는 차순위 프로그램입니다.</Typography></Box><Grid container spacing={1.5}>{rankedPrograms.filter(({ program }) => program.id !== recommendation?.program.id).slice(0, 2).map(({ candidate: _candidate, program }) => { const rank = (recommendationTrace?.candidatePrograms.findIndex((item) => item.programId === program.id) ?? 0) + 1; const selected = snapshotSourceProgram?.id === program.id; return <Grid item key={program.id} md={6} xs={12}><Card onClick={() => selectProgramForBuilder(program)} sx={{ ...infoCardSx, borderColor: selected ? "primary.main" : "divider", boxShadow: selected ? palette.shadowAccent : "none", cursor: "pointer" }}><CardContent><Stack spacing={1.5}><Stack alignItems="center" direction="row" justifyContent="space-between"><Chip label={`${rank}순위`} size="small" variant="outlined" /><MuscleSilhouette active={selected} area={categoryToBodyArea(program.category)} /></Stack><Typography variant="h2">{program.title}</Typography><Stack direction="row" flexWrap="wrap" gap={1}><Chip label={getCategoryLabel(program.category)} size="small" /><Chip label={getDifficultyLabel(program.difficulty)} size="small" variant="outlined" /><Chip label={`${program.exercises.length}개 운동`} size="small" variant="outlined" /></Stack>{selected ? <Chip color="primary" label="선택됨" /> : null}</Stack></CardContent></Card></Grid>; })}</Grid></Stack> : null}
-              <Button disabled={!snapshotSourceProgram} endIcon={<ArrowForwardIcon />} variant="contained" onClick={() => setCurrentStep(4)} sx={{ alignSelf: "center", fontSize: 18, minHeight: kiosk.primaryActionHeight, minWidth: { sm: 420, xs: "100%" } }}>운동 구성 편집하기</Button>
+              <Stack alignItems="center" spacing={1.5}><Button disabled={!snapshotSourceProgram} endIcon={<ArrowForwardIcon />} variant="contained" onClick={() => setCurrentStep(4)} sx={{ fontSize: 18, minHeight: kiosk.primaryActionHeight, minWidth: { sm: 420, xs: "100%" } }}>운동 구성 편집하기</Button><Button variant="outlined" onClick={beginManualWorkout} sx={{ minHeight: kiosk.standardControlHeight }}>직접 운동 구성하기</Button></Stack>
+              <ExercisePicker disabledExerciseIds={new Set()} errorMessage={catalogState.status === "error" ? catalogState.message : undefined} exercises={catalogOptions} loading={catalogState.status === "loading"} open={manualPickerOpen} onClose={cancelManualWorkout} onSelect={selectManualFirstExercise} />
               <Button endIcon={<ExpandMoreIcon sx={{ transform: showRecommendationBasis ? "rotate(180deg)" : "none", transition: "transform 150ms ease" }} />} variant="text" onClick={() => setShowRecommendationBasis((current) => !current)}>{showRecommendationBasis ? "추천 근거 닫기" : "추천 근거 보기"}</Button>
               <Collapse in={showRecommendationBasis}><RecommendationTraceCard recommendation={recommendation} trace={recommendationTrace} /></Collapse>
             </Stack>
@@ -628,7 +650,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
                   <Typography variant="h1">오늘 할 운동 구성</Typography>
                   <Typography color="text.secondary">오늘의 컨디션에 맞춰 운동 순서와 세트 수를 조정하세요.</Typography>
                 </Stack>
-                <Button startIcon={<ArrowBackIcon />} variant="outlined" onClick={() => setCurrentStep(3)}>다른 프로그램 보기</Button>
+                <Button startIcon={<ArrowBackIcon />} variant="outlined" onClick={() => { setCurrentStep(3); if (manualMode) { setManualMode(false); setBuilderHistory(null); } }}>다른 프로그램 보기</Button>
               </Stack>
               <Card sx={{ ...infoCardSx, height: "auto" }}>
                 <CardContent sx={{ py: 1.5 }}>
@@ -661,7 +683,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
                   />
                 ))}
               </Stack>
-              <Button disabled={!builderState?.exercises.length} endIcon={<ArrowForwardIcon />} variant="contained" onClick={() => setCurrentStep(5)} sx={{ alignSelf: "center", fontSize: 18, minHeight: kiosk.primaryActionHeight, minWidth: { sm: 420, xs: "100%" } }}>이 구성으로 운동하기</Button>
+              <Button disabled={!builderState?.exercises.length || manualMode} endIcon={<ArrowForwardIcon />} variant="contained" onClick={() => setCurrentStep(5)} sx={{ alignSelf: "center", fontSize: 18, minHeight: kiosk.primaryActionHeight, minWidth: { sm: 420, xs: "100%" } }}>{manualMode ? "직접 구성 운동 편집 중" : "이 구성으로 운동하기"}</Button>
               <ExercisePicker disabledExerciseIds={duplicateCatalogIds} errorMessage={catalogState.status === "error" ? catalogState.message : undefined} exercises={catalogOptions} loading={catalogState.status === "loading"} open={addPickerOpen} onClose={() => setAddPickerOpen(false)} onSelect={addExerciseToBuilder} />
             </Stack>
           </CardContent>

@@ -1,0 +1,21 @@
+import assert from "node:assert/strict";
+import { createManualWorkoutBuilderHistory } from "../src/features/printing/services/manualWorkoutBuilderService";
+import { createSnapshotBuilderHistory, evaluateExerciseAdd, snapshotBuilderService } from "../src/features/printing/services/snapshotBuilderService";
+
+const first = { id: "catalog-first", name: "First", displayName: "First" } as never;
+const second = { id: "catalog-second", name: "Second", displayName: "Second" } as never;
+const condition = { condition: "GOOD" as const, sleep: "ENOUGH" as const, alcohol: "NO" as const, targetFatigue: "NORMAL" as const };
+let checks = 0;
+const equal = (actual: unknown, expected: unknown) => { checks += 1; assert.deepEqual(actual, expected); };
+const manual = createManualWorkoutBuilderHistory(first, condition);
+equal(manual.past.length, 0); equal(manual.present.title, "직접 구성 운동"); equal(manual.present.exercises.length, 1);
+equal(Boolean(manual.present.exercises[0].id), true); equal(manual.present.exercises[0].catalogExerciseId, "catalog-first"); equal(manual.present.exercises[0].order, 1); equal(manual.present.exercises[0].plannedSets >= 1 && manual.present.exercises[0].plannedSets <= 5, true);
+equal(evaluateExerciseAdd(manual.present.exercises, first), { allowed: false, reason: "duplicate" });
+let history = snapshotBuilderService.addExercise(manual, second).history;
+equal(history.present.exercises.length, 2); equal(history.present.exercises.map((item) => item.catalogExerciseId), ["catalog-first", "catalog-second"]); assert.notEqual(history.present.exercises[0].id, history.present.exercises[1].id); checks += 1;
+history = snapshotBuilderService.move(history, history.present.exercises[1].id, "up"); equal(history.present.exercises.map((item) => item.catalogExerciseId), ["catalog-second", "catalog-first"]);
+history = snapshotBuilderService.patchExercise(history, history.present.exercises[0].id, { plannedSets: 5, memo: "manual memo" }); equal(history.present.exercises[0].plannedSets, 5); equal(history.present.exercises[0].memo, "manual memo");
+const single = createManualWorkoutBuilderHistory(first, condition); equal(snapshotBuilderService.remove(single, single.present.exercises[0].id).present.exercises.length, 1);
+const program = { id: "program-a", title: "Program", schemaVersion: 1, category: "BACK", difficulty: "GENERAL", memo: "", exercises: [{ id: "program-item", name: "Program Exercise", displayName: "Program Exercise", catalogExerciseId: "catalog-program", order: 1, sets: 3, memo: "" }], createdAt: new Date(), updatedAt: new Date(), usageCount: 0, favorite: false, isArchived: false } as never;
+const programHistory = createSnapshotBuilderHistory(program, condition); equal(programHistory.present.exercises[0].catalogExerciseId, "catalog-program"); equal(programHistory.present.title, "Program");
+console.log(`Manual workout entry checks: PASS (${checks} assertions)`);

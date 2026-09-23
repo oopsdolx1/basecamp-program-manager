@@ -9,7 +9,7 @@ import PrintIcon from "@mui/icons-material/Print";
 import HistoryIcon from "@mui/icons-material/History";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import { Alert, Box, Button, Card, CardActionArea, CardContent, Chip, CircularProgress, Collapse, Grid, LinearProgress, Stack, Typography } from "@mui/material";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { routeBuilder } from "../../../../app/routeBuilder";
 import { EmptyState } from "../../../../components/common/EmptyState";
@@ -284,6 +284,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
   const [builderHistory, setBuilderHistory] = useState<SnapshotBuilderHistory | null>(null);
   const [showRecommendationBasis, setShowRecommendationBasis] = useState(false);
   const [sessionSaving, setSessionSaving] = useState(false);
+  const sessionSubmissionInFlight = useRef(false);
   const [sessionError, setSessionError] = useState("");
   const [addPickerOpen, setAddPickerOpen] = useState(false);
   const [manualPickerOpen, setManualPickerOpen] = useState(false);
@@ -445,43 +446,33 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
   };
 
   const goPrintPreview = async () => {
-    if (!selectedMember || !snapshotSourceProgram || !snapshotValues || sessionSaving) return;
+    if (!selectedMember || !snapshotValues || sessionSaving || sessionSubmissionInFlight.current || (!manualMode && !snapshotSourceProgram)) return;
     const sanitized = sanitizeProgramForm(snapshotValues);
     if (sanitized.exercises.length > 9) {
       setSessionError("운동은 최대 9개까지 가능합니다.");
       return;
     }
+    sessionSubmissionInFlight.current = true;
     setSessionSaving(true);
     setSessionError("");
     try {
-      const sessionProgram = historyToProgram(snapshotSourceProgram, sanitized);
-      const resolved = resolveProgramExerciseKnowledge(sessionProgram);
+      const resolved = manualMode
+        ? new Map((builderState?.exercises ?? []).map((exercise) => [exercise.id, { id: exercise.catalogExerciseId ?? exercise.id, name: exercise.name }]))
+        : resolveProgramExerciseKnowledge(historyToProgram(snapshotSourceProgram!, sanitized));
       const sessionId = await createWorkoutSession({
         appId,
         memberId: selectedMember.memberId,
         memberName: selectedMember.displayName,
-        programId: snapshotSourceProgram.id,
         programTitle: sanitized.title,
+        ...(manualMode ? { source: { type: "manual" as const } } : { programId: snapshotSourceProgram!.id }),
         exercises: mapSessionPrescriptionExercises(builderState?.exercises ?? [], resolved),
       });
-      savePrintSnapshot({
-      workoutSessionId: sessionId,
-      sourceProgramId: snapshotSourceProgram.id,
-      sourceProgramTitle: snapshotSourceProgram.title,
-      recommendationReasons: recommendationReason ? [recommendationReason] : [],
-      aiRecommendation: null,
-      intelligence,
-      metadata: intelligenceMetadata,
-      periodization,
-      recommendationTrace,
-      condition,
-      recentWorkout,
-        formValues: sanitized,
-      });
+      if (!manualMode) savePrintSnapshot({ workoutSessionId: sessionId, sourceProgramId: snapshotSourceProgram!.id, sourceProgramTitle: snapshotSourceProgram!.title, recommendationReasons: recommendationReason ? [recommendationReason] : [], aiRecommendation: null, intelligence, metadata: intelligenceMetadata, periodization, recommendationTrace, condition, recentWorkout, formValues: sanitized });
       navigate(routeBuilder.printPreviewSession(selectedMember.memberId, sessionId, true));
     } catch (caught) {
       setSessionError(caught instanceof Error ? caught.message : "운동 세션을 생성하지 못했습니다.");
     } finally {
+      sessionSubmissionInFlight.current = false;
       setSessionSaving(false);
     }
   };
@@ -683,7 +674,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
                   />
                 ))}
               </Stack>
-              <Button disabled={!builderState?.exercises.length || manualMode} endIcon={<ArrowForwardIcon />} variant="contained" onClick={() => setCurrentStep(5)} sx={{ alignSelf: "center", fontSize: 18, minHeight: kiosk.primaryActionHeight, minWidth: { sm: 420, xs: "100%" } }}>{manualMode ? "직접 구성 운동 편집 중" : "이 구성으로 운동하기"}</Button>
+              <Button disabled={!builderState?.exercises.length} endIcon={<ArrowForwardIcon />} variant="contained" onClick={() => setCurrentStep(5)} sx={{ alignSelf: "center", fontSize: 18, minHeight: kiosk.primaryActionHeight, minWidth: { sm: 420, xs: "100%" } }}>이 구성으로 운동하기</Button>
               <ExercisePicker disabledExerciseIds={duplicateCatalogIds} errorMessage={catalogState.status === "error" ? catalogState.message : undefined} exercises={catalogOptions} loading={catalogState.status === "loading"} open={addPickerOpen} onClose={() => setAddPickerOpen(false)} onSelect={addExerciseToBuilder} />
             </Stack>
           </CardContent>
@@ -705,7 +696,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
               {catalogState.status === "loading" ? <LoadingState message="Exercise Catalog를 불러오는 중입니다." /> : null}
               {catalogState.status === "error" ? <Alert severity="warning">{catalogState.message}</Alert> : null}
               <Grid container spacing={2.5}><Grid item lg={4} xs={12}><Stack spacing={2}><Card sx={infoCardSx}><CardContent><Stack spacing={1.5}><Typography variant="h2">확인 사항</Typography>{(recommendationTrace?.decisionFactors ?? []).filter((factor) => factor.score > 0).slice(0, 4).map((factor) => <Stack key={`${factor.key}-${factor.reason}`} direction="row" spacing={1.25}><CheckCircleIcon color="success" fontSize="small" /><Box><Typography fontWeight={800}>{factorDisplayLabel(factor)}</Typography><Typography color="text.secondary" variant="body2">{factorDisplayReason(factor)}</Typography></Box></Stack>)}</Stack></CardContent></Card><Card sx={infoCardSx}><CardContent><Stack spacing={1.5}><Typography variant="h2">주의 사항</Typography>{(recommendationTrace?.decisionFactors ?? []).filter((factor) => factor.score < 0).slice(0, 3).map((factor) => <Stack key={`${factor.key}-${factor.reason}`} direction="row" spacing={1.25}><WarningAmberIcon color="warning" fontSize="small" /><Box><Typography fontWeight={800}>{factorDisplayLabel(factor)}</Typography><Typography color="text.secondary" variant="body2">{factorDisplayReason(factor)}</Typography></Box></Stack>)}{(recommendationTrace?.decisionFactors ?? []).every((factor) => factor.score >= 0) ? <Typography color="text.secondary">특별한 주의 사항이 없습니다.</Typography> : null}{builderState?.memo ? <Typography color="text.secondary" variant="body2">{builderState.memo}</Typography> : null}</Stack></CardContent></Card></Stack></Grid><Grid item lg={8} xs={12}><Card sx={{ ...infoCardSx, borderColor: "primary.main", borderWidth: 2, boxShadow: palette.shadowAccent }}><CardContent sx={{ p: { md: 3, xs: 2 } }}><Stack spacing={2.5}><Stack direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={2}><Stack direction="row" spacing={1.5}><MuscleSilhouette active area={builderState ? categoryToBodyArea(builderState.category) : "NONE"} /><Box><Chip color="primary" label="BEST" size="small" /><Typography sx={{ fontSize: { md: 28, xs: 22 }, mt: 1 }} variant="h2">{builderState?.title}</Typography><Typography color="text.secondary">{builderState ? getCategoryLabel(builderState.category) : ""} · {builderState ? getDifficultyLabel(builderState.difficulty) : ""}</Typography></Box></Stack><Stack direction="row" flexWrap="wrap" gap={1}><Chip label={`${builderState?.exercises.length ?? 0}개 운동`} /><Chip label={`${builderState?.exercises.reduce((sum, item) => sum + item.plannedSets, 0) ?? 0}세트`} variant="outlined" /></Stack></Stack><Box sx={{ bgcolor: palette.primaryGoldMuted, borderRadius: `${palette.radiusMd}px`, p: 2 }}><Typography color="primary.main" fontWeight={900} variant="caption">추천 포인트</Typography><Typography sx={{ mt: 0.75 }}>{displayRecommendationReason}</Typography></Box><Box sx={{ border: 1, borderColor: "divider", borderRadius: `${palette.radiusMd}px`, overflow: "hidden" }}>{(builderState?.exercises ?? []).map((exercise) => <Box key={exercise.id} sx={{ alignItems: "center", bgcolor: palette.surfaceInteractive, borderTop: exercise.order > 1 ? 1 : 0, borderColor: "divider", display: "grid", gap: 1.5, gridTemplateColumns: { sm: "42px minmax(0, 1fr) auto", xs: "36px minmax(0, 1fr)" }, px: 2, py: 1.5 }}><Typography color="primary.main" fontWeight={900}>{String(exercise.order).padStart(2, "0")}</Typography><Box><Typography fontWeight={900}>{exercise.name}</Typography><Typography color="text.secondary" variant="body2">{exercise.memo || "운동 목표에 맞춰 정확한 자세로 진행하세요."}</Typography></Box><Chip label={`${exercise.plannedSets} SET`} size="small" sx={{ gridColumn: { sm: "auto", xs: "2" } }} variant="outlined" /></Box>)}</Box></Stack></CardContent></Card></Grid></Grid>
-              <Stack direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1.5}><Button startIcon={<ArrowBackIcon />} variant="text" onClick={() => setCurrentStep(4)} sx={{ minHeight: kiosk.standardControlHeight }}>운동 구성 편집하기</Button><Button disabled={!snapshotValidation.valid || !selectedMember || !snapshotSourceProgram || !snapshotValues} endIcon={<ArrowForwardIcon />} startIcon={<PrintIcon />} variant="contained" onClick={goPrintPreview} sx={{ fontSize: 18, minHeight: kiosk.primaryActionHeight, minWidth: 300 }}>이 프로그램으로 진행하기</Button></Stack>
+              <Stack direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1.5}><Button startIcon={<ArrowBackIcon />} variant="text" onClick={() => setCurrentStep(4)} sx={{ minHeight: kiosk.standardControlHeight }}>운동 구성 편집하기</Button><Button disabled={!snapshotValidation.valid || !selectedMember || !snapshotValues || (!manualMode && !snapshotSourceProgram)} endIcon={<ArrowForwardIcon />} startIcon={<PrintIcon />} variant="contained" onClick={goPrintPreview} sx={{ fontSize: 18, minHeight: kiosk.primaryActionHeight, minWidth: 300 }}>{manualMode ? "이 구성으로 진행하기" : "이 프로그램으로 진행하기"}</Button></Stack>
             </Stack>
           </CardContent>
         </Card>

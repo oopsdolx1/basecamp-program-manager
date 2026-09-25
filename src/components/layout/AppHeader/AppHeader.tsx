@@ -1,4 +1,3 @@
-import FitnessCenterIcon from "@mui/icons-material/FitnessCenter";
 import { AppBar, Box, Button, Toolbar, Typography } from "@mui/material";
 import { Link as RouterLink, useLocation } from "react-router-dom";
 import { routeBuilder } from "../../../app/routeBuilder";
@@ -18,40 +17,17 @@ export const AppHeader = (): JSX.Element => {
     <AppBar
       position="sticky"
       sx={{
-        bgcolor: palette.surfaceRaised,
-        backdropFilter: "blur(12px)",
+        bgcolor: "rgba(17, 17, 17, 0.94)",
         borderBottom: `1px solid ${palette.borderStrong}`,
         color: "text.primary",
         flex: "none",
         zIndex: 50,
       }}
     >
-      <Toolbar sx={{ gap: 2, height: 64, maxWidth: 1152, mx: "auto", px: 2, width: "100%" }}>
-        <Box sx={{ alignItems: "center", display: "flex", gap: 1.5, userSelect: "none" }}>
-          <Box
-            sx={{
-              alignItems: "center",
-              background: `linear-gradient(135deg, ${palette.primaryGold} 0%, ${palette.primaryGoldHover} 100%)`,
-              borderRadius: 3,
-              boxShadow: palette.shadowAccent,
-              color: "primary.contrastText",
-              display: "flex",
-              height: 44,
-              justifyContent: "center",
-              transition: "transform 150ms ease, box-shadow 150ms ease",
-              width: 44,
-            }}
-          >
-            <FitnessCenterIcon />
-          </Box>
-          <Box sx={{ display: { sm: "flex", xs: "none" }, flexDirection: "column", lineHeight: 1 }}>
-            <Typography fontSize={22} fontWeight={900} letterSpacing="-0.03em">
-              BASECAMP
-            </Typography>
-            <Typography color="primary.main" fontSize={11} fontWeight={700} letterSpacing="0.28em" mt={0.75} textTransform="uppercase">
-              PROGRAM MANAGER
-            </Typography>
-          </Box>
+      <Toolbar sx={{ gap: 2, height: 52, maxWidth: 1440, mx: "auto", px: { md: 4, xs: 2 }, width: "100%" }}>
+        <Box sx={{ alignItems: "baseline", display: "flex", gap: 1.25, userSelect: "none" }}>
+          <Typography fontSize={16} fontWeight={900} letterSpacing="0.08em">BASECAMP</Typography>
+          <Typography color="text.secondary" fontSize={11} fontWeight={700} letterSpacing="0.12em" sx={{ display: { sm: "block", xs: "none" } }}>PROGRAM MANAGER</Typography>
         </Box>
 
         <Box sx={{ flexGrow: 1 }} />
@@ -70,16 +46,17 @@ export const AppHeader = (): JSX.Element => {
                 to={item.to}
                 variant={active ? "contained" : "text"}
                 sx={{
-                  bgcolor: active ? "primary.main" : "transparent",
-                  border: active ? `1px solid ${palette.borderAccent}` : "1px solid transparent",
-                  color: active ? "primary.contrastText" : "text.secondary",
-                  fontSize: { sm: 14, xs: 13 },
-                  minHeight: 48,
-                  minWidth: { sm: 88, xs: 68 },
-                  px: { sm: 2, xs: 1.25 },
+                  bgcolor: "transparent",
+                  borderBottom: active ? `2px solid ${palette.primaryGold}` : "2px solid transparent",
+                  borderRadius: 0,
+                  color: active ? "text.primary" : "text.secondary",
+                  fontSize: { sm: 13, xs: 12 },
+                  minHeight: 52,
+                  minWidth: { sm: 76, xs: 58 },
+                  px: { sm: 1.25, xs: 0.75 },
                   "&:hover": {
-                    bgcolor: active ? "primary.main" : palette.surface,
-                    color: active ? "primary.contrastText" : "text.primary",
+                    bgcolor: "transparent",
+                    color: "text.primary",
                   },
                 }}
               >

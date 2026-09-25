@@ -23,7 +23,7 @@ const createProgram = (id: string, count: number): Program => ({
     displayName: `${id} Exercise ${index + 1}`,
     catalogExerciseId: `${id}-catalog-${index}`,
     order: index + 1,
-    sets: 3,
+    sets: 1,
     memo: index === 0 ? "preserve this memo" : "",
   })),
 });
@@ -36,6 +36,7 @@ const programABefore = JSON.stringify(programA);
 let history = createSnapshotBuilderHistory(programA, condition);
 assert.equal(history.present.exercises.length, 3, "program selection creates builder exercises");
 assert(history.present.exercises.every((exercise) => exercise.id !== programA.exercises.find((source) => source.order === exercise.order)?.id), "builder exercise IDs are transient");
+assert.deepEqual(history.present.exercises.map((exercise) => exercise.plannedSets), [3, 3, 3], "recommendation preview must use the builder prescription, not the template set defaults");
 
 const originalFirstId = history.present.exercises[0].id;
 const secondId = history.present.exercises[1].id;

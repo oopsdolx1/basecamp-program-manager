@@ -3,8 +3,10 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import PrintIcon from "@mui/icons-material/Print";
 import QrCode2Icon from "@mui/icons-material/QrCode2";
 import { Alert, Box, Stack, Typography } from "@mui/material";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { GlobalWorkerOptions, getDocument } from "pdfjs-dist/build/pdf.mjs";
+import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { routeBuilder } from "../../../app/routeBuilder";
 import { Button, Card, EmptyState, Loading, colors, kiosk, motion, radius, shadows, spacing } from "../../../design-system";
 import { toAppId, toProfileId, toProgramId } from "../../../types/brandedIds";
@@ -20,6 +22,67 @@ import "../styles/print.css";
 const conditionLabAppId = toAppId(import.meta.env.VITE_CONDITION_LAB_APP_ID ?? "");
 const printAgentEndpoint = import.meta.env.VITE_PRINT_AGENT_ENDPOINT ?? "http://127.0.0.1:43127";
 const formatDateTime = (date: Date): string => new Intl.DateTimeFormat("ko-KR", { dateStyle: "short", timeStyle: "short" }).format(date);
+
+GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+
+const PdfCanvasPreview = ({ artifactId, expectedPages, onPageCount }: { artifactId: string; expectedPages: number; onPageCount: (pages: number) => void }): JSX.Element => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageCount, setPageCount] = useState(expectedPages);
+  const [status, setStatus] = useState<"loading" | "fetch-error" | "render-error" | "ready">("loading");
+  const [retryKey, setRetryKey] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    let renderTask: { cancel: () => void; promise: Promise<void> } | null = null;
+    let loadingTask: { destroy: () => Promise<void>; promise: Promise<{ numPages: number; getPage: (pageNumber: number) => Promise<{ cleanup: () => void; getViewport: (options: { scale: number }) => { width: number; height: number }; render: (context: { canvasContext: CanvasRenderingContext2D; viewport: { width: number; height: number }; transform: [number, number, number, number, number, number] }) => { promise: Promise<void>; cancel: () => void } }> }> } | null = null;
+    const render = async (): Promise<void> => {
+      setStatus("loading");
+      try {
+        const response = await fetch(`${printAgentEndpoint}/preview/${artifactId}`);
+        if (!response.ok) throw new Error("artifact_fetch_failed");
+        const contentType = response.headers.get("content-type") ?? "";
+        if (!contentType.includes("application/pdf")) throw new Error("artifact_not_pdf");
+        const bytes = await response.arrayBuffer();
+        if (bytes.byteLength === 0) throw new Error("artifact_empty");
+        loadingTask = getDocument({ data: bytes });
+        const pdf = await loadingTask.promise;
+        if (!active) return;
+        setPageCount(pdf.numPages);
+        onPageCount(pdf.numPages);
+        const page = await pdf.getPage(Math.min(currentPage, pdf.numPages));
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const viewport = page.getViewport({ scale: 1 });
+        const maxWidth = Math.min(canvas.parentElement?.clientWidth ?? 980, 980);
+        const cssWidth = Math.max(1, maxWidth);
+        const cssHeight = cssWidth * (viewport.height / viewport.width);
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        canvas.width = Math.round(cssWidth * dpr);
+        canvas.height = Math.round(cssHeight * dpr);
+        canvas.style.width = `${cssWidth}px`;
+        canvas.style.height = `${cssHeight}px`;
+        const context = canvas.getContext("2d");
+        if (!context) throw new Error("canvas_unavailable");
+        renderTask = page.render({ canvasContext: context, transform: [dpr, 0, 0, dpr, 0, 0], viewport });
+        await renderTask.promise;
+        page.cleanup();
+        if (active) setStatus("ready");
+      } catch (error) {
+        if (!active || (error instanceof Error && error.name === "RenderingCancelledException")) return;
+        setStatus(error instanceof Error && error.message.startsWith("artifact_") ? "fetch-error" : "render-error");
+      }
+    };
+    void render();
+    return () => { active = false; renderTask?.cancel(); void loadingTask?.destroy(); };
+  }, [artifactId, currentPage, onPageCount, retryKey]);
+
+  return <Stack alignItems="center" spacing={`${spacing[2]}px`} sx={{ minHeight: "min(70vh, 760px)", position: "relative", width: "100%" }}>
+    <canvas aria-label={`운동일지 ${currentPage}페이지 미리보기`} ref={canvasRef} style={{ background: "white", display: status === "ready" ? "block" : "none", maxWidth: "100%" }} />
+    {status !== "ready" ? <Stack alignItems="center" justifyContent="center" spacing={`${spacing[2]}px`} sx={{ bgcolor: "white", minHeight: "min(70vh, 760px)", position: "absolute", width: "100%" }}><Typography color="text.primary">{status === "fetch-error" ? "운동일지를 불러오지 못했습니다." : status === "render-error" ? "운동일지 미리보기를 표시하지 못했습니다." : "운동일지를 준비하고 있습니다."}</Typography>{status !== "loading" ? <Button variant="secondary" onClick={() => setRetryKey((current) => current + 1)}>다시 시도</Button> : null}</Stack> : null}
+    {pageCount > 1 ? <Stack alignItems="center" direction="row" spacing={`${spacing[2]}px`}><Button disabled={currentPage === 1} variant="secondary" onClick={() => setCurrentPage((current) => current - 1)}>이전</Button><Typography color={colors.neutral.gray400}>{currentPage} / {pageCount}</Typography><Button disabled={currentPage === pageCount} variant="secondary" onClick={() => setCurrentPage((current) => current + 1)}>다음</Button></Stack> : null}
+  </Stack>;
+};
 
 export const PrintPreviewPage = (): JSX.Element => {
   const { programId, workoutSessionId: routeWorkoutSessionId } = useParams();
@@ -37,6 +100,7 @@ export const PrintPreviewPage = (): JSX.Element => {
   const [pdfPreview, setPdfPreview] = useState<{ artifactId: string; pages: number } | null>(null);
   const [pdfPreviewError, setPdfPreviewError] = useState<string | null>(null);
   const previewStarted = useRef(false);
+  const updatePdfPageCount = useCallback((pages: number) => setPdfPreview((current) => current && current.pages !== pages ? { ...current, pages } : current), []);
   const state = usePrintPreview({
     appId: conditionLabAppId,
     memberId: memberId ? toProfileId(memberId) : null,
@@ -133,14 +197,14 @@ export const PrintPreviewPage = (): JSX.Element => {
 
           <Stack alignItems="center" spacing={`${spacing[2]}px`} textAlign="center"><Box sx={{ alignItems: "center", bgcolor: colors.alpha.goldMuted, border: `1px solid ${colors.primary.gold}`, borderRadius: `${radius.full}px`, color: colors.primary.gold, display: "flex", height: 52, justifyContent: "center", width: 52 }}><PrintIcon /></Box><Box><Typography color={colors.primary.gold} fontWeight={800} variant="overline">4 · 출력</Typography><Typography fontFamily="inherit" fontWeight={800} letterSpacing="-0.02em" lineHeight={1.3} variant="h4">출력 준비 완료</Typography><Typography color={colors.neutral.gray400} sx={{ mt: `${spacing[1]}px` }}>{state.document.member.name} · {state.document.program.title}</Typography></Box></Stack>
 
-          <Box sx={{ display: "grid", gap: `${spacing[3]}px`, gridTemplateColumns: { lg: "minmax(0, 1fr) 360px", xs: "1fr" }, minWidth: 0, "@media (orientation: portrait)": { gridTemplateColumns: "1fr" } }}>
-            <Card sx={{ minWidth: 0, overflow: "hidden", p: `${spacing[3]}px` }}>
+          <Box sx={{ alignItems: "start", display: "grid", gap: { lg: `${spacing[6]}px`, xs: `${spacing[3]}px` }, gridTemplateColumns: { lg: "minmax(0, 1fr) 320px", xs: "1fr" }, minWidth: 0, "@media (orientation: portrait)": { gridTemplateColumns: "1fr" } }}>
+            <Box sx={{ minWidth: 0, overflow: "hidden", py: { md: `${spacing[2]}px`, xs: 0 } }}>
               <Stack alignItems="center" spacing={`${spacing[2]}px`}>
                 <Box sx={{ alignItems: "center", bgcolor: colors.neutral.gray800, border: `1px dashed ${colors.neutral.gray600}`, borderRadius: `${radius.sm}px`, display: "flex", justifyContent: "center", overflow: "auto", p: { md: `${spacing[3]}px`, xs: `${spacing[2]}px` }, width: "100%" }}>
-                  {pdfPreview ? <Box component="object" data={`${printAgentEndpoint}/preview/${pdfPreview.artifactId}`} sx={{ aspectRatio: "210 / 148", bgcolor: "white", display: "block", height: "auto", maxHeight: "calc(100vh - 240px)", maxWidth: "100%", width: "min(100%, 980px)" }} type="application/pdf" /> : <Loading label={pdfPreviewError ? "출력 서비스에 연결할 수 없습니다." : "운동일지를 준비하고 있습니다."} progress={pdfPreviewError ? undefined : 75} />}
+                  {pdfPreview ? <PdfCanvasPreview artifactId={pdfPreview.artifactId} expectedPages={pdfPreview.pages} onPageCount={updatePdfPageCount} /> : <Loading label={pdfPreviewError ? "출력 서비스에 연결할 수 없습니다." : "운동일지를 준비하고 있습니다."} progress={pdfPreviewError ? undefined : 75} />}
                 </Box>
               </Stack>
-            </Card>
+            </Box>
 
             <Card><Stack spacing={`${spacing[3]}px`}><Box><Typography color={colors.primary.gold} fontWeight={800} variant="overline">SESSION INFORMATION</Typography><Typography variant="h6">운동 세션</Typography></Box><Box><Typography color={colors.neutral.gray400} variant="caption">회원</Typography><Typography fontWeight={800}>{state.document.member.name}</Typography></Box><Box><Typography color={colors.neutral.gray400} variant="caption">프로그램</Typography><Typography fontWeight={800}>{state.document.program.title}</Typography></Box><Box><Typography color={colors.neutral.gray400} variant="caption">Session ID</Typography><Typography fontFamily="monospace" fontWeight={800} sx={{ overflowWrap: "anywhere" }}>{state.document.workoutSessionId}</Typography></Box><Stack alignItems="center" spacing={`${spacing[1]}px`} sx={{ bgcolor: colors.neutral.gray800, borderRadius: `${radius.md}px`, p: `${spacing[3]}px` }} textAlign="center"><QrCode2Icon sx={{ color: colors.primary.gold, fontSize: 40 }} /><Typography color={colors.neutral.gray400} variant="body2">운동 기록 입력과 다음 프로그램 추천에 사용하는 QR입니다.</Typography></Stack><Stack direction="row" spacing={`${spacing[1]}px`}><CheckCircleIcon sx={{ color: colors.semantic.success }} /><Typography fontWeight={800}>모든 정보가 정상적으로 준비되었습니다.</Typography></Stack>{history[0] ? <Box><Typography color={colors.neutral.gray400} variant="caption">최근 출력</Typography><Typography fontWeight={800}>Copy {history[0].copy} · {formatDateTime(history[0].printedAt)}</Typography></Box> : null}<Stack spacing={`${spacing[2]}px`}><Button fullWidth variant="secondary" startIcon={<ArrowBackIcon />} onClick={goWorkspace}>프로그램 변경</Button><Button fullWidth variant="secondary" startIcon={<PrintIcon />} disabled={!ready || printRequest.saving || markingPrinted} onClick={() => void requestPrint()}>PDF로 저장</Button><Button fullWidth startIcon={<PrintIcon />} loading={printRequest.saving || markingPrinted} disabled={!ready} onClick={() => void requestPrint()} sx={{ minHeight: 52 }}>출력하기</Button></Stack></Stack></Card>
           </Box>

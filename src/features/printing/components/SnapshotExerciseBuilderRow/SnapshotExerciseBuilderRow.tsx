@@ -60,9 +60,16 @@ export const SnapshotExerciseBuilderRow = memo(function SnapshotExerciseBuilderR
 
   return (
     <Card sx={{ bgcolor: palette.surfaceInteractive, border: 1, borderColor: "divider", boxShadow: "none" }}>
-      <CardContent>
-        <Stack spacing={2}>
-          <Stack alignItems={{ sm: "center", xs: "flex-start" }} direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1}>
+      <CardContent sx={prescription ? { p: { sm: 1.5, xs: 1 } } : undefined}>
+        <Stack spacing={prescription ? 1 : 2}>
+          {prescription ? <Stack alignItems="center" direction="row" spacing={0.5} sx={{ minWidth: 0 }}>
+            <Stack direction="row" spacing={0.25}>
+              <IconButton aria-label={`${exercise.order}번 운동 위로 이동`} disabled={index === 0} onClick={onMoveUp} sx={{ minHeight: 48, minWidth: 48 }}><KeyboardArrowUpIcon /></IconButton>
+              <IconButton aria-label={`${exercise.order}번 운동 아래로 이동`} disabled={index === total - 1} onClick={onMoveDown} sx={{ minHeight: 48, minWidth: 48 }}><KeyboardArrowDownIcon /></IconButton>
+            </Stack>
+            <Typography fontSize={22} fontWeight={900} noWrap sx={{ flex: 1, minWidth: 0 }}>{exercise.displayName || exercise.name}</Typography>
+            <IconButton aria-label={`${exercise.order}번 운동 삭제`} disabled={total <= 1} onClick={onDelete} sx={{ minHeight: 48, minWidth: 48 }}><DeleteIcon /></IconButton>
+          </Stack> : <Stack alignItems={{ sm: "center", xs: "flex-start" }} direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1}>
             <Stack alignItems="center" direction="row" spacing={1}>
               <Typography variant="h2">운동 {exercise.order}</Typography>
               <Chip label={index + 1 === total ? "Last" : `#${index + 1}`} size="small" variant="outlined" />
@@ -71,11 +78,11 @@ export const SnapshotExerciseBuilderRow = memo(function SnapshotExerciseBuilderR
               <IconButton aria-label={`${exercise.order}번 운동 위로 이동`} disabled={index === 0} onClick={onMoveUp} sx={{ minHeight: 48, minWidth: 48 }}><KeyboardArrowUpIcon /></IconButton>
               <IconButton aria-label={`${exercise.order}번 운동 아래로 이동`} disabled={index === total - 1} onClick={onMoveDown} sx={{ minHeight: 48, minWidth: 48 }}><KeyboardArrowDownIcon /></IconButton>
               {!guided ? <IconButton aria-label={`${exercise.order}번 운동 복사`} onClick={onDuplicate} sx={{ minHeight: 48, minWidth: 48 }}><ContentCopyIcon /></IconButton> : null}
-              {!guided || prescription ? <IconButton aria-label={`${exercise.order}번 운동 삭제`} disabled={total <= 1} onClick={onDelete} sx={{ minHeight: 56, minWidth: 56 }}><DeleteIcon /></IconButton> : null}
+              <IconButton aria-label={`${exercise.order}번 운동 삭제`} disabled={total <= 1} onClick={onDelete} sx={{ minHeight: 48, minWidth: 48 }}><DeleteIcon /></IconButton>
             </Stack>
-          </Stack>
+          </Stack>}
 
-          {prescription ? <Typography fontSize={22} fontWeight={900}>{exercise.displayName || exercise.name}</Typography> : <Autocomplete
+          {!prescription ? <Autocomplete
             options={catalogOptions}
             value={selectedOption}
             filterOptions={(options, state) => {
@@ -91,11 +98,11 @@ export const SnapshotExerciseBuilderRow = memo(function SnapshotExerciseBuilderR
               }
             }}
             renderInput={(params) => <TextField {...params} helperText={unavailableName ? `현재 저장값: ${unavailableName} (Shared Runtime에 없음)` : undefined} label="Exercise Replace" />}
-          />}
+          /> : null}
 
           {guided ? (
-            <Stack spacing={1.5}>
-              {prescription ? <Stack alignItems="center" direction="row" spacing={1}><Button aria-label={`${exercise.order}번 운동 세트 줄이기`} disabled={exercise.plannedSets <= 1} variant="outlined" onClick={() => onPatch({ plannedSets: exercise.plannedSets - 1 })} sx={{ fontSize: 28, minHeight: 56, minWidth: 64 }}>−</Button><Typography align="center" color="primary.main" fontSize={22} fontWeight={900} sx={{ minWidth: 92 }}>{exercise.plannedSets}세트</Typography><Button aria-label={`${exercise.order}번 운동 세트 늘리기`} disabled={exercise.plannedSets >= 5} variant="outlined" onClick={() => onPatch({ plannedSets: exercise.plannedSets + 1 })} sx={{ fontSize: 28, minHeight: 56, minWidth: 64 }}>+</Button></Stack> : <Stack direction="row" flexWrap="wrap" gap={1}><Chip label={`${exercise.sets}세트`} /><Chip label={exercise.reps ? `${exercise.reps}회` : "횟수 미지정"} variant="outlined" /><Chip label={`휴식 ${exercise.restSeconds}초`} variant="outlined" /></Stack>}
+            <Stack spacing={prescription ? 0.5 : 1.5}>
+              {prescription ? <Stack alignItems="center" direction="row" justifyContent="flex-end" spacing={0.5}><Button aria-label={`${exercise.order}번 운동 세트 줄이기`} disabled={exercise.plannedSets <= 1} variant="outlined" onClick={() => onPatch({ plannedSets: exercise.plannedSets - 1 })} sx={{ fontSize: 26, minHeight: 48, minWidth: 48 }}>−</Button><Typography align="center" color="primary.main" fontSize={20} fontWeight={900} sx={{ minWidth: 76 }}>{exercise.plannedSets}세트</Typography><Button aria-label={`${exercise.order}번 운동 세트 늘리기`} disabled={exercise.plannedSets >= 5} variant="outlined" onClick={() => onPatch({ plannedSets: exercise.plannedSets + 1 })} sx={{ fontSize: 26, minHeight: 48, minWidth: 48 }}>+</Button></Stack> : <Stack direction="row" flexWrap="wrap" gap={1}><Chip label={`${exercise.sets}세트`} /><Chip label={exercise.reps ? `${exercise.reps}회` : "횟수 미지정"} variant="outlined" /><Chip label={`휴식 ${exercise.restSeconds}초`} variant="outlined" /></Stack>}
               {exercise.memo ? <Typography color="text.secondary" variant="body2">{exercise.memo}</Typography> : null}
             </Stack>
           ) : (

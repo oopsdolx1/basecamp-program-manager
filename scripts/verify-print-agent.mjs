@@ -14,4 +14,8 @@ const first = await post({ jobId: "a", artifact: html(), copies: 2 }); assert.eq
 assert.equal((await post({ jobId: "a", artifact: html(), copies: 2 })).status, 200); assert.equal(calls.length, 1);
 assert.equal((await post({ jobId: "a", artifact: html("B"), copies: 2 })).status, 409); assert.equal((await post({ jobId: "a", artifact: html(), copies: 3 })).status, 409);
 assert.equal((await post({ jobId: "b", artifact: html(), copies: 1 })).status, 200); assert.equal((await post({ jobId: "backend-fail", artifact: html(), copies: 1 })).status, 502); assert.equal(calls.length, 3); assert.equal(cleanups, 3);
+const previewResponse = await fetch("http://127.0.0.1:43128/preview", { method: "POST", headers: { "content-type": "application/json", origin: "https://allowed.example" }, body: JSON.stringify({ jobId: "preview-session", artifact: html("P") }) });
+assert.equal(previewResponse.status, 201); const preview = await previewResponse.json(); assert.match(preview.artifactId, /^[0-9a-f-]{36}$/u);
+assert.equal((await post({ jobId: "preview-print", artifactId: preview.artifactId, copies: 1 })).status, 200); assert.equal(calls.at(-1).pdfPath, "C:\\temp\\preview-session.pdf"); assert.equal(cleanups, 4);
+assert.equal((await post({ jobId: "unknown-preview", artifactId: "00000000-0000-0000-0000-000000000000", copies: 1 })).status, 404);
 await agent.close(); console.log("Windows Print Agent protocol checks: PASS");

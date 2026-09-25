@@ -13,10 +13,12 @@ import { getPrintRequestsByIds } from "../../print-history/services/printRequest
 import { markWorkoutSessionPrinted } from "../../workout-sessions/services/workoutSessionService";
 import { WorkoutPrintTemplateV1 } from "../components/WorkoutPrintTemplateV1/WorkoutPrintTemplateV1";
 import { configuredPrintAdapter } from "../gateways/configuredPrintAdapter";
+import { createRenderedPrintArtifactFactory } from "../gateways/printArtifactFactory";
 import { usePrintPreview } from "../hooks/usePrintPreview";
 import "../styles/print.css";
 
 const conditionLabAppId = toAppId(import.meta.env.VITE_CONDITION_LAB_APP_ID ?? "");
+const printAgentEndpoint = import.meta.env.VITE_PRINT_AGENT_ENDPOINT ?? "http://127.0.0.1:43127";
 const formatDateTime = (date: Date): string => new Intl.DateTimeFormat("ko-KR", { dateStyle: "short", timeStyle: "short" }).format(date);
 
 export const PrintPreviewPage = (): JSX.Element => {
@@ -32,6 +34,9 @@ export const PrintPreviewPage = (): JSX.Element => {
   const [secondsRemaining, setSecondsRemaining] = useState(30);
   const autoPrintStarted = useRef(false);
   const [history, setHistory] = useState<PrintRequestRecord[]>([]);
+  const [pdfPreview, setPdfPreview] = useState<{ artifactId: string; pages: number } | null>(null);
+  const [pdfPreviewError, setPdfPreviewError] = useState<string | null>(null);
+  const previewStarted = useRef(false);
   const state = usePrintPreview({
     appId: conditionLabAppId,
     memberId: memberId ? toProfileId(memberId) : null,
@@ -39,6 +44,20 @@ export const PrintPreviewPage = (): JSX.Element => {
     workoutSessionId,
   });
   const printRequest = useCreatePrintRequest(conditionLabAppId);
+
+  useEffect(() => {
+    if (state.status !== "ready" || previewStarted.current) return;
+    previewStarted.current = true;
+    void (async () => {
+      try {
+        const artifact = await createRenderedPrintArtifactFactory().create({ jobId: workoutSessionId ?? state.document.workoutSessionId, document: state.document });
+        const response = await fetch(`${printAgentEndpoint}/preview`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jobId: workoutSessionId ?? state.document.workoutSessionId, artifact }) });
+        const body = await response.json() as { artifactId?: string; pages?: number; reason?: string };
+        if (!response.ok || !body.artifactId) throw new Error(body.reason ?? "preview_unavailable");
+        setPdfPreview({ artifactId: body.artifactId, pages: body.pages ?? 1 });
+      } catch (error) { setPdfPreviewError(error instanceof Error ? error.message : "출력 서비스에 연결할 수 없습니다."); }
+    })();
+  }, [state, workoutSessionId]);
 
   useEffect(() => {
     if (state.status !== "ready" || state.workoutSession.print.historyIds.length === 0) {
@@ -62,10 +81,10 @@ export const PrintPreviewPage = (): JSX.Element => {
     setMarkingPrinted(true);
     try {
       await markWorkoutSessionPrinted(conditionLabAppId, workoutSessionId, record.id);
-      setCompletedPrints((current) => current + 1);
       setHistory((current) => [record, ...current]);
-      const printResult = await configuredPrintAdapter.print({ jobId: record.id, document: state.document, copies: 1 });
+      const printResult = await configuredPrintAdapter.print({ jobId: record.id, document: state.document, copies: 1, artifactId: completedPrints === 0 ? pdfPreview?.artifactId : undefined });
       if (printResult.status === "failed") setSessionError(printResult.reason ?? "인쇄 요청을 전송하지 못했습니다.");
+      else setCompletedPrints((current) => current + 1);
     } catch (caught) {
       setSessionError(caught instanceof Error ? caught.message : "운동 세션 출력 상태를 저장하지 못했습니다.");
     } finally {
@@ -74,13 +93,13 @@ export const PrintPreviewPage = (): JSX.Element => {
   };
 
   useEffect(() => {
-    if (!autoPrint || state.status !== "ready" || autoPrintStarted.current) return;
+    if (!autoPrint || state.status !== "ready" || !pdfPreview || autoPrintStarted.current) return;
     autoPrintStarted.current = true;
     void requestPrint();
-  }, [autoPrint, state.status]);
+  }, [autoPrint, pdfPreview, state.status]);
 
   useEffect(() => {
-    if (completedPrints === 0) return;
+    if (completedPrints === 0 || markingPrinted || printRequest.saving || sessionError) return;
     setSecondsRemaining(30);
     const intervalId = window.setInterval(() => setSecondsRemaining((current) => Math.max(0, current - 1)), 1_000);
     const timeoutId = window.setTimeout(() => navigate(routeBuilder.print(), { replace: true }), 30_000);
@@ -88,11 +107,11 @@ export const PrintPreviewPage = (): JSX.Element => {
       window.clearInterval(intervalId);
       window.clearTimeout(timeoutId);
     };
-  }, [completedPrints, navigate]);
+  }, [completedPrints, markingPrinted, navigate, printRequest.saving, sessionError]);
   if (state.status === "loading") return <Box sx={{ bgcolor: colors.neutral.black, minHeight: "100vh", p: `${spacing[6]}px` }}><Card><Loading label="A5 가로 미리보기를 준비하고 있습니다." progress={75} /></Card></Box>;
   if (state.status === "error") return <Box sx={{ bgcolor: colors.neutral.black, minHeight: "100vh", p: `${spacing[6]}px` }}><Card><Stack spacing={`${spacing[4]}px`}><EmptyState title="미리보기를 만들 수 없습니다." description={state.message} /><Button variant="secondary" startIcon={<ArrowBackIcon />} onClick={goWorkspace}>프로그램으로 돌아가기</Button></Stack></Card></Box>;
 
-  if (completedPrints > 0) return <Box sx={{ bgcolor: colors.neutral.black, minHeight: "100vh", p: { md: `${spacing[8]}px`, xs: `${spacing[4]}px` } }}><Card sx={{ margin: "0 auto", maxWidth: 760 }}><Stack alignItems="center" spacing={`${spacing[4]}px`} textAlign="center"><CheckCircleIcon sx={{ color: colors.semantic.success, fontSize: 80 }} /><Box><Typography fontSize={{ md: kiosk.pageTitle, xs: 28 }} fontWeight={900}>출력이 완료되었습니다.</Typography><Typography color={colors.neutral.gray400} fontSize={kiosk.secondaryText} sx={{ mt: `${spacing[2]}px` }}>동일한 운동 세션과 QR로 다시 출력할 수 있습니다. {secondsRemaining}초 후 처음 화면으로 돌아갑니다.</Typography></Box><Stack direction={{ sm: "row", xs: "column" }} spacing={`${spacing[2]}px`} sx={{ width: "100%" }}><Button fullWidth startIcon={<PrintIcon />} loading={printRequest.saving || markingPrinted} onClick={() => void requestPrint()} sx={{ minHeight: kiosk.primaryActionHeight }}>다시 출력</Button><Button fullWidth variant="secondary" onClick={goWorkspace} sx={{ minHeight: kiosk.standardControlHeight }}>메인 페이지로 돌아가기</Button></Stack></Stack></Card><Box className="print-only-root" sx={{ display: "none", displayPrint: "block" }}><WorkoutPrintTemplateV1 document={state.document} /></Box></Box>;
+  if (completedPrints > 0) return <Box sx={{ alignItems: "center", bgcolor: colors.neutral.black, display: "flex", justifyContent: "center", minHeight: "100vh", p: { md: `${spacing[8]}px`, xs: `${spacing[4]}px` } }}><Stack alignItems="center" spacing={`${spacing[3]}px`} sx={{ maxWidth: 520, width: "100%" }} textAlign="center"><Typography color={colors.primary.gold} fontWeight={900} letterSpacing="0.12em" variant="overline">BASECAMP</Typography><CheckCircleIcon sx={{ color: colors.semantic.success, fontSize: 56, mt: `${spacing[4]}px` }} /><Box><Typography fontSize={{ md: kiosk.pageTitle, xs: 28 }} fontWeight={900}>출력 요청을 보냈어요</Typography><Typography color={colors.neutral.gray400} sx={{ mt: `${spacing[1]}px` }}>{state.document.member.name} · {state.document.program.title}</Typography><Typography color={colors.neutral.gray400} variant="body2">A5 · {pdfPreview?.pages ?? 1}페이지</Typography></Box>{markingPrinted || printRequest.saving ? <Typography color={colors.neutral.gray400}>다시 출력하고 있습니다.</Typography> : sessionError ? <Typography color="error.main">다시 출력하지 못했습니다. {sessionError}</Typography> : <Typography color={colors.neutral.gray400} variant="body2">{secondsRemaining}초 후 처음 화면으로 돌아갑니다.</Typography>}<Stack spacing={`${spacing[1]}px`} sx={{ mt: `${spacing[2]}px`, width: "100%" }}><Button fullWidth onClick={goWorkspace} sx={{ minHeight: kiosk.primaryActionHeight }}>처음으로 돌아가기</Button><Button fullWidth disabled={markingPrinted || printRequest.saving} loading={markingPrinted || printRequest.saving} variant="secondary" onClick={() => { setSecondsRemaining(30); void requestPrint(); }} sx={{ minHeight: kiosk.standardControlHeight }}>다시 출력</Button></Stack></Stack><Box className="print-only-root" sx={{ display: "none", displayPrint: "block" }}><WorkoutPrintTemplateV1 document={state.document} /></Box></Box>;
 
   if (autoPrint) return <Box sx={{ bgcolor: colors.neutral.black, minHeight: "100vh", p: `${spacing[6]}px` }}><Card sx={{ margin: "0 auto", maxWidth: 760 }}><Loading label={printRequest.error || sessionError || "운동 세션과 QR을 확인하고 인쇄를 요청하고 있습니다."} progress={printRequest.error || sessionError ? undefined : 85} /></Card><Box className="print-only-root" sx={{ display: "none", displayPrint: "block" }}><WorkoutPrintTemplateV1 document={state.document} /></Box></Box>;
   const checklist = [
@@ -103,7 +122,7 @@ export const PrintPreviewPage = (): JSX.Element => {
     ["운동 세션 준비", Boolean(state.workoutSession.sessionId)],
     ["미리보기 생성", Boolean(state.document.rows.length)],
   ] as const;
-  const ready = checklist.every(([, valid]) => valid);
+  const ready = checklist.every(([, valid]) => valid) && Boolean(pdfPreview);
 
   return (
     <Box sx={{ bgcolor: colors.neutral.black, minHeight: "100vh" }}>
@@ -118,7 +137,7 @@ export const PrintPreviewPage = (): JSX.Element => {
             <Card sx={{ minWidth: 0, overflow: "hidden", p: `${spacing[3]}px` }}>
               <Stack alignItems="center" spacing={`${spacing[2]}px`}>
                 <Box sx={{ alignItems: "center", bgcolor: colors.neutral.gray800, border: `1px dashed ${colors.neutral.gray600}`, borderRadius: `${radius.sm}px`, display: "flex", justifyContent: "center", overflow: "auto", p: { md: `${spacing[3]}px`, xs: `${spacing[2]}px` }, width: "100%" }}>
-                  <Box sx={{ boxShadow: shadows.xl, flex: "0 0 auto", maxWidth: "100%", transition: motion.transition }}><WorkoutPrintTemplateV1 document={state.document} /></Box>
+                  {pdfPreview ? <Box component="object" data={`${printAgentEndpoint}/preview/${pdfPreview.artifactId}`} sx={{ aspectRatio: "210 / 148", bgcolor: "white", display: "block", height: "auto", maxHeight: "calc(100vh - 240px)", maxWidth: "100%", width: "min(100%, 980px)" }} type="application/pdf" /> : <Loading label={pdfPreviewError ? "출력 서비스에 연결할 수 없습니다." : "운동일지를 준비하고 있습니다."} progress={pdfPreviewError ? undefined : 75} />}
                 </Box>
               </Stack>
             </Card>

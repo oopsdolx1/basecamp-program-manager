@@ -1,8 +1,9 @@
 import type { PrintAdapter } from "./browserPrintGateway";
 import { browserPrintGateway } from "./browserPrintGateway";
+import { resolvePrintRuntime, type PrintRuntime } from "./printRuntimeResolver";
 import { userGesturePdfPrintAdapter } from "./userGesturePdfPrintAdapter";
 import { createWindowsPrintAdapter } from "./windowsPrintAdapter";
-export type PrintRuntime = "browser" | "browser-user-gesture" | "windows-agent";
+export type { PrintRuntime } from "./printRuntimeResolver";
 export const createConfiguredPrintAdapter = (runtime?: string): PrintAdapter => {
   const selected = runtime || "browser";
   if (selected === "browser") return browserPrintGateway;
@@ -10,4 +11,4 @@ export const createConfiguredPrintAdapter = (runtime?: string): PrintAdapter => 
   if (selected === "windows-agent") return createWindowsPrintAdapter();
   throw new Error(`Unsupported VITE_PRINT_RUNTIME: ${selected}`);
 };
-export const configuredPrintAdapter = createConfiguredPrintAdapter(import.meta.env?.VITE_PRINT_RUNTIME);
+export const configuredPrintAdapter = createConfiguredPrintAdapter(resolvePrintRuntime({ environmentRuntime: import.meta.env?.VITE_PRINT_RUNTIME }));

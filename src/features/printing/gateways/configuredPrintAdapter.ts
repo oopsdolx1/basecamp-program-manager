@@ -11,4 +11,5 @@ export const createConfiguredPrintAdapter = (runtime?: string): PrintAdapter => 
   if (selected === "windows-agent") return createWindowsPrintAdapter();
   throw new Error(`Unsupported VITE_PRINT_RUNTIME: ${selected}`);
 };
-export const configuredPrintAdapter = createConfiguredPrintAdapter(resolvePrintRuntime({ environmentRuntime: import.meta.env?.VITE_PRINT_RUNTIME }));
+export const configuredPrintRuntime = resolvePrintRuntime({ environmentRuntime: import.meta.env?.VITE_PRINT_RUNTIME });
+export const configuredPrintAdapter = createConfiguredPrintAdapter(configuredPrintRuntime);

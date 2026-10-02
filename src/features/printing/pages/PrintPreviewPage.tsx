@@ -1,6 +1,7 @@
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import PrintIcon from "@mui/icons-material/Print";
+import DownloadIcon from "@mui/icons-material/Download";
 import QrCode2Icon from "@mui/icons-material/QrCode2";
 import { Alert, Box, Stack, Typography } from "@mui/material";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -14,11 +15,12 @@ import { useCreatePrintRequest, type PrintRequestRecord } from "../../print-hist
 import { getPrintRequestsByIds } from "../../print-history/services/printRequestService";
 import { markWorkoutSessionPrinted } from "../../workout-sessions/services/workoutSessionService";
 import { WorkoutPrintTemplateV1 } from "../components/WorkoutPrintTemplateV1/WorkoutPrintTemplateV1";
-import { configuredPrintAdapter } from "../gateways/configuredPrintAdapter";
+import { configuredPrintAdapter, configuredPrintRuntime } from "../gateways/configuredPrintAdapter";
 import { createRenderedPrintArtifactFactory } from "../gateways/printArtifactFactory";
 import { createPreparedPdfHandoff, type PreparedPdfHandoff } from "../gateways/preparedPdfHandoff";
 import { isUserGesturePdfPrintAdapter } from "../gateways/userGesturePdfPrintAdapter";
 import { usePrintPreview } from "../hooks/usePrintPreview";
+import { createPrintArtifactPreview, downloadPdfArtifact, fetchVisualPdfPreview, isPrintDispatchReady, type PrintArtifactPreview } from "../services/printPreviewReadiness";
 import "../styles/print.css";
 
 const conditionLabAppId = toAppId(import.meta.env.VITE_CONDITION_LAB_APP_ID ?? "");
@@ -94,10 +96,14 @@ export const PrintPreviewPage = (): JSX.Element => {
   const [secondsRemaining, setSecondsRemaining] = useState(30);
   const autoPrintStarted = useRef(false);
   const [history, setHistory] = useState<PrintRequestRecord[]>([]);
-  const [pdfPreview, setPdfPreview] = useState<({ artifactId: string; pages: number; bytes: Uint8Array } & PreparedPdfHandoff) | null>(null);
-  const [pdfPreviewError, setPdfPreviewError] = useState<string | null>(null);
+  const [printArtifact, setPrintArtifact] = useState<PrintArtifactPreview | null>(null);
+  const [printArtifactError, setPrintArtifactError] = useState<string | null>(null);
+  const [visualPdfPreview, setVisualPdfPreview] = useState<({ bytes: Uint8Array } & PreparedPdfHandoff) | null>(null);
+  const [visualPdfPreviewError, setVisualPdfPreviewError] = useState<string | null>(null);
   const [previewRetryKey, setPreviewRetryKey] = useState(0);
-  const updatePdfPageCount = useCallback((pages: number) => setPdfPreview((current) => current && current.pages !== pages ? { ...current, pages } : current), []);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [pdfSaveInProgress, setPdfSaveInProgress] = useState(false);
+  const updatePdfPageCount = useCallback((pages: number) => setPrintArtifact((current) => current && current.pages !== pages ? { ...current, pages } : current), []);
   const state = usePrintPreview({
     appId: conditionLabAppId,
     memberId: memberId ? toProfileId(memberId) : null,
@@ -105,32 +111,46 @@ export const PrintPreviewPage = (): JSX.Element => {
     workoutSessionId,
   });
   const printRequest = useCreatePrintRequest(conditionLabAppId);
+  const documentWorkoutSessionId = state.status === "ready" ? state.document.workoutSessionId : null;
+  const pdfDownloadName = state.status === "ready" ? state.document.member.name || state.document.workoutSessionId : null;
+  const printArtifactId = printArtifact?.artifactId ?? null;
 
   useEffect(() => {
     if (state.status !== "ready") return;
     let active = true;
-    setPdfPreview(null);
-    setPdfPreviewError(null);
+    setPrintArtifact(null);
+    setPrintArtifactError(null);
+    setVisualPdfPreview(null);
+    setVisualPdfPreviewError(null);
     void (async () => {
       try {
         const artifact = await createRenderedPrintArtifactFactory().create({ jobId: workoutSessionId ?? state.document.workoutSessionId, document: state.document });
-        const response = await fetch(`${printAgentEndpoint}/preview`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jobId: workoutSessionId ?? state.document.workoutSessionId, artifact }) });
-        const body = await response.json() as { artifactId?: string; pages?: number; reason?: string };
-        if (!response.ok || !body.artifactId) throw new Error(body.reason ?? "preview_unavailable");
-        const pdfResponse = await fetch(`${printAgentEndpoint}/preview/${body.artifactId}`);
-        if (!pdfResponse.ok) throw new Error("artifact_fetch_failed");
-        if (!(pdfResponse.headers.get("content-type") ?? "").includes("application/pdf")) throw new Error("artifact_not_pdf");
-        const bytes = await pdfResponse.arrayBuffer();
-        if (bytes.byteLength === 0) throw new Error("artifact_empty");
-        const prepared = createPreparedPdfHandoff(bytes, `basecamp-workout-${state.document.workoutSessionId}.pdf`);
-        if (active) setPdfPreview({ artifactId: body.artifactId, bytes: new Uint8Array(bytes), pages: body.pages ?? 1, ...prepared });
-        else URL.revokeObjectURL(prepared.blobUrl);
-      } catch (error) { if (active) setPdfPreviewError(error instanceof Error ? error.message : "출력 서비스에 연결할 수 없습니다."); }
+        const preview = await createPrintArtifactPreview({ endpoint: printAgentEndpoint, jobId: workoutSessionId ?? state.document.workoutSessionId, artifact });
+        if (active) setPrintArtifact(preview);
+      } catch (error) { if (active) setPrintArtifactError(error instanceof Error ? error.message : "인쇄 artifact를 준비하지 못했습니다."); }
     })();
     return () => { active = false; };
   }, [previewRetryKey, state, workoutSessionId]);
 
-  useEffect(() => () => { if (pdfPreview) URL.revokeObjectURL(pdfPreview.blobUrl); }, [pdfPreview]);
+  useEffect(() => {
+    if (!printArtifactId) return;
+    let active = true;
+    setVisualPdfPreview(null);
+    setVisualPdfPreviewError(null);
+    void (async () => {
+      try {
+        const bytes = await fetchVisualPdfPreview({ endpoint: printAgentEndpoint, artifactId: printArtifactId });
+        const pdfBuffer = new ArrayBuffer(bytes.byteLength);
+        new Uint8Array(pdfBuffer).set(bytes);
+        const prepared = createPreparedPdfHandoff(pdfBuffer, `basecamp-workout-${documentWorkoutSessionId ?? printArtifactId}.pdf`);
+        if (active) setVisualPdfPreview({ bytes, ...prepared });
+        else URL.revokeObjectURL(prepared.blobUrl);
+      } catch (error) { if (active) setVisualPdfPreviewError(error instanceof Error ? error.message : "인쇄용 문서를 준비하지 못했습니다."); }
+    })();
+    return () => { active = false; };
+  }, [documentWorkoutSessionId, printArtifactId]);
+
+  useEffect(() => () => { if (visualPdfPreview) URL.revokeObjectURL(visualPdfPreview.blobUrl); }, [visualPdfPreview]);
 
   useEffect(() => {
     if (state.status !== "ready" || state.workoutSession.print.historyIds.length === 0) {
@@ -146,17 +166,26 @@ export const PrintPreviewPage = (): JSX.Element => {
 
   const goWorkspace = () => navigate(routeBuilder.print());
   const openPreparedPdf = async () => {
-    if (!pdfPreview || !isUserGesturePdfPrintAdapter(configuredPrintAdapter)) return;
-    const result = await configuredPrintAdapter.handoffPdf(pdfPreview, false);
+    if (!visualPdfPreview || !isUserGesturePdfPrintAdapter(configuredPrintAdapter)) return;
+    const result = await configuredPrintAdapter.handoffPdf(visualPdfPreview, false);
     if (result.status === "failed") setSessionError(result.reason ?? "PDF를 열지 못했습니다.");
+  };
+  const savePdf = async () => {
+    if (!printArtifactId || pdfSaveInProgress) return;
+    setDownloadError(null);
+    setPdfSaveInProgress(true);
+    const safe = String(pdfDownloadName ?? printArtifactId).replace(/[\\/:*?"<>|]/g, "_").trim() || printArtifactId;
+    try { await downloadPdfArtifact({ endpoint: printAgentEndpoint, artifactId: printArtifactId, filename: `BaseCamp_${safe}_${new Date().toISOString().slice(0, 10)}.pdf` }); }
+    catch { setDownloadError("PDF를 저장하지 못했습니다. 다시 시도해 주세요."); }
+    finally { setPdfSaveInProgress(false); }
   };
   const requestPrint = async () => {
     if (state.status !== "ready" || printRequest.saving || markingPrinted || !workoutSessionId) return;
     setSessionError(null);
     const userGestureAdapter = isUserGesturePdfPrintAdapter(configuredPrintAdapter) ? configuredPrintAdapter : null;
     if (userGestureAdapter) {
-      if (!pdfPreview) { setSessionError("인쇄용 문서를 준비하지 못했습니다."); return; }
-      const handoff = await userGestureAdapter.handoffPdf(pdfPreview);
+      if (!visualPdfPreview) { setSessionError("인쇄용 문서를 준비하지 못했습니다."); return; }
+      const handoff = await userGestureAdapter.handoffPdf(visualPdfPreview);
       if (handoff.status === "failed") { setSessionError(handoff.reason ?? "PDF를 열지 못했습니다."); return; }
     }
     const nextCopy = Math.max(state.workoutSession.print.copyCount, ...history.map((item) => item.copy), 0) + 1;
@@ -166,7 +195,7 @@ export const PrintPreviewPage = (): JSX.Element => {
     try {
       await markWorkoutSessionPrinted(conditionLabAppId, workoutSessionId, record.id);
       setHistory((current) => [record, ...current]);
-      const printResult = userGestureAdapter ? { status: "submitted" as const } : await configuredPrintAdapter.print({ jobId: record.id, document: state.document, copies: 1, artifactId: completedPrints === 0 ? pdfPreview?.artifactId : undefined });
+      const printResult = userGestureAdapter ? { status: "submitted" as const } : await configuredPrintAdapter.print({ jobId: record.id, document: state.document, copies: 1, artifactId: completedPrints === 0 ? printArtifact?.artifactId : undefined });
       if (printResult.status === "failed") setSessionError(printResult.reason ?? "인쇄 요청을 전송하지 못했습니다.");
       else setCompletedPrints((current) => current + 1);
     } catch (caught) {
@@ -177,10 +206,10 @@ export const PrintPreviewPage = (): JSX.Element => {
   };
 
   useEffect(() => {
-    if (!autoPrint || isUserGesturePdfPrintAdapter(configuredPrintAdapter) || state.status !== "ready" || !pdfPreview || autoPrintStarted.current) return;
+    if (!autoPrint || isUserGesturePdfPrintAdapter(configuredPrintAdapter) || state.status !== "ready" || !isPrintDispatchReady(configuredPrintRuntime, printArtifact, Boolean(visualPdfPreview)) || autoPrintStarted.current) return;
     autoPrintStarted.current = true;
     void requestPrint();
-  }, [autoPrint, pdfPreview, state.status]);
+  }, [autoPrint, printArtifact, state.status, visualPdfPreview]);
 
   useEffect(() => {
     if (completedPrints === 0 || markingPrinted || printRequest.saving || sessionError) return;
@@ -195,9 +224,10 @@ export const PrintPreviewPage = (): JSX.Element => {
   if (state.status === "loading") return <Box sx={{ bgcolor: colors.neutral.black, minHeight: "100vh", p: `${spacing[6]}px` }}><Card><Loading label="A5 가로 미리보기를 준비하고 있습니다." progress={75} /></Card></Box>;
   if (state.status === "error") return <Box sx={{ bgcolor: colors.neutral.black, minHeight: "100vh", p: `${spacing[6]}px` }}><Card><Stack spacing={`${spacing[4]}px`}><EmptyState title="미리보기를 만들 수 없습니다." description={state.message} /><Button variant="secondary" startIcon={<ArrowBackIcon />} onClick={goWorkspace}>프로그램으로 돌아가기</Button></Stack></Card></Box>;
 
-  if (completedPrints > 0) return <Box sx={{ alignItems: "center", bgcolor: colors.neutral.black, display: "flex", justifyContent: "center", minHeight: "100vh", p: { md: `${spacing[8]}px`, xs: `${spacing[4]}px` } }}><Stack alignItems="center" spacing={`${spacing[3]}px`} sx={{ maxWidth: 520, width: "100%" }} textAlign="center"><Typography color={colors.primary.gold} fontWeight={900} letterSpacing="0.12em" variant="overline">BASECAMP</Typography><CheckCircleIcon sx={{ color: colors.semantic.success, fontSize: 56, mt: `${spacing[4]}px` }} /><Box><Typography fontSize={{ md: kiosk.pageTitle, xs: 28 }} fontWeight={900}>출력 요청을 보냈어요</Typography><Typography color={colors.neutral.gray400} sx={{ mt: `${spacing[1]}px` }}>{state.document.member.name} · {state.document.program.title}</Typography><Typography color={colors.neutral.gray400} variant="body2">A5 · {pdfPreview?.pages ?? 1}페이지</Typography></Box>{markingPrinted || printRequest.saving ? <Typography color={colors.neutral.gray400}>다시 출력하고 있습니다.</Typography> : sessionError ? <Typography color="error.main">다시 출력하지 못했습니다. {sessionError}</Typography> : <Typography color={colors.neutral.gray400} variant="body2">{secondsRemaining}초 후 처음 화면으로 돌아갑니다.</Typography>}<Stack spacing={`${spacing[1]}px`} sx={{ mt: `${spacing[2]}px`, width: "100%" }}><Button fullWidth onClick={goWorkspace} sx={{ minHeight: kiosk.primaryActionHeight }}>처음으로 돌아가기</Button><Button fullWidth disabled={markingPrinted || printRequest.saving} loading={markingPrinted || printRequest.saving} variant="secondary" onClick={() => { setSecondsRemaining(30); void requestPrint(); }} sx={{ minHeight: kiosk.standardControlHeight }}>다시 출력</Button></Stack></Stack><Box className="print-only-root" sx={{ display: "none", displayPrint: "block" }}><WorkoutPrintTemplateV1 document={state.document} /></Box></Box>;
+  if (completedPrints > 0) return <Box sx={{ alignItems: "center", bgcolor: colors.neutral.black, display: "flex", justifyContent: "center", minHeight: "100vh", p: { md: `${spacing[8]}px`, xs: `${spacing[4]}px` } }}><Stack alignItems="center" spacing={`${spacing[3]}px`} sx={{ maxWidth: 520, width: "100%" }} textAlign="center"><Typography color={colors.primary.gold} fontWeight={900} letterSpacing="0.12em" variant="overline">BASECAMP</Typography><CheckCircleIcon sx={{ color: colors.semantic.success, fontSize: 56, mt: `${spacing[4]}px` }} /><Box><Typography fontSize={{ md: kiosk.pageTitle, xs: 28 }} fontWeight={900}>출력 요청을 보냈어요</Typography><Typography color={colors.neutral.gray400} sx={{ mt: `${spacing[1]}px` }}>{state.document.member.name} · {state.document.program.title}</Typography><Typography color={colors.neutral.gray400} variant="body2">A5 · {printArtifact?.pages ?? 1}페이지</Typography></Box>{markingPrinted || printRequest.saving ? <Typography color={colors.neutral.gray400}>다시 출력하고 있습니다.</Typography> : sessionError ? <Typography color="error.main">다시 출력하지 못했습니다. {sessionError}</Typography> : <Typography color={colors.neutral.gray400} variant="body2">{secondsRemaining}초 후 처음 화면으로 돌아갑니다.</Typography>}<Stack spacing={`${spacing[1]}px`} sx={{ mt: `${spacing[2]}px`, width: "100%" }}><Button fullWidth variant="secondary" startIcon={<DownloadIcon />} disabled={!printArtifactId || pdfSaveInProgress} onClick={() => void savePdf()}>PDF 저장</Button><Button fullWidth onClick={goWorkspace} sx={{ minHeight: kiosk.primaryActionHeight }}>처음으로 돌아가기</Button><Button fullWidth disabled={markingPrinted || printRequest.saving} loading={markingPrinted || printRequest.saving} variant="secondary" onClick={() => { setSecondsRemaining(30); void requestPrint(); }} sx={{ minHeight: kiosk.standardControlHeight }}>다시 출력</Button></Stack></Stack><Box className="print-only-root" sx={{ display: "none", displayPrint: "block" }}><WorkoutPrintTemplateV1 document={state.document} /></Box></Box>;
 
-  if (autoPrint && !isUserGesturePdfPrintAdapter(configuredPrintAdapter)) return <Box sx={{ bgcolor: colors.neutral.black, minHeight: "100vh", p: `${spacing[6]}px` }}><Card sx={{ margin: "0 auto", maxWidth: 760 }}><Loading label={printRequest.error || sessionError || "운동 세션과 QR을 확인하고 인쇄를 요청하고 있습니다."} progress={printRequest.error || sessionError ? undefined : 85} /></Card><Box className="print-only-root" sx={{ display: "none", displayPrint: "block" }}><WorkoutPrintTemplateV1 document={state.document} /></Box></Box>;
+  if (autoPrint && !isUserGesturePdfPrintAdapter(configuredPrintAdapter) && printArtifactError) return <Box sx={{ bgcolor: colors.neutral.black, minHeight: "100vh", p: `${spacing[6]}px` }}><Card sx={{ margin: "0 auto", maxWidth: 760 }}><Stack spacing={`${spacing[3]}px`}><EmptyState title="인쇄 artifact를 준비하지 못했습니다." description={printArtifactError} /><Button onClick={() => setPreviewRetryKey((current) => current + 1)}>다시 시도</Button><Button variant="secondary" onClick={goWorkspace}>프로그램으로 돌아가기</Button></Stack></Card></Box>;
+  if (autoPrint && !isUserGesturePdfPrintAdapter(configuredPrintAdapter)) return <Box sx={{ bgcolor: colors.neutral.black, minHeight: "100vh", p: `${spacing[6]}px` }}><Card sx={{ margin: "0 auto", maxWidth: 760 }}><Stack spacing={`${spacing[3]}px`}><Loading label={printRequest.error || sessionError || "운동 세션과 QR을 확인하고 인쇄를 요청하고 있습니다."} progress={printRequest.error || sessionError ? undefined : 85} /><Button fullWidth variant="secondary" startIcon={<DownloadIcon />} disabled={!printArtifactId || pdfSaveInProgress} onClick={() => void savePdf()}>PDF 저장</Button>{downloadError ? <Alert severity="error">{downloadError}</Alert> : null}</Stack></Card><Box className="print-only-root" sx={{ display: "none", displayPrint: "block" }}><WorkoutPrintTemplateV1 document={state.document} /></Box></Box>;
   const checklist = [
     ["회원 선택", Boolean(state.member.memberId)],
     ["프로그램 선택", Boolean(state.program.id)],
@@ -206,7 +236,7 @@ export const PrintPreviewPage = (): JSX.Element => {
     ["운동 세션 준비", Boolean(state.workoutSession.sessionId)],
     ["미리보기 생성", Boolean(state.document.rows.length)],
   ] as const;
-  const ready = checklist.every(([, valid]) => valid) && Boolean(pdfPreview);
+  const ready = checklist.every(([, valid]) => valid) && isPrintDispatchReady(configuredPrintRuntime, printArtifact, Boolean(visualPdfPreview));
 
   return (
     <Box sx={{ bgcolor: colors.neutral.black, minHeight: "100vh" }}>
@@ -221,12 +251,12 @@ export const PrintPreviewPage = (): JSX.Element => {
             <Box sx={{ minWidth: 0, overflow: "hidden", py: { md: `${spacing[2]}px`, xs: 0 } }}>
               <Stack alignItems="center" spacing={`${spacing[2]}px`}>
                 <Box sx={{ alignItems: "center", bgcolor: colors.neutral.gray800, border: `1px dashed ${colors.neutral.gray600}`, borderRadius: `${radius.sm}px`, display: "flex", justifyContent: "center", overflow: "auto", p: { md: `${spacing[3]}px`, xs: `${spacing[2]}px` }, width: "100%" }}>
-                  {pdfPreview ? <PdfCanvasPreview pdfBytes={pdfPreview.bytes} expectedPages={pdfPreview.pages} onPageCount={updatePdfPageCount} /> : pdfPreviewError ? <Stack alignItems="center" spacing={`${spacing[2]}px`}><Typography>인쇄용 문서를 준비하지 못했습니다.</Typography><Button variant="secondary" onClick={() => setPreviewRetryKey((current) => current + 1)}>다시 시도</Button></Stack> : <Loading label="운동 기록을 인쇄용으로 준비하고 있습니다." progress={75} />}
+                  {visualPdfPreview && printArtifact ? <PdfCanvasPreview pdfBytes={visualPdfPreview.bytes} expectedPages={printArtifact.pages} onPageCount={updatePdfPageCount} /> : visualPdfPreviewError ? <Stack alignItems="center" spacing={`${spacing[2]}px`}><Typography>인쇄 미리보기를 표시하지 못했습니다.</Typography><Button variant="secondary" onClick={() => setPreviewRetryKey((current) => current + 1)}>다시 시도</Button></Stack> : printArtifactError ? <Stack alignItems="center" spacing={`${spacing[2]}px`}><Typography>인쇄 artifact를 준비하지 못했습니다.</Typography><Button variant="secondary" onClick={() => setPreviewRetryKey((current) => current + 1)}>다시 시도</Button></Stack> : <Loading label="운동 기록을 인쇄용으로 준비하고 있습니다." progress={75} />}
                 </Box>
               </Stack>
             </Box>
 
-            <Card><Stack spacing={`${spacing[3]}px`}><Box><Typography color={colors.primary.gold} fontWeight={800} variant="overline">SESSION INFORMATION</Typography><Typography variant="h6">운동 세션</Typography></Box><Box><Typography color={colors.neutral.gray400} variant="caption">회원</Typography><Typography fontWeight={800}>{state.document.member.name}</Typography></Box><Box><Typography color={colors.neutral.gray400} variant="caption">프로그램</Typography><Typography fontWeight={800}>{state.document.program.title}</Typography></Box><Box><Typography color={colors.neutral.gray400} variant="caption">Session ID</Typography><Typography fontFamily="monospace" fontWeight={800} sx={{ overflowWrap: "anywhere" }}>{state.document.workoutSessionId}</Typography></Box><Stack alignItems="center" spacing={`${spacing[1]}px`} sx={{ bgcolor: colors.neutral.gray800, borderRadius: `${radius.md}px`, p: `${spacing[3]}px` }} textAlign="center"><QrCode2Icon sx={{ color: colors.primary.gold, fontSize: 40 }} /><Typography color={colors.neutral.gray400} variant="body2">운동 기록 입력과 다음 프로그램 추천에 사용하는 QR입니다.</Typography></Stack><Stack direction="row" spacing={`${spacing[1]}px`}><CheckCircleIcon sx={{ color: colors.semantic.success }} /><Typography fontWeight={800}>{isUserGesturePdfPrintAdapter(configuredPrintAdapter) ? "인쇄 준비가 완료되었습니다." : "모든 정보가 정상적으로 준비되었습니다."}</Typography></Stack>{history[0] ? <Box><Typography color={colors.neutral.gray400} variant="caption">최근 출력</Typography><Typography fontWeight={800}>Copy {history[0].copy} · {formatDateTime(history[0].printedAt)}</Typography></Box> : null}<Stack spacing={`${spacing[2]}px`}><Button fullWidth variant="secondary" startIcon={<ArrowBackIcon />} onClick={goWorkspace}>프로그램 변경</Button>{isUserGesturePdfPrintAdapter(configuredPrintAdapter) ? <Button fullWidth variant="secondary" startIcon={<PrintIcon />} disabled={!ready} onClick={() => void openPreparedPdf()}>PDF 열기</Button> : <Button fullWidth variant="secondary" startIcon={<PrintIcon />} disabled={!ready || printRequest.saving || markingPrinted} onClick={() => void requestPrint()}>PDF로 저장</Button>}<Button fullWidth startIcon={<PrintIcon />} loading={printRequest.saving || markingPrinted} disabled={!ready} onClick={() => void requestPrint()} sx={{ minHeight: 52 }}>인쇄하기</Button></Stack></Stack></Card>
+            <Card><Stack spacing={`${spacing[3]}px`}><Box><Typography color={colors.primary.gold} fontWeight={800} variant="overline">SESSION INFORMATION</Typography><Typography variant="h6">운동 세션</Typography></Box><Box><Typography color={colors.neutral.gray400} variant="caption">회원</Typography><Typography fontWeight={800}>{state.document.member.name}</Typography></Box><Box><Typography color={colors.neutral.gray400} variant="caption">프로그램</Typography><Typography fontWeight={800}>{state.document.program.title}</Typography></Box><Box><Typography color={colors.neutral.gray400} variant="caption">Session ID</Typography><Typography fontFamily="monospace" fontWeight={800} sx={{ overflowWrap: "anywhere" }}>{state.document.workoutSessionId}</Typography></Box><Stack alignItems="center" spacing={`${spacing[1]}px`} sx={{ bgcolor: colors.neutral.gray800, borderRadius: `${radius.md}px`, p: `${spacing[3]}px` }} textAlign="center"><QrCode2Icon sx={{ color: colors.primary.gold, fontSize: 40 }} /><Typography color={colors.neutral.gray400} variant="body2">운동 기록 입력과 다음 프로그램 추천에 사용하는 QR입니다.</Typography></Stack><Stack direction="row" spacing={`${spacing[1]}px`}><CheckCircleIcon sx={{ color: colors.semantic.success }} /><Typography fontWeight={800}>{isUserGesturePdfPrintAdapter(configuredPrintAdapter) ? "인쇄 준비가 완료되었습니다." : "모든 정보가 정상적으로 준비되었습니다."}</Typography></Stack>{history[0] ? <Box><Typography color={colors.neutral.gray400} variant="caption">최근 출력</Typography><Typography fontWeight={800}>Copy {history[0].copy} · {formatDateTime(history[0].printedAt)}</Typography></Box> : null}{downloadError ? <Alert severity="error">{downloadError}</Alert> : null}<Stack spacing={`${spacing[2]}px`}><Button fullWidth variant="secondary" startIcon={<ArrowBackIcon />} onClick={goWorkspace}>프로그램 변경</Button><Button fullWidth variant="secondary" startIcon={<DownloadIcon />} disabled={!printArtifactId || pdfSaveInProgress} onClick={() => void savePdf()}>PDF 저장</Button>{isUserGesturePdfPrintAdapter(configuredPrintAdapter) ? <Button fullWidth variant="secondary" startIcon={<PrintIcon />} disabled={!ready} onClick={() => void openPreparedPdf()}>PDF 열기</Button> : null}<Button fullWidth startIcon={<PrintIcon />} loading={printRequest.saving || markingPrinted} disabled={!ready} onClick={() => void requestPrint()} sx={{ minHeight: 52 }}>인쇄하기</Button></Stack></Stack></Card>
           </Box>
         </Stack>
       </Box>

@@ -1,0 +1,66 @@
+import assert from "node:assert/strict";
+import { createPrintArtifactPreview, downloadPdfArtifact, fetchVisualPdfPreview, isPrintDispatchReady } from "../src/features/printing/services/printPreviewReadiness";
+import type { PrintAdapter, PrintRequest } from "../src/features/printing/gateways/browserPrintGateway";
+
+const artifact = { type: "html" as const, content: "<!doctype html><article class=\"a5-workout-document\"></article>" };
+const request = { jobId: "print-1", document: {} as PrintRequest["document"], copies: 1, artifactId: "artifact-1" };
+
+const dispatchIfReady = async (adapter: PrintAdapter, visualPdfReady: boolean, artifactReady: { artifactId: string; pages: number } | null): Promise<boolean> => {
+  if (!isPrintDispatchReady("windows-agent", artifactReady, visualPdfReady)) return false;
+  const result = await adapter.print({ ...request, artifactId: artifactReady?.artifactId });
+  return result.status === "submitted";
+};
+
+const main = async (): Promise<void> => {
+  let calls = 0;
+  const adapter: PrintAdapter = { print: async (value) => { calls += 1; assert.equal(value.artifactId, "artifact-1"); return { status: "submitted" }; } };
+  const postOnly = await createPrintArtifactPreview({ endpoint: "http://agent", jobId: "session-1", artifact, fetchImpl: async (url) => {
+    assert.equal(String(url), "http://agent/preview");
+    return new Response(JSON.stringify({ artifactId: "artifact-1", pages: 1 }), { status: 201 });
+  } });
+  let pendingGetStarted = false;
+  const visualPdfStillPending = fetchVisualPdfPreview({ endpoint: "http://agent", artifactId: postOnly.artifactId, fetchImpl: async () => {
+    pendingGetStarted = true;
+    return await new Promise<Response>(() => undefined);
+  } });
+  await Promise.resolve();
+  assert.equal(pendingGetStarted, true);
+  let autoPrintStarted = false;
+  if (!autoPrintStarted && isPrintDispatchReady("windows-agent", postOnly, false)) {
+    autoPrintStarted = true;
+    assert.equal(await dispatchIfReady(adapter, false, postOnly), true);
+  }
+  assert.equal(calls, 1);
+  // A second effect pass cannot duplicate the same automatic print.
+  void visualPdfStillPending;
+  await assert.rejects(fetchVisualPdfPreview({ endpoint: "http://agent", artifactId: postOnly.artifactId, fetchImpl: async () => { throw new Error("pdf_get_failed"); } }), /pdf_get_failed/);
+  // A user-requested same-session reprint remains a separate deliberate dispatch.
+  assert.equal(await dispatchIfReady(adapter, false, postOnly), true);
+  assert.equal(calls, 2);
+  await assert.rejects(createPrintArtifactPreview({ endpoint: "http://agent", jobId: "session-2", artifact, fetchImpl: async () => new Response(JSON.stringify({ reason: "preview_failed" }), { status: 502 }) }), /preview_failed/);
+  assert.equal(await dispatchIfReady(adapter, false, null), false);
+  assert.equal(calls, 2);
+  assert.equal(isPrintDispatchReady("browser", postOnly, false), false);
+  assert.equal(isPrintDispatchReady("browser", postOnly, true), true);
+  assert.equal(isPrintDispatchReady("windows-agent", postOnly, false), true);
+  assert.equal(isPrintDispatchReady("windows-agent", null, true), false);
+  let downloaded = false;
+  const links: Array<{ download: string; href: string }> = [];
+  const documentImpl = {
+    body: { appendChild: () => undefined },
+    createElement: () => {
+      const link = { download: "", href: "", click: () => { downloaded = true; }, remove: () => undefined };
+      links.push(link);
+      return link;
+    },
+  } as unknown as Document;
+  await downloadPdfArtifact({ endpoint: "http://agent", artifactId: "artifact-1", filename: "BaseCamp_session-1_2026-10-02.pdf", documentImpl, fetchImpl: async (url) => {
+    assert.equal(String(url), "http://agent/preview/artifact-1");
+    return new Response(new Uint8Array([1, 2, 3]), { headers: { "content-type": "application/pdf" } });
+  } });
+  assert.equal(downloaded, true);
+  assert.equal(links[0].download, "BaseCamp_session-1_2026-10-02.pdf");
+  console.log("Print preview readiness checks: PASS (visual PDF failure does not block Windows artifact print; artifact failure blocks dispatch)");
+};
+
+void main().catch((error) => { console.error(error); process.exitCode = 1; });

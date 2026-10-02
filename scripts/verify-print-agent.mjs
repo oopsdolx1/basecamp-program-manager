@@ -5,7 +5,7 @@ const calls = []; let cleanups = 0;
 const agent = createPrintAgent({ port: 43128, allowedOrigins: ["https://allowed.example"], pdfPipeline: { create: async (job) => ({ path: `C:\\temp\\${job.jobId}.pdf`, cleanup: async () => { cleanups += 1; } }) }, backend: { submit: async (job) => { calls.push(job); return job.jobId === "backend-fail" ? { status: "failed", reason: "printer_submission_failed" } : { status: "submitted" }; } } });
 await agent.listen();
 const post = (body, origin = "https://allowed.example") => fetch("http://127.0.0.1:43128/print", { method: "POST", headers: { "content-type": "application/json", origin }, body: JSON.stringify(body) });
-assert.deepEqual(await (await fetch("http://127.0.0.1:43128/health")).json(), { status: "ok" });
+assert.deepEqual(await (await fetch("http://127.0.0.1:43128/health")).json(), { status: "ok", service: "basecamp-print-agent" });
 assert.equal((await post({ jobId: "a", artifact: html() }, "https://blocked.example")).status, 403);
 assert.equal((await post({ jobId: "a", document: {} })).status, 400);
 const external = html(); external.content = external.content.replace("<article", "<img src=\"https://remote.example/a.png\"><article"); assert.equal((await post({ jobId: "external", artifact: external })).status, 400);

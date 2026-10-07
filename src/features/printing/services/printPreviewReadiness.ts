@@ -21,12 +21,20 @@ interface PdfPreviewRequestOptions {
   timeoutMs?: number;
 }
 
-export const downloadPdfArtifact = async ({ endpoint, artifactId, filename, fetchImpl = fetch, documentImpl = document }: PdfPreviewRequestOptions & { filename: string; documentImpl?: Document }): Promise<void> => {
+type ObjectUrlApi = Pick<typeof URL, "createObjectURL" | "revokeObjectURL">;
+
+export const downloadPdfArtifact = async ({ endpoint, artifactId, filename, fetchImpl = fetch, documentImpl = document, objectUrlApi = URL, setTimeoutImpl = globalThis.setTimeout }: PdfPreviewRequestOptions & { filename: string; documentImpl?: Document; objectUrlApi?: ObjectUrlApi; setTimeoutImpl?: typeof setTimeout }): Promise<void> => {
   const bytes = await fetchVisualPdfPreview({ endpoint, artifactId, fetchImpl });
   const buffer = new ArrayBuffer(bytes.byteLength); new Uint8Array(buffer).set(bytes);
-  const url = URL.createObjectURL(new Blob([buffer], { type: "application/pdf" }));
-  try { const link = documentImpl.createElement("a"); link.href = url; link.download = filename; documentImpl.body.appendChild(link); link.click(); link.remove(); }
-  finally { URL.revokeObjectURL(url); }
+  const url = objectUrlApi.createObjectURL(new Blob([buffer], { type: "application/pdf" }));
+  const link = documentImpl.createElement("a");
+  link.href = url;
+  link.download = filename;
+  documentImpl.body.appendChild(link);
+  link.click();
+  link.remove();
+  // Some browsers start the download after the click handler returns.
+  setTimeoutImpl(() => objectUrlApi.revokeObjectURL(url), 1_000);
 };
 
 export const PRINT_PREVIEW_REQUEST_TIMEOUT_MS = 45_000;

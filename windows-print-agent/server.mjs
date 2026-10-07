@@ -50,11 +50,10 @@ export const createPrintAgent = ({ backend, pdfPipeline, port = DEFAULT_PORT, al
         response = result?.status === "submitted" ? { status: "submitted", jobId: payload.jobId } : { status: "failed", jobId: payload.jobId, reason: result?.reason ?? "backend_failed" };
       } catch (error) { response = { status: "failed", jobId: payload.jobId, reason: error instanceof Error ? error.message : "pdf_generation_failed" }; }
       finally {
-        if (preview && response?.status === "submitted") {
-          console.log(`[print] job=${payload.jobId} preview cleanup started`);
-          await disposePreview(payload.artifactId);
-          console.log(`[print] job=${payload.jobId} preview cleanup completed`);
-        } else if (!preview && rendered) await rendered.cleanup().catch(() => undefined);
+        // A preview artifact is also the source for the success-screen PDF download.
+        // Keep it available until its normal TTL expires; inline artifacts are still
+        // one-shot and can be cleaned up as soon as printing finishes.
+        if (!preview && rendered) await rendered.cleanup().catch(() => undefined);
       }
       jobs.set(payload.jobId, { fingerprint, result: response });
       res.once("finish", () => console.log(`[print] job=${payload.jobId} response sent status=${response.status}`));

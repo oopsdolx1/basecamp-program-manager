@@ -58,21 +58,32 @@ const main = async (): Promise<void> => {
   assert.equal(isPrintDispatchReady("windows-agent", postOnly, false), true);
   assert.equal(isPrintDispatchReady("windows-agent", null, true), false);
   let downloaded = false;
+  let appended = false;
+  let revoked = false;
+  let runCleanup: (() => void) | null = null;
   const links: Array<{ download: string; href: string }> = [];
   const documentImpl = {
-    body: { appendChild: () => undefined },
+    body: { appendChild: () => { appended = true; } },
     createElement: () => {
       const link = { download: "", href: "", click: () => { downloaded = true; }, remove: () => undefined };
       links.push(link);
       return link;
     },
   } as unknown as Document;
-  await downloadPdfArtifact({ endpoint: "http://agent", artifactId: "artifact-1", filename: "BaseCamp_session-1_2026-10-02.pdf", documentImpl, fetchImpl: async (url) => {
+  await downloadPdfArtifact({ endpoint: "http://agent", artifactId: "artifact-1", filename: "BaseCamp_session-1_2026-10-02.pdf", documentImpl, objectUrlApi: { createObjectURL: () => "blob:pdf", revokeObjectURL: () => { revoked = true; } }, setTimeoutImpl: (callback) => {
+    runCleanup = callback as () => void;
+    return 0 as ReturnType<typeof setTimeout>;
+  }, fetchImpl: async (url) => {
     assert.equal(String(url), "http://agent/preview/artifact-1");
     return new Response(new Uint8Array([1, 2, 3]), { headers: { "content-type": "application/pdf" } });
   } });
   assert.equal(downloaded, true);
+  assert.equal(appended, true);
   assert.equal(links[0].download, "BaseCamp_session-1_2026-10-02.pdf");
+  assert.equal(revoked, false);
+  assert.ok(runCleanup);
+  runCleanup();
+  assert.equal(revoked, true);
   console.log("Print preview readiness checks: PASS (visual PDF failure does not block Windows artifact print; artifact failure blocks dispatch)");
 };
 

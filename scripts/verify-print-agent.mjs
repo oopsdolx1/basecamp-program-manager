@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createPrintAgent } from "../windows-print-agent/server.mjs";
 const html = (label = "A") => ({ type: "html", content: `<!doctype html><html><style>@page { size: A5 landscape; margin: 0 } .a5-workout-document { width: 210mm; height: 148mm; }</style><body><article class="a5-workout-document">${label.repeat(256)}</article></body></html>` });
 const calls = []; let cleanups = 0;
-const agent = createPrintAgent({ port: 43128, allowedOrigins: ["https://allowed.example"], pdfPipeline: { create: async (job) => ({ path: `C:\\temp\\${job.jobId}.pdf`, cleanup: async () => { cleanups += 1; } }) }, backend: { submit: async (job) => { calls.push(job); return job.jobId === "backend-fail" ? { status: "failed", reason: "printer_submission_failed" } : { status: "submitted" }; } } });
+const tempDir = await mkdtemp(join(tmpdir(), "basecamp-print-agent-"));
+const agent = createPrintAgent({ port: 43128, allowedOrigins: ["https://allowed.example"], pdfPipeline: { create: async (job) => { const path = join(tempDir, `${job.jobId}.pdf`); await writeFile(path, "%PDF-1.4\\nBaseCamp A5 workout log\\n%%EOF"); return { path, cleanup: async () => { cleanups += 1; await rm(path, { force: true }); } }; } }, backend: { submit: async (job) => { calls.push(job); return job.jobId === "backend-fail" ? { status: "failed", reason: "printer_submission_failed" } : { status: "submitted" }; } } });
 await agent.listen();
 const post = (body, origin = "https://allowed.example") => fetch("http://127.0.0.1:43128/print", { method: "POST", headers: { "content-type": "application/json", origin }, body: JSON.stringify(body) });
 assert.deepEqual(await (await fetch("http://127.0.0.1:43128/health")).json(), { status: "ok", service: "basecamp-print-agent" });
@@ -16,6 +20,8 @@ assert.equal((await post({ jobId: "a", artifact: html("B"), copies: 2 })).status
 assert.equal((await post({ jobId: "b", artifact: html(), copies: 1 })).status, 200); assert.equal((await post({ jobId: "backend-fail", artifact: html(), copies: 1 })).status, 502); assert.equal(calls.length, 3); assert.equal(cleanups, 3);
 const previewResponse = await fetch("http://127.0.0.1:43128/preview", { method: "POST", headers: { "content-type": "application/json", origin: "https://allowed.example" }, body: JSON.stringify({ jobId: "preview-session", artifact: html("P") }) });
 assert.equal(previewResponse.status, 201); const preview = await previewResponse.json(); assert.match(preview.artifactId, /^[0-9a-f-]{36}$/u);
-assert.equal((await post({ jobId: "preview-print", artifactId: preview.artifactId, copies: 1 })).status, 200); assert.equal(calls.at(-1).pdfPath, "C:\\temp\\preview-session.pdf"); assert.equal(cleanups, 4);
+assert.equal((await post({ jobId: "preview-print", artifactId: preview.artifactId, copies: 1 })).status, 200); assert.equal(calls.at(-1).pdfPath, join(tempDir, "preview-session.pdf")); assert.equal(cleanups, 3);
+const previewGet = await fetch(`http://127.0.0.1:43128/preview/${preview.artifactId}`, { headers: { origin: "https://allowed.example" } });
+assert.equal(previewGet.status, 200); assert.match(previewGet.headers.get("content-type") ?? "", /^application\/pdf\b/u); assert.ok((await previewGet.arrayBuffer()).byteLength > 0);
 assert.equal((await post({ jobId: "unknown-preview", artifactId: "00000000-0000-0000-0000-000000000000", copies: 1 })).status, 404);
-await agent.close(); console.log("Windows Print Agent protocol checks: PASS");
+await agent.close(); assert.equal(cleanups, 4); await rm(tempDir, { recursive: true, force: true }); console.log("Windows Print Agent protocol checks: PASS");

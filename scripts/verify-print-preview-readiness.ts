@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { createPrintArtifactPreview, downloadPdfArtifact, fetchVisualPdfPreview, isPrintDispatchReady } from "../src/features/printing/services/printPreviewReadiness";
 import type { PrintAdapter, PrintRequest } from "../src/features/printing/gateways/browserPrintGateway";
 
@@ -12,6 +13,18 @@ const dispatchIfReady = async (adapter: PrintAdapter, visualPdfReady: boolean, a
 };
 
 const main = async (): Promise<void> => {
+  const page = readFileSync("src/features/printing/pages/PrintPreviewPage.tsx", "utf8");
+  const factory = readFileSync("src/features/printing/gateways/printArtifactFactory.ts", "utf8");
+  const css = readFileSync("src/features/printing/styles/print.css", "utf8");
+  assert.equal(page.includes("const PrintSourceDocument"), true);
+  assert.equal(page.match(/<PrintSourceDocument document=\{state\.document\} \/>/g)?.length, 4);
+  assert.equal(page.includes("isRenderedPrintDocumentReady(artifactRequest)"), true);
+  assert.equal(factory.includes("element.isConnected"), true);
+  assert.equal(factory.includes("bounds.width > 0 && bounds.height > 0"), true);
+  assert.equal(css.includes(".print-source-root"), true);
+  assert.equal(css.includes("left: -100000px"), true);
+  assert.equal(css.includes(".print-source-root {\n  display: none"), false);
+
   let calls = 0;
   const adapter: PrintAdapter = { print: async (value) => { calls += 1; assert.equal(value.artifactId, "artifact-1"); return { status: "submitted" }; } };
   const postOnly = await createPrintArtifactPreview({ endpoint: "http://agent", jobId: "session-1", artifact, fetchImpl: async (url) => {

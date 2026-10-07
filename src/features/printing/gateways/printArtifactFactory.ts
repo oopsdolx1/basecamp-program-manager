@@ -4,10 +4,18 @@ export interface HtmlPrintArtifact { type: "html"; content: string; }
 export interface PrintArtifactFactory { create: (request: PrintRequest) => Promise<HtmlPrintArtifact>; }
 export interface PrintArtifactFactoryOptions { getMarkup?: (request: PrintRequest) => string; getPrintCss?: () => string; }
 
+export const isRenderedPrintDocumentReady = (request: PrintRequest): boolean => {
+  const element = document.querySelector<HTMLElement>(".print-only-root .a5-workout-document");
+  if (!element || !element.isConnected || !element.textContent?.includes(request.document.workoutSessionId)) return false;
+  if (element.querySelectorAll(".exercise-row").length !== request.document.rows.length) return false;
+  const bounds = element.getBoundingClientRect();
+  const style = window.getComputedStyle(element);
+  return bounds.width > 0 && bounds.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+};
+
 const readRenderedMarkup = (request: PrintRequest): string => {
   const element = document.querySelector<HTMLElement>(".print-only-root .a5-workout-document");
-  if (!element || !element.textContent?.includes(request.document.workoutSessionId)) throw new Error("print_dom_unavailable");
-  if (element.querySelectorAll(".exercise-row").length !== request.document.rows.length) throw new Error("print_dom_mismatch");
+  if (!isRenderedPrintDocumentReady(request) || !element) throw new Error("print_dom_unavailable");
   return element.outerHTML;
 };
 

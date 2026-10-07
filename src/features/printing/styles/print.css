@@ -59,6 +59,14 @@
     width: 210mm;
   }
 
+  .print-source-root {
+    left: 0;
+    opacity: 1;
+    pointer-events: auto;
+    position: absolute;
+    top: 0;
+  }
+
   .no-print {
     display: none !important;
   }
@@ -68,6 +76,18 @@
     margin: 0;
     transform: none;
   }
+}
+
+/* Keep the artifact source mounted and laid out while the kiosk UI changes state. */
+.print-source-root {
+  height: 148mm;
+  left: -100000px;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  position: fixed;
+  top: 0;
+  width: 210mm;
 }
 
 .a5-workout-document {

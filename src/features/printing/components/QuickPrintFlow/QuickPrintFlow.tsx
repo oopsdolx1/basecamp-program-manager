@@ -470,6 +470,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
         memberId: selectedMember.memberId,
         memberName: selectedMember.displayName,
         programTitle: sanitized.title,
+        category: manualMode ? condition.workoutTarget ?? sanitized.category : sanitized.category,
         ...(manualMode ? { source: { type: "manual" as const } } : { programId: snapshotSourceProgram!.id }),
         exercises: mapSessionPrescriptionExercises(builderState?.exercises ?? [], resolved),
       });

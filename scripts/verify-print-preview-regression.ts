@@ -59,6 +59,7 @@ const run = async (): Promise<void> => {
     memberName: "Regression Member",
     programId: sourceProgramId,
     programTitle: "Edited Back Day",
+    category: "BACK",
     exercises: prescriptionExercises,
   }, "trainer-1", "ws-regression");
   const session = { ...persisted, createdAt: new Date(), updatedAt: new Date(), printedAt: null, lastPrintedAt: null } satisfies WorkoutSessionRecord;
@@ -87,9 +88,21 @@ const run = async (): Promise<void> => {
   const document = createWorkoutPrintDocument({ member, program: authoritativeProgram, workoutSessionId: session.sessionId, printDate: new Date("2026-09-21T00:00:00Z") });
   assert.equal(document.workoutSessionId, "ws-regression");
   assert.equal(document.member.name, "Regression Member");
+  assert.equal(document.program.category, "BACK");
+  assert.equal(document.program.categoryLabel, "등");
   assert.deepEqual(document.program.exercises.map((exercise) => exercise.name), ["Cable Row", "Face Pull", "Lat Pulldown"]);
   assert.deepEqual(document.program.exercises.map((exercise) => exercise.configuredSets), [5, 2, 4]);
   assert.deepEqual(document.program.exercises.map((exercise) => exercise.memo), ["Tempo", "Added cue", "Pause"]);
+  const categoryLabels = new Map([ ["LOWER_BODY", "하체"], ["BACK", "등"], ["CHEST", "가슴"], ["FULL_BODY", "전신"] ]);
+  for (const [category, label] of categoryLabels) {
+    const categorized = { ...session, programSnapshot: { ...session.programSnapshot, category: category as Program["category"] }, prescription: { ...session.prescription!, category: category as Program["category"] } };
+    const printed = createWorkoutPrintDocument({ member, program: await resolvePrintPreviewSource(categorized, async () => { throw new Error("unexpected legacy lookup"); }), workoutSessionId: categorized.sessionId });
+    assert.equal(printed.program.categoryLabel, label);
+  }
+  const manualWithTarget = { ...session, source: { type: "manual" as const }, programId: undefined, programSnapshot: { ...session.programSnapshot, category: "SHOULDER" as const }, prescription: { ...session.prescription!, source: { type: "manual" as const }, sourceProgramId: undefined, category: "SHOULDER" as const } };
+  assert.equal((await resolvePrintPreviewSource(manualWithTarget, async () => { throw new Error("unexpected legacy lookup"); })).category, "SHOULDER");
+  const manualWithoutTarget = { ...manualWithTarget, programSnapshot: { title: manualWithTarget.programSnapshot.title }, prescription: { ...manualWithTarget.prescription!, category: undefined } };
+  assert.equal((await resolvePrintPreviewSource(manualWithoutTarget, async () => { throw new Error("unexpected legacy lookup"); })).category, "CUSTOM");
 
   const legacySession = { ...session, prescription: undefined };
   assert.throws(() => assertPrintPreviewSessionContext(legacySession, "member-1", snapshotRouteProgramId), /프로그램/);

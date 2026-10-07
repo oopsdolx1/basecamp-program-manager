@@ -3,9 +3,12 @@ import { getFirestoreClient } from "../../../firebase/firestoreClient";
 import { workoutSessionsCollectionPath } from "../../../firebase/firestorePaths";
 import type { AppId } from "../../../types/brandedIds";
 import type { WorkoutSessionRecord } from "../domain/workoutSession.types";
+import type { ProgramCategory } from "../../programs/types/program.types";
 
 const asDate = (value: unknown): Date => value instanceof Timestamp ? value.toDate() : new Date(0);
 const statuses = new Set(["created", "printed", "ocr_pending", "ocr_completed", "ai_completed", "confirmed"]);
+const categories = new Set<ProgramCategory>(["FULL_BODY", "CHEST", "BACK", "LOWER_BODY", "SHOULDER", "ARMS", "RECOVERY", "ETC", "CUSTOM"]);
+const categoryOf = (value: unknown): ProgramCategory | undefined => typeof value === "string" && categories.has(value as ProgramCategory) ? value as ProgramCategory : undefined;
 
 const mapRecord = (id: string, data: DocumentData): WorkoutSessionRecord => ({
   sessionId: id,
@@ -16,9 +19,9 @@ const mapRecord = (id: string, data: DocumentData): WorkoutSessionRecord => ({
   status: statuses.has(data.status) ? data.status : data.status === "preview" ? "created" : "created",
   exerciseIds: Array.isArray(data.exerciseIds) ? data.exerciseIds.map(String) : [],
   memberSnapshot: data.memberSnapshot,
-  programSnapshot: data.programSnapshot,
+  programSnapshot: { title: String(data.programSnapshot?.title ?? ""), ...(categoryOf(data.programSnapshot?.category) ? { category: categoryOf(data.programSnapshot?.category) } : {}) },
   exercises: Array.isArray(data.exercises) ? data.exercises : [],
-  prescription: data.prescription && Array.isArray(data.prescription.exercises) ? { sourceProgramId: String(data.prescription.sourceProgramId), sourceProgramName: String(data.prescription.sourceProgramName), exercises: data.prescription.exercises } : undefined,
+  prescription: data.prescription && Array.isArray(data.prescription.exercises) ? { source: data.prescription.source, sourceProgramId: String(data.prescription.sourceProgramId), sourceProgramName: String(data.prescription.sourceProgramName), ...(categoryOf(data.prescription.category) ? { category: categoryOf(data.prescription.category) } : {}), exercises: data.prescription.exercises } : undefined,
   print: {
     format: "A5-landscape",
     templateKey: "basecamp-workout-log-v1",

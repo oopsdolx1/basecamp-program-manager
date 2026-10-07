@@ -1,4 +1,5 @@
 import type { AppId } from "../../../types/brandedIds";
+import type { ProgramCategory } from "../../programs/types/program.types";
 
 export type WorkoutSessionStatus =
   | "created"
@@ -29,9 +30,9 @@ export interface WorkoutSessionRecord {
   status: WorkoutSessionStatus;
   exerciseIds: string[];
   memberSnapshot: { name: string };
-  programSnapshot: { title: string };
+  programSnapshot: { title: string; category?: ProgramCategory };
   exercises: WorkoutSessionExerciseSnapshot[];
-  prescription?: { source?: WorkoutSource; sourceProgramId?: string; sourceProgramName: string; exercises: WorkoutSessionExerciseSnapshot[] };
+  prescription?: { source?: WorkoutSource; sourceProgramId?: string; sourceProgramName: string; category?: ProgramCategory; exercises: WorkoutSessionExerciseSnapshot[] };
   print: {
     format: "A5-portrait" | "A5-landscape";
     templateKey: "basecamp-workout-log-v1";
@@ -53,5 +54,6 @@ export interface CreateWorkoutSessionInput {
   programId?: string;
   source?: WorkoutSource;
   programTitle: string;
+  category?: ProgramCategory;
   exercises: WorkoutSessionExerciseSnapshot[];
 }

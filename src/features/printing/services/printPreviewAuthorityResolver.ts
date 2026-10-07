@@ -21,7 +21,8 @@ export const programFromSessionPrescription = (session: WorkoutSessionRecord): P
   if (!prescription) throw new Error("Prescription이 없습니다.");
   const source = normalizeWorkoutSource(session);
   const transientId = source.type === "program" ? source.programId : session.sessionId;
-  return { id: transientId as ProgramId, title: prescription.sourceProgramName, schemaVersion: 1, category: "CUSTOM", difficulty: "GENERAL", memo: "", exercises: prescription.exercises.map((exercise, index) => ({ id: exercise.programExerciseId, name: exercise.name, displayName: exercise.name, catalogExerciseId: exercise.exerciseId, order: exercise.order ?? index + 1, sets: exercise.plannedSets ?? 1, memo: exercise.memo })).sort((a, b) => a.order - b.order), createdAt: new Date(), updatedAt: new Date(), usageCount: 0, favorite: false, isArchived: false };
+  const category = session.programSnapshot.category ?? prescription.category ?? "CUSTOM";
+  return { id: transientId as ProgramId, title: prescription.sourceProgramName, schemaVersion: 1, category, difficulty: "GENERAL", memo: "", exercises: prescription.exercises.map((exercise, index) => ({ id: exercise.programExerciseId, name: exercise.name, displayName: exercise.name, catalogExerciseId: exercise.exerciseId, order: exercise.order ?? index + 1, sets: exercise.plannedSets ?? 1, memo: exercise.memo })).sort((a, b) => a.order - b.order), createdAt: new Date(), updatedAt: new Date(), usageCount: 0, favorite: false, isArchived: false };
 };
 
 export const resolvePrintPreviewSource = async (session: WorkoutSessionRecord, resolveLegacyProgram: () => Promise<Program>): Promise<Program> =>

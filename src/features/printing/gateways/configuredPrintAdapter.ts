@@ -11,5 +11,10 @@ export const createConfiguredPrintAdapter = (runtime?: string): PrintAdapter => 
   if (selected === "windows-agent") return createWindowsPrintAdapter();
   throw new Error(`Unsupported VITE_PRINT_RUNTIME: ${selected}`);
 };
+// Preview artifacts only exist on the Windows agent. A browser runtime can still
+// produce one while previewing, so route that artifact back to its owning agent
+// instead of asking the browser gateway to reject it.
+export const createArtifactPrintAdapter = (runtime: PrintRuntime, hasArtifact: boolean): PrintAdapter =>
+  runtime === "browser" && hasArtifact ? createWindowsPrintAdapter() : createConfiguredPrintAdapter(runtime);
 export const configuredPrintRuntime = resolvePrintRuntime({ environmentRuntime: import.meta.env?.VITE_PRINT_RUNTIME });
 export const configuredPrintAdapter = createConfiguredPrintAdapter(configuredPrintRuntime);

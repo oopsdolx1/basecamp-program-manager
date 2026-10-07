@@ -83,7 +83,9 @@ const targetFatigueOptions: Array<{ value: TargetFatigue; label: string; descrip
   { value: "HIGH", label: "높음", description: "강도 조절이 필요한 상태", stress: 5 },
 ];
 const defaultCondition: ConditionInput = { condition: null, sleep: null, workoutTarget: null, targetFatigue: null, fatigueAreas: [], stress: 3, alcohol: null };
-const centeredCardSx = (maxWidth: number) => ({ maxWidth, mx: "auto", width: "100%" });
+// The workflow steps deliberately use different readable widths. Keep those widths,
+// but center every bounded step within the full PageContainer on desktop.
+const centeredWorkflowSx = (maxWidth: number) => ({ marginInline: "auto", maxWidth, width: "100%" });
 const largeChoiceCardSx = (active: boolean) => ({
   bgcolor: active ? palette.primaryGoldMuted : palette.surfaceInteractive,
   border: 1,
@@ -488,13 +490,13 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
     return <Box sx={{ alignItems: "center", display: "flex", justifyContent: "center", minHeight: "calc(100vh - 48px)", py: 3, width: "100%" }}><Stack alignItems="center" spacing={{ md: 5, xs: 3.5 }} sx={{ maxWidth: 860, width: "100%" }} textAlign="center"><Stack alignItems="center" spacing={1.5}><Box sx={{ alignItems: "center", bgcolor: palette.primaryGoldMuted, border: 1, borderColor: "primary.main", borderRadius: 999, boxShadow: palette.shadowAccent, display: "flex", height: 72, justifyContent: "center", width: 72 }}><FitnessCenterIcon color="primary" sx={{ fontSize: 38 }} /></Box><Box><Typography color="primary.main" fontWeight={900} letterSpacing={2} variant="overline">BASECAMP</Typography><Typography color="text.secondary" fontWeight={800} letterSpacing={4} variant="caption">PROGRAM STATION</Typography></Box></Stack><Box><Typography sx={{ fontSize: { md: 44, sm: 38, xs: 32 }, fontWeight: 900, letterSpacing: -1.2, lineHeight: 1.2 }}>안녕하세요!</Typography><Typography color="text.secondary" sx={{ fontSize: { md: 19, xs: 16 }, mt: 1.5 }}>오늘의 운동 프로그램을 확인하고 출력하세요.</Typography></Box><Grid container spacing={2} sx={{ width: "100%" }}><Grid item sm={6} xs={12}><CardActionArea onClick={() => setStarted(true)} sx={{ bgcolor: palette.primaryGoldMuted, border: 1, borderColor: "primary.main", borderRadius: `${palette.radiusMd}px`, boxShadow: palette.shadowAccent, minHeight: 176, p: 3, transition: "transform 150ms ease, box-shadow 150ms ease", "&:hover": { boxShadow: palette.shadowAccentStrong, transform: "translateY(-3px)" } }}><Stack alignItems="center" spacing={1.5}><FitnessCenterIcon color="primary" sx={{ fontSize: 42 }} /><Typography variant="h2">프로그램 시작</Typography><Typography color="text.secondary" variant="body2">회원 컨디션에 맞는 프로그램을 추천받습니다.</Typography></Stack></CardActionArea></Grid><Grid item sm={6} xs={12}><CardActionArea onClick={() => navigate(routeBuilder.master("history"))} sx={{ bgcolor: palette.surfaceRaised, border: 1, borderColor: "divider", borderRadius: `${palette.radiusMd}px`, minHeight: 176, p: 3, transition: "transform 150ms ease, border-color 150ms ease", "&:hover": { borderColor: "primary.main", transform: "translateY(-3px)" } }}><Stack alignItems="center" spacing={1.5}><HistoryIcon color="primary" sx={{ fontSize: 42 }} /><Typography variant="h2">출력 내역</Typography><Typography color="text.secondary" variant="body2">이전 Workout Session과 출력 기록을 확인합니다.</Typography></Stack></CardActionArea></Grid></Grid></Stack></Box>;
   }
   return (
-    <Stack spacing={{ md: 4, xs: 3 }} sx={{ maxWidth: 1360, mx: "auto", pb: 6, width: "100%" }}>
+    <Stack alignItems="center" spacing={{ md: 4, xs: 3 }} sx={{ ...centeredWorkflowSx(1360), pb: 6 }}>
       <StepIndicator currentStep={currentStep} />
       {sessionError ? <Alert severity="error" sx={{ maxWidth: 1180, width: "100%" }}>{sessionError}</Alert> : null}
       {sessionSaving ? <Alert icon={<CircularProgress size={20} />} severity="info" sx={{ maxWidth: 1180, width: "100%" }}>운동 세션을 저장하고 있습니다.</Alert> : null}
 
       {currentStep === 1 ? (
-        <Box sx={{ maxWidth: 1040, mx: "auto", width: "100%" }}>
+        <Box sx={centeredWorkflowSx(1040)}>
               <Stack spacing={{ md: 4, xs: 3 }}>
                <Stack spacing={0.75} sx={{ borderLeft: 3, borderColor: "primary.main", pl: 2.5 }}>
                  <Typography color="primary.main" fontWeight={800} variant="overline">MANUAL MEMBER LOOKUP</Typography>
@@ -558,7 +560,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
       ) : null}
 
       {currentStep === 2 ? (
-        <Box sx={{ maxWidth: 1280, mx: "auto", width: "100%" }}>
+        <Box sx={centeredWorkflowSx(1280)}>
           <Box sx={{ p: { md: 3, xs: 0 } }}>
             <Stack spacing={0} sx={{ display: "grid", gap: { lg: 3, xs: 2.25 }, gridTemplateColumns: { lg: "minmax(0, 1.25fr) minmax(360px, 0.75fr)", xs: "1fr" }, "& > :nth-of-type(1)": { gridColumn: { lg: "1 / -1", xs: "auto" } }, "& > :nth-of-type(2)": { alignSelf: "start", gridColumn: { lg: "1", xs: "auto" }, gridRow: { lg: "2 / span 6", xs: "auto" }, pr: { lg: 4, xs: 0 } }, "& > :nth-of-type(n + 3)": { gridColumn: { lg: "2", xs: "auto" } } }}>
               <Stack direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1.5}>
@@ -596,7 +598,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
       ) : null}
 
       {currentStep === 3 ? (
-        <Box sx={{ maxWidth: 1180, mx: "auto", px: { md: 3, xs: 0 }, width: "100%" }}>
+        <Box sx={{ ...centeredWorkflowSx(1180), px: { md: 3, xs: 0 } }}>
           <Box sx={{ py: { md: 3, xs: 1 } }}>
             <Stack spacing={3}>
               <Stack direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1.5}>
@@ -636,7 +638,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
         </Box>
       ) : null}
       {currentStep === 4 ? (
-        <Box sx={{ maxWidth: 1180, mx: "auto", px: { md: 3, xs: 0 }, width: "100%" }}>
+        <Box sx={{ ...centeredWorkflowSx(1180), px: { md: 3, xs: 0 } }}>
           <Box sx={{ py: { md: 3, xs: 1 } }}>
             <Stack spacing={3}>
               <Stack direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1.5}>
@@ -684,7 +686,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
         </Box>
       ) : null}
       {currentStep === 5 ? (
-        <Card sx={{ ...centeredCardSx(kiosk.contentMaxWidth), "@media (orientation: portrait)": { maxWidth: kiosk.portraitContentWidth } }}>
+        <Card sx={{ ...centeredWorkflowSx(kiosk.contentMaxWidth), "@media (orientation: portrait)": { maxWidth: kiosk.portraitContentWidth } }}>
           <CardContent sx={{ p: { md: 4, xs: 2.5 } }}>
             <Stack spacing={3}>
               <Stack direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1.5}>

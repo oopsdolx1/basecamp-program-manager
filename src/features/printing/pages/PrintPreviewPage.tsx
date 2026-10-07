@@ -15,7 +15,7 @@ import { useCreatePrintRequest, type PrintRequestRecord } from "../../print-hist
 import { getPrintRequestsByIds } from "../../print-history/services/printRequestService";
 import { markWorkoutSessionPrinted } from "../../workout-sessions/services/workoutSessionService";
 import { WorkoutPrintTemplateV1 } from "../components/WorkoutPrintTemplateV1/WorkoutPrintTemplateV1";
-import { configuredPrintAdapter, configuredPrintRuntime } from "../gateways/configuredPrintAdapter";
+import { configuredPrintAdapter, configuredPrintRuntime, createArtifactPrintAdapter } from "../gateways/configuredPrintAdapter";
 import { createRenderedPrintArtifactFactory, isRenderedPrintDocumentReady } from "../gateways/printArtifactFactory";
 import { createPreparedPdfHandoff, type PreparedPdfHandoff } from "../gateways/preparedPdfHandoff";
 import { isUserGesturePdfPrintAdapter } from "../gateways/userGesturePdfPrintAdapter";
@@ -212,13 +212,14 @@ export const PrintPreviewPage = (): JSX.Element => {
       if (handoff.status === "failed") { setSessionError(handoff.reason ?? "PDF를 열지 못했습니다."); return; }
     }
     const nextCopy = Math.max(state.workoutSession.print.copyCount, ...history.map((item) => item.copy), 0) + 1;
+    const printAdapter = createArtifactPrintAdapter(configuredPrintRuntime, Boolean(printArtifact?.artifactId));
     const record = await printRequest.create(state.document, nextCopy);
     if (!record) return;
     setMarkingPrinted(true);
     try {
       await markWorkoutSessionPrinted(conditionLabAppId, workoutSessionId, record.id);
       setHistory((current) => [record, ...current]);
-      const printResult = userGestureAdapter ? { status: "submitted" as const } : await configuredPrintAdapter.print({ jobId: record.id, document: state.document, copies: 1, artifactId: completedPrints === 0 ? printArtifact?.artifactId : undefined });
+      const printResult = userGestureAdapter ? { status: "submitted" as const } : await printAdapter.print({ jobId: record.id, document: state.document, copies: 1, artifactId: completedPrints === 0 ? printArtifact?.artifactId : undefined });
       if (printResult.status === "failed") setSessionError(userFacingPrintError(printResult.reason ?? "print_submission_failed"));
       else setCompletedPrints((current) => current + 1);
     } catch {

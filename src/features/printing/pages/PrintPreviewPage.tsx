@@ -27,6 +27,11 @@ import "../styles/print.css";
 const conditionLabAppId = toAppId(import.meta.env.VITE_CONDITION_LAB_APP_ID ?? "");
 const printAgentEndpoint = import.meta.env.VITE_PRINT_AGENT_ENDPOINT ?? "http://127.0.0.1:43127";
 const formatDateTime = (date: Date): string => new Intl.DateTimeFormat("ko-KR", { dateStyle: "short", timeStyle: "short" }).format(date);
+const userFacingPrintError = (reason: string): string => {
+  if (reason === "print_agent_unavailable" || reason === "preview_artifact_requires_windows_agent") return "인쇄 서비스를 연결하지 못했습니다.";
+  if (reason === "default_printer_unavailable" || reason === "physical_printer_unavailable") return "연결된 프린터를 찾을 수 없습니다. PDF 저장은 사용할 수 있습니다.";
+  return "인쇄 artifact를 준비하지 못했습니다.";
+};
 
 GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
@@ -145,7 +150,7 @@ export const PrintPreviewPage = (): JSX.Element => {
         const artifact = await createRenderedPrintArtifactFactory().create(artifactRequest);
         const preview = await createPrintArtifactPreview({ endpoint: printAgentEndpoint, jobId: workoutSessionId ?? state.document.workoutSessionId, artifact });
         if (active) setPrintArtifact(preview);
-      } catch (error) { if (active) setPrintArtifactError(error instanceof Error ? error.message : "인쇄 artifact를 준비하지 못했습니다."); }
+      } catch (error) { if (active) setPrintArtifactError(error instanceof Error ? error.message : "print_artifact_creation_failed"); }
     })();
     return () => { active = false; };
   }, [previewRetryKey, state, workoutSessionId]);
@@ -214,10 +219,10 @@ export const PrintPreviewPage = (): JSX.Element => {
       await markWorkoutSessionPrinted(conditionLabAppId, workoutSessionId, record.id);
       setHistory((current) => [record, ...current]);
       const printResult = userGestureAdapter ? { status: "submitted" as const } : await configuredPrintAdapter.print({ jobId: record.id, document: state.document, copies: 1, artifactId: completedPrints === 0 ? printArtifact?.artifactId : undefined });
-      if (printResult.status === "failed") setSessionError(printResult.reason ?? "인쇄 요청을 전송하지 못했습니다.");
+      if (printResult.status === "failed") setSessionError(userFacingPrintError(printResult.reason ?? "print_submission_failed"));
       else setCompletedPrints((current) => current + 1);
-    } catch (caught) {
-      setSessionError(caught instanceof Error ? caught.message : "운동 세션 출력 상태를 저장하지 못했습니다.");
+    } catch {
+      setSessionError("운동 세션 출력 상태를 저장하지 못했습니다.");
     } finally {
       setMarkingPrinted(false);
     }
@@ -244,7 +249,7 @@ export const PrintPreviewPage = (): JSX.Element => {
 
   if (completedPrints > 0) return <><PrintSourceDocument document={state.document} /><Box sx={{ alignItems: "center", bgcolor: colors.neutral.black, display: "flex", justifyContent: "center", minHeight: "100vh", p: { md: `${spacing[8]}px`, xs: `${spacing[4]}px` } }}><Stack alignItems="center" spacing={`${spacing[3]}px`} sx={{ maxWidth: 520, width: "100%" }} textAlign="center"><Typography color={colors.primary.gold} fontWeight={900} letterSpacing="0.12em" variant="overline">BASECAMP</Typography><CheckCircleIcon sx={{ color: colors.semantic.success, fontSize: 56, mt: `${spacing[4]}px` }} /><Box><Typography fontSize={{ md: kiosk.pageTitle, xs: 28 }} fontWeight={900}>출력 요청을 보냈어요</Typography><Typography color={colors.neutral.gray400} sx={{ mt: `${spacing[1]}px` }}>{state.document.member.name} · {state.document.program.title}</Typography><Typography color={colors.neutral.gray400} variant="body2">A5 · {printArtifact?.pages ?? 1}페이지</Typography></Box>{markingPrinted || printRequest.saving ? <Typography color={colors.neutral.gray400}>다시 출력하고 있습니다.</Typography> : sessionError ? <Typography color="error.main">다시 출력하지 못했습니다. {sessionError}</Typography> : <Typography color={colors.neutral.gray400} variant="body2">{secondsRemaining}초 후 처음 화면으로 돌아갑니다.</Typography>}<Stack spacing={`${spacing[1]}px`} sx={{ mt: `${spacing[2]}px`, width: "100%" }}><Button fullWidth variant="secondary" startIcon={<DownloadIcon />} disabled={!printArtifactId || pdfSaveInProgress} onClick={() => void savePdf()}>PDF 저장</Button><Button fullWidth onClick={goWorkspace} sx={{ minHeight: kiosk.primaryActionHeight }}>처음으로 돌아가기</Button><Button fullWidth disabled={markingPrinted || printRequest.saving} loading={markingPrinted || printRequest.saving} variant="secondary" onClick={() => { setSecondsRemaining(30); void requestPrint(); }} sx={{ minHeight: kiosk.standardControlHeight }}>다시 출력</Button></Stack></Stack></Box></>;
 
-  if (autoPrint && !isUserGesturePdfPrintAdapter(configuredPrintAdapter) && printArtifactError) return <><PrintSourceDocument document={state.document} /><Box sx={{ bgcolor: colors.neutral.black, minHeight: "100vh", p: `${spacing[6]}px` }}><Card sx={{ margin: "0 auto", maxWidth: 760 }}><Stack spacing={`${spacing[3]}px`}><EmptyState title="인쇄 artifact를 준비하지 못했습니다." description={printArtifactError} /><Button onClick={() => setPreviewRetryKey((current) => current + 1)}>다시 시도</Button><Button variant="secondary" onClick={goWorkspace}>프로그램으로 돌아가기</Button></Stack></Card></Box></>;
+  if (autoPrint && !isUserGesturePdfPrintAdapter(configuredPrintAdapter) && printArtifactError) return <><PrintSourceDocument document={state.document} /><Box sx={{ bgcolor: colors.neutral.black, minHeight: "100vh", p: `${spacing[6]}px` }}><Card sx={{ margin: "0 auto", maxWidth: 760 }}><Stack spacing={`${spacing[3]}px`}><EmptyState title={userFacingPrintError(printArtifactError)} description="인쇄 서비스를 확인한 뒤 다시 시도해 주세요." /><Button onClick={() => setPreviewRetryKey((current) => current + 1)}>다시 시도</Button><Button variant="secondary" onClick={goWorkspace}>프로그램으로 돌아가기</Button></Stack></Card></Box></>;
   if (autoPrint && !isUserGesturePdfPrintAdapter(configuredPrintAdapter)) return <><PrintSourceDocument document={state.document} /><Box sx={{ bgcolor: colors.neutral.black, minHeight: "100vh", p: `${spacing[6]}px` }}><Card sx={{ margin: "0 auto", maxWidth: 760 }}><Stack spacing={`${spacing[3]}px`}><Loading label={printRequest.error || sessionError || "운동 세션과 QR을 확인하고 인쇄를 요청하고 있습니다."} progress={printRequest.error || sessionError ? undefined : 85} /><Button fullWidth variant="secondary" startIcon={<DownloadIcon />} disabled={!printArtifactId || pdfSaveInProgress} onClick={() => void savePdf()}>PDF 저장</Button>{downloadError ? <Alert severity="error">{downloadError}</Alert> : null}</Stack></Card></Box></>;
   const checklist = [
     ["회원 선택", Boolean(state.member.memberId)],
@@ -269,7 +274,7 @@ export const PrintPreviewPage = (): JSX.Element => {
             <Box sx={{ minWidth: 0, overflow: "hidden", py: { md: `${spacing[2]}px`, xs: 0 } }}>
               <Stack alignItems="center" spacing={`${spacing[2]}px`}>
                 <Box sx={{ alignItems: "center", bgcolor: colors.neutral.gray800, border: `1px dashed ${colors.neutral.gray600}`, borderRadius: `${radius.sm}px`, display: "flex", justifyContent: "center", overflow: "auto", p: { md: `${spacing[3]}px`, xs: `${spacing[2]}px` }, width: "100%" }}>
-                  {visualPdfPreview && printArtifact ? <PdfCanvasPreview pdfBytes={visualPdfPreview.bytes} expectedPages={printArtifact.pages} onPageCount={updatePdfPageCount} /> : visualPdfPreviewError ? <Stack alignItems="center" spacing={`${spacing[2]}px`}><Typography>인쇄 미리보기를 표시하지 못했습니다.</Typography><Button variant="secondary" onClick={() => setPreviewRetryKey((current) => current + 1)}>다시 시도</Button></Stack> : printArtifactError ? <Stack alignItems="center" spacing={`${spacing[2]}px`}><Typography>인쇄 artifact를 준비하지 못했습니다.</Typography><Button variant="secondary" onClick={() => setPreviewRetryKey((current) => current + 1)}>다시 시도</Button></Stack> : <Loading label="운동 기록을 인쇄용으로 준비하고 있습니다." progress={75} />}
+                  {visualPdfPreview && printArtifact ? <PdfCanvasPreview pdfBytes={visualPdfPreview.bytes} expectedPages={printArtifact.pages} onPageCount={updatePdfPageCount} /> : visualPdfPreviewError ? <Stack alignItems="center" spacing={`${spacing[2]}px`}><Typography>인쇄 미리보기를 표시하지 못했습니다.</Typography><Button variant="secondary" onClick={() => setPreviewRetryKey((current) => current + 1)}>다시 시도</Button></Stack> : printArtifactError ? <Stack alignItems="center" spacing={`${spacing[2]}px`}><Typography>{userFacingPrintError(printArtifactError)}</Typography><Button variant="secondary" onClick={() => setPreviewRetryKey((current) => current + 1)}>다시 시도</Button></Stack> : <Loading label="운동 기록을 인쇄용으로 준비하고 있습니다." progress={75} />}
                 </Box>
               </Stack>
             </Box>

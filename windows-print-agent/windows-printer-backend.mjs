@@ -11,6 +11,7 @@ const defaultRendererPath = join(agentDirectory, "bin", "SumatraPDF.exe");
 const defaultControlledRoot = join(tmpdir(), "basecamp-print-agent");
 const safeReason = (error) => error instanceof Error && error.message ? error.message : "print_system_failed";
 const isWithin = (root, target) => { const value = relative(root, target); return value !== "" && !value.startsWith("..") && !isAbsolute(value); };
+export const isVirtualPrinter = (name) => /microsoft print to pdf|microsoft xps document writer|onenote|alpdf|pdf|virtual/iu.test(name ?? "");
 
 export const createWindowsPrintSystem = ({ platform = process.platform, rendererPath = process.env.BASECAMP_SUMATRA_PATH || defaultRendererPath, run = execFile, ensureReadable = access } = {}) => ({
   async getDefaultPrinter() {
@@ -34,10 +35,17 @@ export const createWindowsPrintSystem = ({ platform = process.platform, renderer
 });
 
 export const createWindowsPrinterBackend = ({ printSystem = createWindowsPrintSystem(), controlledRoot = defaultControlledRoot } = {}) => ({
+  async getStatus() {
+    try {
+      const defaultPrinter = await printSystem.getDefaultPrinter();
+      return { printerAvailable: Boolean(defaultPrinter) && !isVirtualPrinter(defaultPrinter), defaultPrinter };
+    } catch { return { printerAvailable: false, defaultPrinter: null }; }
+  },
   async submit(job) {
     try {
       if (!job || !Number.isInteger(job.copies) || job.copies < 1 || typeof job.pdfPath !== "string" || !isWithin(controlledRoot, job.pdfPath) || !job.pdfPath.toLowerCase().endsWith(".pdf")) return { status: "failed", reason: "invalid_job" };
-      if (!await printSystem.getDefaultPrinter()) return { status: "failed", reason: "default_printer_unavailable" };
+      const { defaultPrinter, printerAvailable } = await this.getStatus();
+      if (!defaultPrinter || !printerAvailable) return { status: "failed", reason: "physical_printer_unavailable" };
       await printSystem.submitPdf({ path: job.pdfPath, copies: job.copies });
       return { status: "submitted" };
     } catch (error) { return { status: "failed", reason: safeReason(error) }; }

@@ -14,6 +14,7 @@ const dispatchIfReady = async (adapter: PrintAdapter, visualPdfReady: boolean, a
 
 const main = async (): Promise<void> => {
   const page = readFileSync("src/features/printing/pages/PrintPreviewPage.tsx", "utf8");
+  const pageContainer = readFileSync("src/components/layout/PageContainer/PageContainer.tsx", "utf8");
   const factory = readFileSync("src/features/printing/gateways/printArtifactFactory.ts", "utf8");
   const css = readFileSync("src/features/printing/styles/print.css", "utf8");
   assert.equal(page.includes("const PrintSourceDocument"), true);
@@ -24,6 +25,9 @@ const main = async (): Promise<void> => {
   assert.equal(css.includes(".print-source-root"), true);
   assert.equal(css.includes("left: -100000px"), true);
   assert.equal(css.includes(".print-source-root {\n  display: none"), false);
+  assert.equal(pageContainer.includes('marginInline: "auto"'), true);
+  assert.equal(pageContainer.includes('width: "100%"'), true);
+  assert.equal(page.includes('"인쇄 서비스를 연결하지 못했습니다."'), true);
 
   let calls = 0;
   const adapter: PrintAdapter = { print: async (value) => { calls += 1; assert.equal(value.artifactId, "artifact-1"); return { status: "submitted" }; } };
@@ -51,6 +55,7 @@ const main = async (): Promise<void> => {
   assert.equal(await dispatchIfReady(adapter, false, postOnly), true);
   assert.equal(calls, 2);
   await assert.rejects(createPrintArtifactPreview({ endpoint: "http://agent", jobId: "session-2", artifact, fetchImpl: async () => new Response(JSON.stringify({ reason: "preview_failed" }), { status: 502 }) }), /preview_failed/);
+  await assert.rejects(createPrintArtifactPreview({ endpoint: "http://agent", jobId: "session-3", artifact, fetchImpl: async () => { throw new TypeError("fetch failed"); } }), /print_agent_unavailable/);
   assert.equal(await dispatchIfReady(adapter, false, null), false);
   assert.equal(calls, 2);
   assert.equal(isPrintDispatchReady("browser", postOnly, false), false);

@@ -19,7 +19,7 @@ export const createPrintAgent = ({ backend, pdfPipeline, port = DEFAULT_PORT, al
     const origin = req.headers.origin;
     if (origin && !allowedOrigins.includes(origin)) return send(res, 403, { status: "failed", reason: "origin_not_allowed" });
     if (req.method === "OPTIONS") { res.writeHead(204, { "access-control-allow-origin": origin ?? "", "access-control-allow-methods": "GET,POST,OPTIONS", "access-control-allow-headers": "content-type" }); return res.end(); }
-    if (req.method === "GET" && req.url === "/health") return send(res, 200, { status: "ok", service: "basecamp-print-agent" }, origin);
+    if (req.method === "GET" && req.url === "/health") { const printer = await printerBackend.getStatus?.() ?? { printerAvailable: false, defaultPrinter: null }; return send(res, 200, { status: "ok", service: "basecamp-print-agent", ...printer }, origin); }
     const previewMatch = req.url?.match(/^\/preview\/([0-9a-f-]{36})$/iu);
     if (req.method === "GET" && previewMatch) { const preview = previews.get(previewMatch[1]); if (!preview || preview.expiresAt <= Date.now()) { if (preview) await disposePreview(previewMatch[1]); return send(res, 404, { status: "failed", reason: "preview_not_found" }, origin); } res.writeHead(200, { "content-type": "application/pdf", "cache-control": "no-store", ...(origin ? { "access-control-allow-origin": origin } : {}) }); return createReadStream(preview.path).pipe(res); }
     if (req.method === "POST" && req.url === "/preview") {

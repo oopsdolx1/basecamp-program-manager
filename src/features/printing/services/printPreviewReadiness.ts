@@ -51,6 +51,8 @@ const requestWithTimeout = async (input: RequestInfo | URL, init: RequestInit, f
 
 const messageFor = (error: unknown, fallback: string): string => error instanceof Error ? error.message : fallback;
 
+const isAgentUnavailable = (error: unknown): boolean => error instanceof TypeError || (error instanceof DOMException && error.name === "AbortError");
+
 export const createPrintArtifactPreview = async ({ endpoint, jobId, artifact, fetchImpl = fetch, timeoutMs = PRINT_PREVIEW_REQUEST_TIMEOUT_MS }: PreviewRequestOptions): Promise<PrintArtifactPreview> => {
   try {
     const response = await requestWithTimeout(`${endpoint}/preview`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jobId, artifact }) }, fetchImpl, timeoutMs);
@@ -58,6 +60,7 @@ export const createPrintArtifactPreview = async ({ endpoint, jobId, artifact, fe
     if (!response.ok || !body.artifactId) throw new Error(body.reason ?? "preview_unavailable");
     return { artifactId: body.artifactId, pages: body.pages ?? 1 };
   } catch (error) {
+    if (isAgentUnavailable(error)) throw new Error("print_agent_unavailable");
     throw new Error(messageFor(error, "print_artifact_creation_failed"));
   }
 };

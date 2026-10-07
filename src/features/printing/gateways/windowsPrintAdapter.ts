@@ -9,6 +9,6 @@ export const createWindowsPrintAdapter = ({ endpoint = "http://127.0.0.1:43127",
     const body = await response.json() as { status?: string; reason?: string };
     if (!response.ok || body.status !== "submitted") return { status: "failed", reason: body.reason ?? `agent_http_${response.status}` };
     return { status: "submitted" };
-  } catch (error) { return { status: "failed", reason: error instanceof Error ? error.message : "agent_unavailable" }; }
+  } catch (error) { return { status: "failed", reason: error instanceof TypeError || (error instanceof DOMException && error.name === "AbortError") ? "print_agent_unavailable" : error instanceof Error ? error.message : "print_agent_unavailable" }; }
   finally { clearTimeout(timer); }
 } });

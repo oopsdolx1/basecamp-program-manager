@@ -31,6 +31,8 @@
     "test:print-runtime-selection": "esbuild scripts/verify-print-runtime-selection.ts --bundle --platform=node --format=cjs --outfile=.print-runtime-selection-test.cjs && node .print-runtime-selection-test.cjs && node -e \"require('fs').unlinkSync('.print-runtime-selection-test.cjs')\"",
     "test:print-agent": "node scripts/verify-print-agent.mjs",
     "test:windows-printer-backend": "node scripts/verify-windows-printer-backend.mjs",
+    "test:print-agent-install": "node scripts/verify-print-agent-install.mjs",
+    "test:print-history-integration": "esbuild scripts/verify-print-history-integration.ts --bundle --platform=node --format=cjs --outfile=.print-history-integration-test.cjs && node .print-history-integration-test.cjs && node -e \"require('fs').unlinkSync('.print-history-integration-test.cjs')\"",
     "test:windows-print-contract": "esbuild scripts/verify-windows-print-contract.ts --bundle --packages=external --jsx=automatic --platform=node --format=esm --outfile=.windows-print-contract-test.mjs && node .windows-print-contract-test.mjs && node -e \"require('fs').unlinkSync('.windows-print-contract-test.mjs')\""
   },
   "dependencies": {

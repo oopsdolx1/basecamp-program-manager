@@ -7,13 +7,13 @@ export const useCreatePrintRequest = (appId: AppId) => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const create = async (document: WorkoutPrintDocument, copy: number) => {
+  const create = async (document: WorkoutPrintDocument, copy: number, printer: string) => {
     if (saving) return null;
 
     setSaving(true);
     setError(null);
     try {
-      return await createPrintRequestFromDocument(appId, document, copy);
+      return await createPrintRequestFromDocument(appId, document, copy, printer);
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : "인쇄 요청을 저장하지 못했습니다.";
       setError(message);

@@ -24,13 +24,16 @@ import type { PrintRequestRepository } from "./printRequestRepository.interface"
 
 const currentDb = () => getFirestoreClient();
 
-const buildRecentQuery = (options: PrintRequestQueryOptions) => {
+// Member, program, category and search are deliberately filtered client-side
+// after this bounded recent list is read. This keeps the deployed Firestore
+// index surface to the one production query below.
+export const printHistoryIndexDefinition = [
+  { fieldPath: "isArchived", order: "ASCENDING" },
+  { fieldPath: "requestedAt", order: "DESCENDING" },
+] as const;
+
+export const buildRecentQuery = (options: PrintRequestQueryOptions) => {
   const constraints: QueryConstraint[] = [where("isArchived", "==", false)];
-  if (options.memberId) constraints.push(where("memberId", "==", options.memberId));
-  if (options.programId) constraints.push(where("programId", "==", options.programId));
-  if (options.category && options.category !== "ALL") {
-    constraints.push(where("programSnapshot.category", "==", options.category));
-  }
   constraints.push(orderBy("requestedAt", "desc"));
   constraints.push(firestoreLimit(options.limit ?? 100));
   return query(collection(currentDb(), printHistoryCollectionPath(options.appId)), ...constraints);

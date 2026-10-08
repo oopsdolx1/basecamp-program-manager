@@ -8,7 +8,7 @@ export interface PrintRequest {
 }
 
 export type PrintSubmissionResult =
-  | { status: "submitted" }
+  | { status: "submitted"; printer?: string }
   | { status: "failed"; reason?: string };
 
 export interface PrintAdapter {
@@ -18,9 +18,7 @@ export interface PrintAdapter {
 export interface BrowserPrintGateway extends PrintAdapter {}
 
 export const browserPrintGateway: BrowserPrintGateway = {
-  print: async (request) => {
-    if (request.artifactId) return { status: "failed", reason: "preview_artifact_requires_windows_agent" };
-    window.print();
-    return { status: "submitted" };
-  },
+  // Browser dialogs cannot satisfy unattended physical printing.  The web app
+  // must use the local Windows agent for a physical print submission.
+  print: async () => ({ status: "failed", reason: "windows_print_agent_required" }),
 };

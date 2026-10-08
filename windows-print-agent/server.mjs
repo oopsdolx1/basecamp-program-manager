@@ -47,7 +47,7 @@ export const createPrintAgent = ({ backend, pdfPipeline, port = DEFAULT_PORT, al
         console.log(`[print] job=${payload.jobId} artifact resolved id=${payload.artifactId ?? "inline"} path=${rendered.path}`);
         const result = await printerBackend.submit({ jobId: payload.jobId, pdfPath: rendered.path, copies });
         console.log(`[print] job=${payload.jobId} backend completed status=${result?.status ?? "unknown"}`);
-        response = result?.status === "submitted" ? { status: "submitted", jobId: payload.jobId } : { status: "failed", jobId: payload.jobId, reason: result?.reason ?? "backend_failed" };
+        response = result?.status === "submitted" ? { status: "submitted", jobId: payload.jobId, printer: result.printer ?? null } : { status: "failed", jobId: payload.jobId, reason: result?.reason ?? "backend_failed" };
       } catch (error) { response = { status: "failed", jobId: payload.jobId, reason: error instanceof Error ? error.message : "pdf_generation_failed" }; }
       finally {
         // A preview artifact is also the source for the success-screen PDF download.

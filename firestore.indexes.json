@@ -1,0 +1,13 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "printHistory",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "isArchived", "order": "ASCENDING" },
+        { "fieldPath": "requestedAt", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

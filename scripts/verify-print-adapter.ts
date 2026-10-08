@@ -9,8 +9,7 @@ const runtimeSource = readFileSync("src/features/printing/gateways/configuredPri
 const pageSource = readFileSync("src/features/printing/pages/PrintPreviewPage.tsx", "utf8");
 const request = { jobId: "print-1", document: {} as PrintRequest["document"], copies: 1 };
 const main = async (): Promise<void> => {
-  let browserCalls = 0; (globalThis as { window?: { print: () => void } }).window = { print: () => { browserCalls += 1; } };
-  assert.deepEqual(await browserPrintGateway.print(request), { status: "submitted" }); assert.equal(browserCalls, 1);
+  assert.deepEqual(await browserPrintGateway.print(request), { status: "failed", reason: "windows_print_agent_required" });
   assert.equal(createConfiguredPrintAdapter("browser"), browserPrintGateway);
   assert.notEqual(createArtifactPrintAdapter("browser", true), browserPrintGateway);
   assert.equal(createArtifactPrintAdapter("browser", false), browserPrintGateway);
@@ -19,12 +18,12 @@ const main = async (): Promise<void> => {
   const windows = createWindowsPrintAdapter({ artifactFactory: { create: async () => ({ type: "html", content: "<!doctype html>controlled" }) }, fetchImpl: async (_input, init) => { fetchCalls += 1; posted = JSON.parse(String(init?.body)); return new Response(JSON.stringify({ status: "submitted" }), { status: 200 }); } });
   assert.deepEqual(await windows.print(request), { status: "submitted" }); assert.deepEqual(posted, { jobId: "print-1", artifact: { type: "html", content: "<!doctype html>controlled" }, copies: 1 }); assert.equal("document" in posted, false);
   const failed = createWindowsPrintAdapter({ artifactFactory: { create: async () => { throw new Error("artifact_failed"); } }, fetchImpl: async () => { fetchCalls += 1; return new Response(); } });
-  assert.deepEqual(await failed.print(request), { status: "failed", reason: "artifact_failed" }); assert.equal(fetchCalls, 1); assert.equal(browserCalls, 1);
+  assert.deepEqual(await failed.print(request), { status: "failed", reason: "artifact_failed" }); assert.equal(fetchCalls, 1);
   const unavailable = createWindowsPrintAdapter({ artifactFactory: { create: async () => ({ type: "html", content: "<!doctype html>controlled" }) }, fetchImpl: async () => { throw new TypeError("fetch failed"); } });
   assert.deepEqual(await unavailable.print(request), { status: "failed", reason: "print_agent_unavailable" });
   const printerUnavailable = createWindowsPrintAdapter({ artifactFactory: { create: async () => ({ type: "html", content: "<!doctype html>controlled" }) }, fetchImpl: async () => new Response(JSON.stringify({ status: "failed", reason: "physical_printer_unavailable" }), { status: 502 }) });
   assert.deepEqual(await printerUnavailable.print(request), { status: "failed", reason: "physical_printer_unavailable" });
-  assert.equal((source.match(/window\.print\(\)/gu) ?? []).length, 1); assert.equal(pageSource.includes("window.print()"), false); assert.equal(pageSource.includes("createArtifactPrintAdapter"), true); assert.equal(pageSource.includes("연결된 프린터를 찾을 수 없습니다. PDF 저장은 사용할 수 있습니다."), true); assert.equal(runtimeSource.includes("navigator.userAgent"), false);
+  assert.equal(source.includes("window.print()"), false); assert.equal(pageSource.includes("window.print()"), false); assert.equal(pageSource.includes("createArtifactPrintAdapter"), true); assert.equal(pageSource.includes("연결된 프린터를 찾을 수 없습니다. PDF 저장은 사용할 수 있습니다."), true); assert.equal(runtimeSource.includes("navigator.userAgent"), false);
   const failingAdapter: PrintAdapter = { print: async () => ({ status: "failed", reason: "test failure" }) }; assert.deepEqual(await failingAdapter.print(request), { status: "failed", reason: "test failure" });
   console.log("PrintAdapter verification passed.");
 };

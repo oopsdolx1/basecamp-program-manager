@@ -11,6 +11,7 @@ export const createPrintRequestFromDocument = async (
   appId: AppId,
   document: WorkoutPrintDocument,
   copy: number,
+  printer: string,
 ): Promise<PrintRequestRecord> => {
   await ensureFirebaseAuth();
   const uid = getFirebaseAuth().currentUser?.uid;
@@ -30,7 +31,7 @@ export const createPrintRequestFromDocument = async (
     appId,
     requestedBy: uid,
     workoutSessionId: document.workoutSessionId,
-    printer: "browser-default",
+    printer,
     copy,
     ...snapshots,
   });

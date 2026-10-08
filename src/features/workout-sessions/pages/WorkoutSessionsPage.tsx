@@ -70,7 +70,7 @@ export const WorkoutSessionsPage = ({ initialSessionId = null }: { initialSessio
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [history, setHistory] = useState<PrintRequestRecord[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyState, setHistoryState] = useState<"loading" | "ready" | "error">("ready");
 
   useEffect(() => subscribeWorkoutSessions(conditionLabAppId, (next) => {
     setRecords(next);
@@ -96,14 +96,17 @@ export const WorkoutSessionsPage = ({ initialSessionId = null }: { initialSessio
   useEffect(() => {
     if (!selected || selected.print.historyIds.length === 0) {
       setHistory([]);
+      setHistoryState("ready");
       return;
     }
     let active = true;
-    setHistoryLoading(true);
+    setHistoryState("loading");
     getPrintRequestsByIds(conditionLabAppId, selected.print.historyIds)
-      .then((items) => { if (active) setHistory(items.sort((left, right) => right.copy - left.copy)); })
-      .catch(() => { if (active) setHistory([]); })
-      .finally(() => { if (active) setHistoryLoading(false); });
+      .then((items) => { if (active) { setHistory(items.sort((left, right) => right.copy - left.copy)); setHistoryState("ready"); } })
+      .catch((caught) => {
+        if (import.meta.env.DEV) console.error("Failed to load workout session print history", caught);
+        if (active) { setHistory([]); setHistoryState("error"); }
+      });
     return () => { active = false; };
   }, [selected]);
 
@@ -191,7 +194,7 @@ export const WorkoutSessionsPage = ({ initialSessionId = null }: { initialSessio
                     </Card>
 
                     <Card>
-                      <Stack spacing={`${spacing[3]}px`}><Typography variant="h6">Print History</Typography>{historyLoading ? <Loading label="출력 이력을 불러오는 중" /> : null}{!historyLoading && history.length === 0 ? <EmptyState title="출력 이력이 없습니다." description="Session이 출력되면 Copy 정보가 표시됩니다." /> : null}{history.map((record) => <Card key={record.id} sx={{ p: `${spacing[3]}px` }}><Stack direction="row" justifyContent="space-between" spacing={`${spacing[2]}px`}><Box><Typography fontWeight={800}>Copy {record.copy}</Typography><Typography color={colors.neutral.gray400} variant="caption">{formatSessionDate(record.printedAt)}</Typography></Box><Box sx={{ textAlign: "right" }}><Typography variant="body2">{record.printedBy ?? "출력자 없음"}</Typography><Typography color={colors.neutral.gray400} variant="caption">{record.printer || "프린터 정보 없음"}</Typography></Box></Stack></Card>)}</Stack>
+                      <Stack spacing={`${spacing[3]}px`}><Typography variant="h6">Print History</Typography>{historyState === "loading" ? <Loading label="출력 이력을 불러오는 중" /> : null}{historyState === "error" ? <Alert severity="error">출력 이력을 불러오지 못했습니다.</Alert> : null}{historyState === "ready" && history.length === 0 ? <EmptyState title="출력 이력이 없습니다." description="Session이 출력되면 Copy 정보가 표시됩니다." /> : null}{history.map((record) => <Card key={record.id} sx={{ p: `${spacing[3]}px` }}><Stack direction="row" justifyContent="space-between" spacing={`${spacing[2]}px`}><Box><Typography fontWeight={800}>Copy {record.copy}</Typography><Typography color={colors.neutral.gray400} variant="caption">{formatSessionDate(record.printedAt)}</Typography></Box><Box sx={{ textAlign: "right" }}><Typography variant="body2">{record.printedBy ?? "출력자 없음"}</Typography><Typography color={colors.neutral.gray400} variant="caption">{record.printer || "프린터 정보 없음"}</Typography></Box></Stack></Card>)}</Stack>
                     </Card>
                   </Stack>
                 )}

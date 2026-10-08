@@ -6,9 +6,9 @@ export const createWindowsPrintAdapter = ({ endpoint = "http://127.0.0.1:43127",
   try {
     const artifact = request.artifactId ? undefined : await artifactFactory.create(request);
     const response = await fetchImpl(`${endpoint}/print`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jobId: request.jobId, artifactId: request.artifactId, artifact, copies: request.copies }), signal: controller.signal });
-    const body = await response.json() as { status?: string; reason?: string };
+    const body = await response.json() as { status?: string; reason?: string; printer?: string | null };
     if (!response.ok || body.status !== "submitted") return { status: "failed", reason: body.reason ?? `agent_http_${response.status}` };
-    return { status: "submitted" };
+    return { status: "submitted", ...(typeof body.printer === "string" && body.printer.trim() ? { printer: body.printer } : {}) };
   } catch (error) { return { status: "failed", reason: error instanceof TypeError || (error instanceof DOMException && error.name === "AbortError") ? "print_agent_unavailable" : error instanceof Error ? error.message : "print_agent_unavailable" }; }
   finally { clearTimeout(timer); }
 } });

@@ -14,11 +14,16 @@ export const AppLayout = ({ children }: PropsWithChildren): JSX.Element => {
         bgcolor: "background.default",
         backgroundImage: isProgramWorkspace ? "none" : `radial-gradient(circle at top, ${palette.primaryGoldDark}1F 0%, transparent 32%)`,
         color: "text.primary",
-        minHeight: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        height: "100dvh",
+        overflow: "hidden",
       }}
     >
       <AppHeader />
-      {children}
+      <Box sx={{ flex: "1 1 auto", minHeight: 0, overflowX: "hidden", overflowY: "auto" }}>
+        {children}
+      </Box>
     </Box>
   );
 };

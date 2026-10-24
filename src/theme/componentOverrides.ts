@@ -4,10 +4,17 @@ import { palette } from "./palette";
 export const componentOverrides: ThemeOptions["components"] = {
   MuiCssBaseline: {
     styleOverrides: {
+      "html, body, #root": {
+        height: "100%",
+        margin: 0,
+        overflow: "hidden",
+      },
+      "*, *::before, *::after": {
+        boxSizing: "border-box",
+      },
       body: {
         backgroundColor: palette.appBackground,
         color: palette.textPrimary,
-        overflowX: "hidden",
       },
     },
   },

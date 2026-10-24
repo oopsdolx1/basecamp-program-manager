@@ -12,6 +12,8 @@ HTML-to-PDF discovery uses the first readable executable in this order:
 
 PDF delivery always uses `C:\ProgramData\BaseCamp\PrintAgent\bin\SumatraPDF.exe` after installation. `bin\SumatraPDF.exe` is a required installation input; the installer fails before it registers a task if it is absent. Both executables are invoked with `execFile` argument arrays and no request-controlled executable or shell command.
 
-The agent resolves the Windows default printer for every health check and immediately before every submission. Known virtual document destinations are rejected; for a physical default it invokes SumatraPDF with `-print-to <resolved name> -silent`, so neither a browser nor a Windows print/save dialog is used. A successful native submission is reported with that dynamically resolved printer name.
+The installer copies the runtime to `C:\ProgramData\BaseCamp\PrintAgent` and registers `node.exe C:\ProgramData\BaseCamp\PrintAgent\server.mjs` as the Scheduled Task action, with that directory as its working directory. It does not run the legacy `launch-print-agent.mjs` supervisor and has no runtime dependency on the repository or mapped drives.
+
+The agent resolves the Windows default printer for every health check and immediately before every submission. Known virtual document destinations are rejected; for a physical default it invokes SumatraPDF with `-print-to <resolved name> -silent -print-settings copies,fit,paper=A5`, so neither a browser nor a Windows print/save dialog is used. A successful native submission is reported with that dynamically resolved printer name.
 
 The HTML artifact has a restrictive CSP, contains no scripts or remote URLs, and uses system font fallbacks (`Noto Sans KR`, Arial, sans-serif). Rendering and submission use only controlled OS temporary files, which are removed after success or failure.

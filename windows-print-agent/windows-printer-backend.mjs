@@ -9,6 +9,7 @@ const execFile = promisify(execFileCallback);
 const agentDirectory = dirname(fileURLToPath(import.meta.url));
 const defaultRendererPath = join(agentDirectory, "bin", "SumatraPDF.exe");
 const defaultControlledRoot = join(tmpdir(), "basecamp-print-agent");
+const defaultPrinterLookupTimeoutMs = 5_000;
 const safeReason = (error) => error instanceof Error && error.message ? error.message : "print_system_failed";
 const isWithin = (root, target) => { const value = relative(root, target); return value !== "" && !value.startsWith("..") && !isAbsolute(value); };
 // This is deliberately a deny-list of well-known document destinations, not a
@@ -19,7 +20,7 @@ export const createWindowsPrintSystem = ({ platform = process.platform, renderer
   async getDefaultPrinter() {
     if (platform !== "win32") return null;
     const command = "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false); $p = Get-CimInstance Win32_Printer | Where-Object Default -eq $true | Select-Object -First 1 -ExpandProperty Name; if ($null -ne $p) { [Console]::Out.Write($p) }";
-    const { stdout } = await run("powershell.exe", ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", command], { windowsHide: true, timeout: 2_000 });
+    const { stdout } = await run("powershell.exe", ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", command], { windowsHide: true, timeout: defaultPrinterLookupTimeoutMs });
     return stdout.trim() || null;
   },
   async submitPdf({ path, copies, printer }) {
@@ -29,7 +30,7 @@ export const createWindowsPrintSystem = ({ platform = process.platform, renderer
     // Use the printer returned by the just-in-time Windows query.  SumatraPDF
     // runs silently; a zero native exit result is its acknowledgement that the
     // job was submitted to the Windows printing backend.
-    try { await run(rendererPath, ["-print-to", printer, "-silent", "-print-settings", `${copies}x,landscape,noscale`, path], { windowsHide: true, timeout: 15_000 }); }
+    try { await run(rendererPath, ["-print-to", printer, "-silent", "-print-settings", `${copies}x,fit,paper=A5`, path], { windowsHide: true, timeout: 15_000 }); }
     catch (error) {
       const code = error && typeof error === "object" ? error.code : undefined;
       if (code === 4) throw new Error("default_printer_unavailable");

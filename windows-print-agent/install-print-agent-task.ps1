@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
 $sourceRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $runtimeRoot = 'C:\ProgramData\BaseCamp\PrintAgent'
-$runtimeFiles = @('server.mjs', 'windows-printer-backend.mjs', 'html-pdf-renderer.mjs', 'launch-print-agent.mjs', 'start-print-agent.ps1')
+$runtimeFiles = @('server.mjs', 'windows-printer-backend.mjs', 'html-pdf-renderer.mjs', 'start-print-agent.ps1')
 $sourceBin = Join-Path $sourceRoot 'bin'
 $sourceRenderer = Join-Path $sourceBin 'SumatraPDF.exe'
 if (-not (Test-Path -LiteralPath $sourceRenderer -PathType Leaf)) { throw "Missing required runtime renderer: $sourceRenderer" }
@@ -15,9 +15,9 @@ $currentUser = "$env:USERDOMAIN\$env:USERNAME"
 if ($LASTEXITCODE -ne 0) { throw "Failed to set runtime ACL for $currentUser" }
 $node = 'C:\Program Files\nodejs\node.exe'
 if (-not (Test-Path -LiteralPath $node)) { throw "Node executable not found: $node" }
-$launcher = Join-Path $runtimeRoot 'launch-print-agent.mjs'
+$server = Join-Path $runtimeRoot 'server.mjs'
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
-$action = New-ScheduledTaskAction -Execute $node -Argument ('"{0}"' -f $launcher) -WorkingDirectory $runtimeRoot
+$action = New-ScheduledTaskAction -Execute $node -Argument ('"{0}"' -f $server) -WorkingDirectory $runtimeRoot
 $settings = New-ScheduledTaskSettingsSet -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit (New-TimeSpan -Days 0) -MultipleInstances IgnoreNew -StartWhenAvailable
 $settings.DisallowStartIfOnBatteries = $false
 $settings.StopIfGoingOnBatteries = $false

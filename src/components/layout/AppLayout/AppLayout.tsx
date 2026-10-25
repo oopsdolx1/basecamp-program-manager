@@ -6,13 +6,13 @@ import { AppHeader } from "../AppHeader";
 
 export const AppLayout = ({ children }: PropsWithChildren): JSX.Element => {
   const location = useLocation();
-  const isProgramWorkspace = location.pathname === "/program-manager/print";
+  const isFixedHeightKioskRoute = location.pathname === "/program-manager/print";
 
   return (
     <Box
       sx={{
         bgcolor: "background.default",
-        backgroundImage: isProgramWorkspace ? "none" : `radial-gradient(circle at top, ${palette.primaryGoldDark}1F 0%, transparent 32%)`,
+        backgroundImage: isFixedHeightKioskRoute ? "none" : `radial-gradient(circle at top, ${palette.primaryGoldDark}1F 0%, transparent 32%)`,
         color: "text.primary",
         display: "flex",
         flexDirection: "column",
@@ -21,7 +21,7 @@ export const AppLayout = ({ children }: PropsWithChildren): JSX.Element => {
       }}
     >
       <AppHeader />
-      <Box sx={{ flex: "1 1 auto", minHeight: 0, overflowX: "hidden", overflowY: "auto" }}>
+      <Box sx={{ flex: "1 1 auto", minHeight: 0, overflowX: "hidden", overflowY: isFixedHeightKioskRoute ? "hidden" : "auto" }}>
         {children}
       </Box>
     </Box>

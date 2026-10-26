@@ -7,14 +7,13 @@ const mapper = readFileSync("src/features/printing/mappers/workoutPrintMapper.ts
 
 assert(template.includes("data-layout-density={document.layout.density}"));
 assert(template.includes("--a5-binding-safe-area"));
-assert(css.includes('.a5-workout-document[data-layout-density="relaxed"]'));
-assert(css.includes('.a5-workout-document[data-layout-density="compact"]'));
-assert(css.includes('.a5-workout-document[data-layout-density="dense"]'));
+assert(css.includes('.a5-workout-document[data-layout-density="standard"]'));
 assert(css.includes("padding: var(--a5-binding-safe-area)"));
 assert(css.includes("size: A5 landscape"));
 assert(!mapper.includes("최대 8개까지만 출력"));
 assert(!mapper.includes("slice(0, 7)") && !mapper.includes("slice(0, 8)") && !mapper.includes("slice(0, 9)"));
 assert(template.includes("configuredSets"));
+assert(!template.includes("print-memo-section"));
 assert(mapper.includes("resolveA5WorkoutLayout(program.exercises.length)"));
 assert(!/display:\s*none[^;]*exercise/u.test(css));
 console.log("A5 adaptive CSS checks: PASS");

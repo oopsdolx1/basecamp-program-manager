@@ -3,6 +3,7 @@ import { routeBuilder } from "../src/app/routeBuilder";
 import { createManualWorkoutBuilderHistory } from "../src/features/printing/services/manualWorkoutBuilderService";
 import { snapshotBuilderService } from "../src/features/printing/services/snapshotBuilderService";
 import { buildWorkoutSessionRecord } from "../src/features/workout-sessions/services/workoutSessionRecordBuilder";
+import { assertPrintPreviewSessionContext, programFromSessionPrescription, resolvePrintPreviewSource } from "../src/features/printing/services/printPreviewAuthorityResolver";
 
 const condition = { condition: "NORMAL" as const, sleep: "NORMAL" as const, alcohol: "NO" as const, targetFatigue: "NORMAL" as const };
 const first = { id: "catalog-a", name: "A", displayName: "A" } as never;
@@ -20,6 +21,10 @@ const record = buildWorkoutSessionRecord({ appId: "app" as never, memberId: "mem
 equal(record.source, { type: "manual" }); equal(record.prescription.source, { type: "manual" }); equal(record.programId, undefined); equal(record.prescription.sourceProgramId, undefined);
 equal(record.prescription.exercises.map((item) => ({ id: item.exerciseId, order: item.order, sets: item.plannedSets, memo: item.memo })), history.present.exercises.map((item) => ({ id: item.catalogExerciseId, order: item.order, sets: item.plannedSets, memo: item.memo })));
 equal(record.prescription.exercises[0].plannedSets, 5); equal(record.prescription.exercises[0].memo, "final memo");
+assertPrintPreviewSessionContext(record as never, "member-a"); checks += 1;
+const prescriptionProgram = await resolvePrintPreviewSource(record as never, async () => { throw new Error("manual preview must use its session prescription"); });
+equal(prescriptionProgram.exercises.map((item) => item.sets), record.prescription.exercises.map((item) => item.plannedSets));
+equal(programFromSessionPrescription(record as never).title, "직접 구성 운동");
 equal(routeBuilder.printPreviewSession("member-a", "manual-session-a", true), "/program-manager/print/session/manual-session-a?memberId=member-a&autoPrint=1");
 const program = buildWorkoutSessionRecord({ appId: "app" as never, memberId: "member-a", memberName: "Member", programId: "program-a", programTitle: "Program", exercises: record.prescription.exercises }, "trainer", "program-session-a");
 equal(program.source, { type: "program", programId: "program-a" }); equal(program.programId, "program-a");

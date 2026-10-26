@@ -9,34 +9,45 @@ const asDate = (value: unknown): Date => value instanceof Timestamp ? value.toDa
 const statuses = new Set(["created", "printed", "ocr_pending", "ocr_completed", "ai_completed", "confirmed"]);
 const categories = new Set<ProgramCategory>(["FULL_BODY", "CHEST", "BACK", "LOWER_BODY", "SHOULDER", "ARMS", "RECOVERY", "ETC", "CUSTOM"]);
 const categoryOf = (value: unknown): ProgramCategory | undefined => typeof value === "string" && categories.has(value as ProgramCategory) ? value as ProgramCategory : undefined;
+const optionalString = (value: unknown): string | undefined => {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim();
+  return normalized && normalized !== "undefined" && normalized !== "null" ? normalized : undefined;
+};
 
-const mapRecord = (id: string, data: DocumentData): WorkoutSessionRecord => ({
-  sessionId: id,
-  schemaVersion: 1,
-  memberId: String(data.memberId ?? ""),
-  programId: String(data.programId ?? ""),
-  trainerId: String(data.trainerId ?? ""),
-  status: statuses.has(data.status) ? data.status : data.status === "preview" ? "created" : "created",
-  exerciseIds: Array.isArray(data.exerciseIds) ? data.exerciseIds.map(String) : [],
-  memberSnapshot: data.memberSnapshot,
-  programSnapshot: { title: String(data.programSnapshot?.title ?? ""), ...(categoryOf(data.programSnapshot?.category) ? { category: categoryOf(data.programSnapshot?.category) } : {}) },
-  exercises: Array.isArray(data.exercises) ? data.exercises : [],
-  prescription: data.prescription && Array.isArray(data.prescription.exercises) ? { source: data.prescription.source, sourceProgramId: String(data.prescription.sourceProgramId), sourceProgramName: String(data.prescription.sourceProgramName), ...(categoryOf(data.prescription.category) ? { category: categoryOf(data.prescription.category) } : {}), exercises: data.prescription.exercises } : undefined,
-  print: {
-    format: "A5-landscape",
-    templateKey: "basecamp-workout-log-v1",
-    templateVersion: 1,
-    printHistoryId: typeof data.print?.printHistoryId === "string" ? data.print.printHistoryId : null,
-    historyIds: Array.isArray(data.print?.historyIds)
-      ? data.print.historyIds.map(String)
-      : typeof data.print?.printHistoryId === "string" ? [data.print.printHistoryId] : [],
-    copyCount: Number.isFinite(data.print?.copyCount) ? data.print.copyCount : data.status === "printed" ? 1 : 0,
-  },
-  createdAt: asDate(data.createdAt),
-  updatedAt: asDate(data.updatedAt),
-  printedAt: data.printedAt ? asDate(data.printedAt) : null,
-  lastPrintedAt: data.lastPrintedAt ? asDate(data.lastPrintedAt) : data.printedAt ? asDate(data.printedAt) : null,
-});
+export const mapWorkoutSessionRecord = (id: string, data: DocumentData): WorkoutSessionRecord => {
+  const programId = optionalString(data.programId);
+  const sourceProgramId = optionalString(data.prescription?.sourceProgramId);
+
+  return {
+    sessionId: id,
+    schemaVersion: 1,
+    memberId: String(data.memberId ?? ""),
+    ...(programId ? { programId } : {}),
+    ...(data.source ? { source: data.source } : {}),
+    trainerId: String(data.trainerId ?? ""),
+    status: statuses.has(data.status) ? data.status : data.status === "preview" ? "created" : "created",
+    exerciseIds: Array.isArray(data.exerciseIds) ? data.exerciseIds.map(String) : [],
+    memberSnapshot: data.memberSnapshot,
+    programSnapshot: { title: String(data.programSnapshot?.title ?? ""), ...(categoryOf(data.programSnapshot?.category) ? { category: categoryOf(data.programSnapshot?.category) } : {}) },
+    exercises: Array.isArray(data.exercises) ? data.exercises : [],
+    prescription: data.prescription && Array.isArray(data.prescription.exercises) ? { source: data.prescription.source, ...(sourceProgramId ? { sourceProgramId } : {}), sourceProgramName: String(data.prescription.sourceProgramName), ...(categoryOf(data.prescription.category) ? { category: categoryOf(data.prescription.category) } : {}), exercises: data.prescription.exercises } : undefined,
+    print: {
+      format: "A5-landscape",
+      templateKey: "basecamp-workout-log-v1",
+      templateVersion: 1,
+      printHistoryId: typeof data.print?.printHistoryId === "string" ? data.print.printHistoryId : null,
+      historyIds: Array.isArray(data.print?.historyIds)
+        ? data.print.historyIds.map(String)
+        : typeof data.print?.printHistoryId === "string" ? [data.print.printHistoryId] : [],
+      copyCount: Number.isFinite(data.print?.copyCount) ? data.print.copyCount : data.status === "printed" ? 1 : 0,
+    },
+    createdAt: asDate(data.createdAt),
+    updatedAt: asDate(data.updatedAt),
+    printedAt: data.printedAt ? asDate(data.printedAt) : null,
+    lastPrintedAt: data.lastPrintedAt ? asDate(data.lastPrintedAt) : data.printedAt ? asDate(data.printedAt) : null,
+  };
+};
 
 export const firestoreWorkoutSessionRepository = {
   async create(appId: AppId, record: Omit<WorkoutSessionRecord, "createdAt" | "updatedAt" | "printedAt" | "lastPrintedAt">): Promise<void> {
@@ -47,13 +58,13 @@ export const firestoreWorkoutSessionRepository = {
 
   async get(appId: AppId, sessionId: string): Promise<WorkoutSessionRecord | null> {
     const snapshot = await getDoc(doc(getFirestoreClient(), workoutSessionsCollectionPath(appId), sessionId));
-    return snapshot.exists() ? mapRecord(snapshot.id, snapshot.data()) : null;
+    return snapshot.exists() ? mapWorkoutSessionRecord(snapshot.id, snapshot.data()) : null;
   },
 
   subscribe(appId: AppId, callback: (records: WorkoutSessionRecord[]) => void, onError: (message: string) => void): Unsubscribe {
     return onSnapshot(
       query(collection(getFirestoreClient(), workoutSessionsCollectionPath(appId)), orderBy("createdAt", "desc")),
-      (snapshot) => callback(snapshot.docs.map((item) => mapRecord(item.id, item.data()))),
+      (snapshot) => callback(snapshot.docs.map((item) => mapWorkoutSessionRecord(item.id, item.data()))),
       (error) => onError(`${error.code}: ${error.message}`),
     );
   },
@@ -64,7 +75,7 @@ export const firestoreWorkoutSessionRepository = {
     return runTransaction(db, async (transaction) => {
       const snapshot = await transaction.get(ref);
       if (!snapshot.exists()) throw new Error("Workout Session을 찾지 못했습니다.");
-      const current = mapRecord(snapshot.id, snapshot.data());
+      const current = mapWorkoutSessionRecord(snapshot.id, snapshot.data());
       const copyCount = current.print.copyCount + 1;
       const timestamp = serverTimestamp();
       transaction.update(ref, {

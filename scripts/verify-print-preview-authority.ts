@@ -4,7 +4,7 @@ import type { WorkoutSessionRecord } from "../src/features/workout-sessions/doma
 import type { Program } from "../src/features/programs/types/program.types";
 
 const exercises = Array.from({ length: 9 }, (_, index) => ({ exerciseId: `catalog-${index + 1}`, programExerciseId: `source-${index + 1}`, name: `Exercise ${index + 1}`, order: index + 1, plannedSets: [2, 3, 4, 5][index % 4], memo: index === 2 ? "paired note" : "" }));
-const session = { sessionId: "ws-test", memberId: "member", programId: "program", prescription: { sourceProgramId: "program", sourceProgramName: "Persisted Program", exercises } } as unknown as WorkoutSessionRecord;
+const session = { sessionId: "ws-test", memberId: "member", programId: "program", programSnapshot: { title: "Persisted Program" }, prescription: { sourceProgramId: "program", sourceProgramName: "Persisted Program", exercises } } as unknown as WorkoutSessionRecord;
 let legacyCalls = 0;
 const hostileLegacy = async (): Promise<Program> => { legacyCalls += 1; throw new Error("legacy must not run"); };
 const run = async () => {

@@ -5,9 +5,9 @@ import { routes } from "../../../app/routes";
 import { palette } from "../../../theme/palette";
 
 const navItems = [
-  { label: "추천 출력", to: routeBuilder.print(), matches: [routeBuilder.print(), routeBuilder.quickPrint(), routeBuilder.dashboard()] },
-  { label: "출력 이력", to: routeBuilder.master("history"), matches: [routeBuilder.master(), routes.printHistory] },
-  { label: "처음으로", to: routeBuilder.print(), matches: [] },
+  { id: "recommend-print", label: "추천 출력", to: routeBuilder.print(), matches: [routeBuilder.print(), routeBuilder.quickPrint(), routeBuilder.dashboard()] },
+  { id: "print-history", label: "출력 이력", to: routeBuilder.master("history"), matches: [routeBuilder.master(), routes.printHistory] },
+  { id: "home", label: "처음으로", to: routeBuilder.print(), matches: [] },
 ];
 
 export const AppHeader = (): JSX.Element => {
@@ -41,7 +41,7 @@ export const AppHeader = (): JSX.Element => {
               <Button
                 component={RouterLink}
                 reloadDocument={item.label === "처음으로"}
-                key={item.to}
+                key={`${item.id}-${item.to}`}
                 size="small"
                 to={item.to}
                 variant={active ? "contained" : "text"}

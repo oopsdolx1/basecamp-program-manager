@@ -25,6 +25,9 @@ assert.match(welcome, /borderRadius: "50%"/);
 assert.match(welcome, /pointerEvents: "none"/);
 assert.match(welcome, /프로그램 시작/);
 assert.match(welcome, /이전 운동 기록 보기/);
+assert.match(welcome, /linear-gradient\(135deg, #F2D56B 0%, #DDB84A 100%\)/);
+assert.match(welcome, /minHeight: \{ md: 120, xs: 100 \}/);
+assert.doesNotMatch(welcome, /BASECAMP PROGRAM MANAGER/);
 assert.doesNotMatch(welcome, /translateY/);
 
 assert.match(picker, /height: \{ md: "min\(1280px, 74vh\)", xs: "100dvh" \}/);

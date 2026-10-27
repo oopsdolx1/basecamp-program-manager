@@ -216,6 +216,16 @@ export const PrintPreviewPage = (): JSX.Element => {
     setHistoryWarning(null);
     void requestPrint();
   };
+  const retryPreview = () => {
+    // Preview failures occur before physical submission.  Regenerate the
+    // canonical artifact and let the readiness effect dispatch once its PDF
+    // is available again.
+    autoPrintStarted.current = false;
+    physicalPrintInFlight.current = false;
+    setSessionError(null);
+    setHistoryWarning(null);
+    setPreviewRetryKey((current) => current + 1);
+  };
   const requestPrint = async () => {
     if (state.status !== "ready" || printRequest.saving || markingPrinted || physicalPrintInFlight.current || !workoutSessionId) return;
     physicalPrintInFlight.current = true;
@@ -279,6 +289,7 @@ export const PrintPreviewPage = (): JSX.Element => {
   if (completedPrints > 0) return <><PrintSourceDocument document={state.document} /><Box sx={{ alignItems: "center", bgcolor: colors.neutral.black, display: "flex", justifyContent: "center", minHeight: "100vh", p: { md: `${spacing[8]}px`, xs: `${spacing[4]}px` } }}><Stack alignItems="center" spacing={`${spacing[3]}px`} sx={{ maxWidth: 560, width: "100%" }} textAlign="center"><CheckCircleIcon sx={{ color: colors.semantic.success, fontSize: 64, mt: `${spacing[4]}px` }} /><Box><Typography fontSize={{ md: 42, xs: 30 }} fontWeight={900}>출력이 완료되었습니다.</Typography><Typography color={colors.neutral.gray400} sx={{ fontSize: { md: 22, xs: 17 }, mt: `${spacing[1]}px` }}>{state.document.member.name} · {state.document.program.title}</Typography></Box>{markingPrinted || printRequest.saving ? <Typography color={colors.neutral.gray400}>출력 기록을 저장하고 있습니다.</Typography> : historyWarning ? <Alert severity="warning">출력 기록 저장 상태를 확인해 주세요.</Alert> : <Typography color={colors.neutral.gray400} variant="body2">{secondsRemaining}초 후 처음 화면으로 돌아갑니다.</Typography>}<Stack spacing={`${spacing[2]}px`} sx={{ mt: `${spacing[2]}px`, width: "100%" }}><Button fullWidth onClick={goWorkspace} sx={{ fontSize: { md: 28, xs: 23 }, minHeight: 92 }}>처음으로</Button><Button fullWidth disabled={markingPrinted || printRequest.saving} loading={markingPrinted || printRequest.saving} variant="secondary" onClick={() => { setSecondsRemaining(30); void requestPrint(); }} sx={{ fontSize: { md: 22, xs: 18 }, minHeight: 72 }}>다시 출력</Button><Button fullWidth variant="tertiary" startIcon={<DownloadIcon />} disabled={!printArtifactId || pdfSaveInProgress} onClick={() => void savePdf()}>PDF 저장</Button></Stack></Stack></Box></>;
 
   if (autoPrint && !isUserGesturePdfPrintAdapter(configuredPrintAdapter) && printArtifactError) return <><PrintSourceDocument document={state.document} /><Box sx={{ bgcolor: colors.neutral.black, minHeight: "100vh", p: `${spacing[6]}px` }}><Card sx={{ margin: "0 auto", maxWidth: 760 }}><Stack spacing={`${spacing[3]}px`}><EmptyState title={userFacingPrintError(printArtifactError)} description="인쇄 서비스를 확인한 뒤 다시 시도해 주세요." /><Button onClick={() => setPreviewRetryKey((current) => current + 1)}>다시 시도</Button><Button variant="secondary" onClick={goWorkspace}>프로그램으로 돌아가기</Button></Stack></Card></Box></>;
+  if (autoPrint && !isUserGesturePdfPrintAdapter(configuredPrintAdapter) && visualPdfPreviewError) return <><PrintSourceDocument document={state.document} /><Box sx={{ bgcolor: colors.neutral.black, minHeight: "100vh", p: `${spacing[6]}px` }}><Card sx={{ margin: "0 auto", maxWidth: 760 }}><Stack spacing={`${spacing[3]}px`}><EmptyState title="인쇄 미리보기를 준비하지 못했습니다." description="인쇄 서비스를 확인한 뒤 다시 시도해 주세요." /><Button onClick={retryPreview}>다시 시도</Button><Button variant="secondary" onClick={goWorkspace}>프로그램으로 돌아가기</Button></Stack></Card></Box></>;
   if (autoPrint && !isUserGesturePdfPrintAdapter(configuredPrintAdapter) && (printRequest.error || sessionError)) return <><PrintSourceDocument document={state.document} /><Box sx={{ bgcolor: colors.neutral.black, minHeight: "100vh", p: `${spacing[6]}px` }}><Card sx={{ margin: "0 auto", maxWidth: 760 }}><Stack spacing={`${spacing[3]}px`}><EmptyState title="출력하지 못했습니다. 프린터 연결을 확인해 주세요." description="잠시 후 다시 시도해 주세요." /><Button onClick={retryAutoPrint}>다시 시도</Button><Button variant="secondary" onClick={goWorkspace}>프로그램으로 돌아가기</Button></Stack></Card></Box></>;
   if (autoPrint && !isUserGesturePdfPrintAdapter(configuredPrintAdapter)) return <><PrintSourceDocument document={state.document} /><Box sx={{ bgcolor: colors.neutral.black, minHeight: "100vh", p: `${spacing[6]}px` }}><Card sx={{ margin: "0 auto", maxWidth: 760 }}><Stack spacing={`${spacing[3]}px`}><Loading label={printRequest.error || sessionError || "운동 세션과 QR을 확인하고 인쇄를 요청하고 있습니다."} progress={printRequest.error || sessionError ? undefined : 85} /><Button fullWidth variant="secondary" startIcon={<DownloadIcon />} disabled={!printArtifactId || pdfSaveInProgress} onClick={() => void savePdf()}>PDF 저장</Button>{downloadError ? <Alert severity="error">{downloadError}</Alert> : null}</Stack></Card></Box></>;
   const checklist = [

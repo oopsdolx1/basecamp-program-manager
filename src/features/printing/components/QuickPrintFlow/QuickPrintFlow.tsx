@@ -218,37 +218,22 @@ const MemberIntelligenceCard = ({ intelligence, status }: { intelligence: Member
 const TrainingTrendCard = ({ periodization, status }: { periodization: PeriodizationSummary | null; status: IntelligenceStatus }): JSX.Element => <Card sx={infoCardSx}><CardContent><Stack spacing={2}><Stack direction="row" justifyContent="space-between" spacing={1}><Typography variant="h2">Training Trend</Typography>{status === "loading" ? <Chip label="분석 중" size="small" /> : null}</Stack>{status === "loading" ? <LinearProgress /> : null}{!periodization ? <Typography color="text.secondary">최근 운동 흐름을 분석하면 Cycle, Plateau, Deload, 다음 추천을 표시합니다.</Typography> : <Grid container spacing={1.5}><Grid item md={3} xs={6}><Typography color="text.secondary">현재 Cycle</Typography><Typography fontWeight={900}>{periodization.currentCycle}</Typography></Grid><Grid item md={3} xs={6}><Typography color="text.secondary">Recovery</Typography><Typography fontWeight={900}>{recoveryTrendLabel(periodization.recoveryTrend)}</Typography></Grid><Grid item md={3} xs={6}><Typography color="text.secondary">Plateau</Typography><Typography fontWeight={900}>{periodization.plateau ? "Yes" : "No"}</Typography></Grid><Grid item md={3} xs={6}><Typography color="text.secondary">다음 추천</Typography><Typography fontWeight={900}>{periodization.nextProgramHint ?? "없음"}</Typography></Grid><Grid item md={3} xs={6}><Chip color="primary" label={modeLabel(periodization.recommendedMode)} /></Grid><Grid item md={3} xs={6}><Chip color={periodization.deload ? "warning" : "default"} label={periodization.deload ? "Deload" : "Normal Load"} variant={periodization.deload ? "filled" : "outlined"} /></Grid><Grid item md={3} xs={6}><Chip label={`주간 운동 ${periodization.weeklyFrequency}회`} variant="outlined" /></Grid><Grid item md={3} xs={6}><Chip label={`반복 ${periodization.repeatedProgramCount}회`} variant="outlined" /></Grid><Grid item xs={12}><Typography color="text.secondary">최근 Program</Typography><Stack direction="row" flexWrap="wrap" gap={1} sx={{ mt: 0.5 }}>{periodization.recentProgramSequence.length > 0 ? periodization.recentProgramSequence.map((title) => <Chip key={title} label={title} size="small" />) : <Chip label="기록 없음" size="small" variant="outlined" />}</Stack></Grid></Grid>}</Stack></CardContent></Card>;
 
 const factorDisplayLabel = (factor: RecommendationTrace["decisionFactors"][number]): string => ({
-  condition: "컨디션 적합",
-  recentWorkout: "최근 운동",
-  exerciseOverlap: "최근 운동 중복",
-  recovery: "회복 상태",
-  risk: "운동 위험도",
-  programRepeat: "프로그램 반복",
-  bias: "운동 부위 균형",
-  history: "운동 이력",
-  periodization: "운동 주기",
-  plateau: "정체 상태",
-  weeklyFrequency: "주간 빈도",
-  favorite: "즐겨찾기",
-  usageCount: "최근 사용 이력",
-  capacity: "수행 기록",
+  condition: "오늘 컨디션을 반영했어요",
+  recentWorkout: "최근 운동 중복을 줄였어요",
+  exerciseOverlap: "최근 운동 종목 중복을 줄였어요",
+  recovery: "회복 상태를 반영했어요",
+  risk: "무리하지 않도록 조정했어요",
+  programRepeat: "프로그램 반복을 줄였어요",
+  bias: "운동 부위 균형을 맞췄어요",
+  history: "최근 운동 간격을 반영했어요",
+  periodization: "최근 운동 흐름을 반영했어요",
+  plateau: "정체 신호를 반영했어요",
+  weeklyFrequency: "주간 운동 빈도를 반영했어요",
+  favorite: "선호 프로그램을 반영했어요",
+  usageCount: "누적 사용 기록을 반영했어요",
+  capacity: "최근 수행 기록을 반영했어요",
 })[factor.key] ?? factor.label;
-const factorDisplayReason = (factor: RecommendationTrace["decisionFactors"][number]): string => ({
-  condition: "오늘 컨디션에 맞는 강도를 고려했습니다.",
-  recentWorkout: "최근 운동 부위와의 균형을 고려했습니다.",
-  exerciseOverlap: "최근 운동과 운동 종목 중복을 확인했습니다.",
-  recovery: "현재 회복 상태를 고려했습니다.",
-  risk: "무리하지 않도록 주의가 필요한 요소를 반영했습니다.",
-  programRepeat: "같은 프로그램의 반복 여부를 확인했습니다.",
-  bias: "최근 운동 부위의 균형을 확인했습니다.",
-  history: "최근 운동 이력을 함께 확인했습니다.",
-  periodization: "최근 운동 흐름에 맞춰 강도를 조정했습니다.",
-  plateau: "최근 운동 변화와 회복 흐름을 확인했습니다.",
-  weeklyFrequency: "이번 주 운동 빈도를 고려했습니다.",
-  favorite: "자주 선택한 프로그램을 참고했습니다.",
-  usageCount: "최근 프로그램 사용 이력을 참고했습니다.",
-  capacity: "최근 확인된 수행 기록을 참고했습니다.",
-})[factor.key] ?? factor.reason;
+const factorDisplayReason = (factor: RecommendationTrace["decisionFactors"][number]): string => factor.reason;
 
 const RecommendationTraceCard = ({
   recommendation,

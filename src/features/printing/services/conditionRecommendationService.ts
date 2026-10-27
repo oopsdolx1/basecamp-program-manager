@@ -4,6 +4,7 @@ import { resolveExercise } from "../../exercise-resolver/services/exerciseResolv
 import type { WorkoutHistoryRecord } from "../providers/workoutHistoryProvider";
 import { sanitizeProgramForm } from "../../programs/services/programService";
 import { buildMemberCapacityProfile } from "./memberCapacityProfileService";
+import { buildRecommendationEvidence } from "./recommendationEvidenceService";
 import { buildProgramDemandProfile, evaluateCapacityFit } from "./programDemandCapacityFitService";
 import type { Program, ProgramCategory, ProgramDifficulty, ProgramFormValues } from "../../programs/types/program.types";
 import type {
@@ -481,6 +482,7 @@ export const recommendProgram = (
       reason: "Highest Score",
     },
     decisionFactors: selected.trace.decisionFactors,
+    evidence: buildRecommendationEvidence({ factors: selected.trace.decisionFactors, history: workoutHistory, program: selected.program, condition }),
     scores: topCandidates.map((candidate) => ({
       programId: candidate.program.id,
       title: candidate.program.title,

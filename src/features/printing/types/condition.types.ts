@@ -111,6 +111,14 @@ export interface RecommendationTraceFactor {
   reason: string;
 }
 
+export type RecommendationEvidence = {
+  type: "low_body_part_frequency" | "body_part_rest_days" | "recent_body_part_repetition" | "exercise_repetition" | "condition_adjustment" | "history_fallback";
+  title: string;
+  description: string;
+  impact: number;
+  direction: "positive" | "negative";
+};
+
 export interface RecommendationTraceCandidate {
   programId: string;
   title: string;
@@ -133,6 +141,7 @@ export interface RecommendationTrace {
     reason: string;
   };
   decisionFactors: RecommendationTraceFactor[];
+  evidence?: RecommendationEvidence[];
   scores: RecommendationTraceScore[];
   engineVersion: "1";
   generatedAt: string;

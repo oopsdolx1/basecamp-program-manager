@@ -6,7 +6,7 @@ import { AppHeader } from "../AppHeader";
 
 export const AppLayout = ({ children }: PropsWithChildren): JSX.Element => {
   const location = useLocation();
-  const isFixedHeightKioskRoute = location.pathname === "/program-manager/print";
+  const isFixedHeightKioskRoute = location.pathname === "/program-manager/print" || location.pathname.startsWith("/program-manager/workout-sessions");
 
   return (
     <Box

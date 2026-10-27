@@ -55,8 +55,8 @@ export const WorkoutSessionsPage = ({ initialSessionId = null }: { initialSessio
   const selected = useMemo(() => filtered.find(({ sessionId }) => sessionId === selectedId) ?? null, [filtered, selectedId]);
 
   return (
-    <Box sx={{ bgcolor: colors.neutral.black, minHeight: "calc(100dvh - 52px)", p: { md: `${spacing[6]}px`, xs: `${spacing[4]}px` } }}>
-      <Stack spacing={`${spacing[4]}px`} sx={{ margin: "0 auto", maxWidth: 1040 }}>
+    <Box sx={{ bgcolor: colors.neutral.black, display: "flex", height: "100%", minHeight: 0, overflow: "hidden", p: { md: `${spacing[6]}px`, xs: `${spacing[4]}px` } }}>
+      <Stack justifyContent="center" spacing={`${spacing[4]}px`} sx={{ flex: "1 1 auto", margin: "0 auto", maxHeight: "100%", maxWidth: 1040, minHeight: 0, overflow: "hidden" }}>
         <Box textAlign="center"><Typography color={colors.primary.gold} fontWeight={800} variant="overline">WORKOUT HISTORY</Typography><Typography fontWeight={800} variant="h4">이전 운동기록</Typography><Typography color={colors.neutral.gray400}>회원의 출력·저장된 운동 기록을 확인할 수 있습니다.</Typography></Box>
         <Card><Stack spacing={`${spacing[3]}px`}><Input fullWidth label="회원명 또는 운동명으로 검색" value={query} onChange={(event) => setQuery(event.target.value)} InputProps={{ startAdornment: <SearchIcon sx={{ mr: 1 }} /> }} /><Stack direction="row" flexWrap="wrap" gap={`${spacing[2]}px`} justifyContent="center">{periodFilters.map((item) => <Chip key={item.value} clickable label={item.label} selected={period === item.value} onClick={() => setPeriod(item.value)} sx={{ minHeight: 48 }} />)}</Stack></Stack></Card>
         {status === "loading" ? <Card><Loading label="운동기록을 불러오는 중" /></Card> : null}

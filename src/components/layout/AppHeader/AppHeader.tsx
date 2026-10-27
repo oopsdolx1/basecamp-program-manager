@@ -6,7 +6,7 @@ import { palette } from "../../../theme/palette";
 
 const navItems = [
   { id: "recommend-print", label: "추천 출력", to: routeBuilder.print(), matches: [routeBuilder.print(), routeBuilder.quickPrint(), routeBuilder.dashboard()] },
-  { id: "print-history", label: "출력 이력", to: routeBuilder.master("history"), matches: [routeBuilder.master(), routes.printHistory] },
+  { id: "workout-history", label: "이전 운동기록", to: routeBuilder.workoutSessions(), matches: [routes.workoutSessions, routes.workoutSessionDetail, routes.printHistory] },
   { id: "home", label: "처음으로", to: routeBuilder.print(), matches: [] },
 ];
 

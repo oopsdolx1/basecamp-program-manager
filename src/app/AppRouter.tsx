@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import { PageContainer } from "../components/layout/PageContainer";
 import { MasterPage } from "../features/master";
 import { PrintPreviewPage, QuickPrintPage } from "../features/printing";
@@ -13,12 +13,7 @@ const PlaceholderPage = ({ title }: { title: string }): JSX.Element => (
   </PageContainer>
 );
 
-const LegacyPrintHistoryRedirect = (): JSX.Element => {
-  const location = useLocation();
-  const params = new URLSearchParams(location.search);
-  params.set("tab", "history");
-  return <Navigate replace to={`${routes.master}?${params.toString()}`} />;
-};
+const LegacyPrintHistoryRedirect = (): JSX.Element => <Navigate replace to={routeBuilder.workoutSessions()} />;
 
 export const AppRouter = (): JSX.Element => (
   <Routes>

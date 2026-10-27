@@ -28,7 +28,10 @@ assert.match(welcome, /프로그램 시작/);
 assert.match(welcome, /이전 운동 기록 보기/);
 assert.match(welcome, /linear-gradient\(135deg, #F2D56B 0%, #DDB84A 100%\)/);
 assert.match(welcome, /minHeight: \{ md: 120, xs: 100 \}/);
-assert.match(welcome, /whiteSpace: "nowrap"/);
+assert.match(flow, /welcomeCopyOptions = \[/);
+assert.match(welcome, /height: \{ md: 132, xs: 86 \}/);
+assert.match(welcome, /WebkitLineClamp: 2/);
+assert.doesNotMatch(welcome, /whiteSpace: "nowrap"/);
 assert.doesNotMatch(welcome, /BASECAMP PROGRAM MANAGER/);
 assert.doesNotMatch(welcome, /translateY/);
 
@@ -37,6 +40,10 @@ assert.match(flow, /height: "100%", justifyContent: "center", minHeight: 0/);
 assert.match(flow, /maxHeight: \{ md: 290, xs: 260 \}, overflowY: "auto"/);
 assert.match(flow, /Grid item md=\{4\} xs=\{12\}/);
 assert.match(flow, /Grid item md=\{8\} xs=\{12\}/);
+assert.doesNotMatch(flow, /Grid container spacing=\{2\}><Grid item md=\{6\} xs=\{12\}><Stack spacing=\{1\}><Typography fontWeight=\{900\}>확인 사항/);
+assert.match(flow, /<Stack spacing=\{2\}><Stack spacing=\{1\}><Typography fontWeight=\{900\}>확인 사항/);
+assert.match(flow, /border: 1/);
+assert.doesNotMatch(flow, /border: selected \? 2/);
 
 assert.match(printPreview, /height: "100%"/);
 assert.match(printPreview, /minHeight: 0/);

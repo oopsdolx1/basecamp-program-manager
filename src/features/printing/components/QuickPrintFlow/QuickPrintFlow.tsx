@@ -54,7 +54,7 @@ import { createWorkoutSession } from "../../../workout-sessions/services/workout
 import { mapSessionPrescriptionExercises } from "../../../workout-sessions/services/sessionPrescriptionMapper";
 import { kiosk } from "../../../../design-system";
 import { SnapshotExerciseBuilderRow } from "../SnapshotExerciseBuilderRow/SnapshotExerciseBuilderRow";
-import { buildExerciseAddCandidates } from "../../services/exerciseAddCandidateService";
+import { addExerciseBatch, buildExerciseAddCandidates } from "../../services/exerciseAddCandidateService";
 
 type PrintStep = 1 | 2 | 3 | 4 | 5;
 type IntelligenceStatus = "idle" | "loading" | "ready" | "error";
@@ -456,11 +456,10 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
     setManualMode(false);
   };
 
-  const addExerciseToBuilder = (candidate: typeof catalogOptions[number]) => {
+  const addExercisesToBuilder = (candidates: typeof catalogOptions) => {
     if (!builderHistory) return;
-    const result = snapshotBuilderService.addExercise(builderHistory, candidate);
-    setBuilderHistory(result.history);
-    if (result.eligibility.allowed) setAddPickerOpen(false);
+    setBuilderHistory(addExerciseBatch(builderHistory, candidates));
+    setAddPickerOpen(false);
   };
 
   const runRecommendation = async () => {
@@ -606,7 +605,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
                 ))}
               </Stack>
               <Stack alignItems="center" spacing={1.5}><Button disabled={(builderState?.exercises.length ?? 0) >= 8} startIcon={<AddIcon sx={{ fontSize: 28 }} />} variant="outlined" onClick={() => setAddPickerOpen(true)} sx={{ fontSize: { md: 25, xs: 21 }, minHeight: { md: 78, xs: 68 }, minWidth: { md: 300, xs: "100%" } }}>{(builderState?.exercises.length ?? 0) >= 8 ? "운동은 최대 8개까지" : "운동 추가"}</Button><Button disabled={!builderState?.exercises.length} endIcon={<ArrowForwardIcon sx={{ fontSize: 32 }} />} variant="contained" onClick={() => setCurrentStep(5)} sx={{ fontSize: { md: 30, xs: 24 }, minHeight: { md: 94, xs: 80 }, minWidth: { md: 540, xs: "100%" } }}>출력 준비하기</Button></Stack>
-              <ExercisePicker disabledExerciseIds={duplicateCatalogIds} errorMessage={catalogState.status === "error" ? catalogState.message : undefined} exercises={catalogOptions} loading={catalogState.status === "loading"} open={addPickerOpen} onClose={() => setAddPickerOpen(false)} onSelect={addExerciseToBuilder} />
+              <ExercisePicker disabledExerciseIds={duplicateCatalogIds} errorMessage={catalogState.status === "error" ? catalogState.message : undefined} exercises={catalogOptions} loading={catalogState.status === "loading"} open={addPickerOpen} onClose={() => setAddPickerOpen(false)} onConfirmSelection={addExercisesToBuilder} onSelect={() => undefined} selectionLimit={Math.max(0, 8 - (builderState?.exercises.length ?? 0))} selectionMode="multiple" />
             </Stack>
           </Box>
         </Box>

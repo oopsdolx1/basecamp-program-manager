@@ -35,7 +35,7 @@ assert.equal(history.present.exercises.length, 3);
 assert.notEqual(addedExercise.id, "source-a", "successful add creates a transient identity");
 assert.notEqual(addedExercise.id, history.present.exercises[0].id, "new transient identity is unique");
 assert.equal(addedExercise.catalogExerciseId, "catalog-c", "catalog semantic identity is retained");
-assert.equal(addedExercise.plannedSets, 3, "existing addBlank plannedSets contract is retained");
+assert.equal(addedExercise.plannedSets, 4, "added exercises use the canonical four-set default");
 assert.equal(JSON.stringify(program), original, "successful add leaves canonical Program immutable");
 
 const session = mapSessionPrescriptionExercises(history.present.exercises, new Map());

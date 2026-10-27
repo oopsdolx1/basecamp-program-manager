@@ -25,6 +25,8 @@ export const buildRecommendationEvidence = ({
   if (historyFactor && history.length <= 1) evidence.push({ type: "history_fallback", title: "운동기록이 아직 적어요", description: "최근 운동기록이 충분하지 않아 오늘의 컨디션과 기본 프로그램 기준을 우선 반영했습니다.", impact: Math.abs(historyFactor.score), direction: historyFactor.score > 0 ? "positive" : "negative" });
   else if (historyFactor && targetHistory.length === 0) evidence.push({ type: "low_body_part_frequency", title: `최근 ${getCategoryLabel(program.category)} 운동이 적었어요`, description: `최근 14일 동안 ${getCategoryLabel(program.category)} 운동 기록이 없습니다.`, impact: Math.abs(historyFactor.score), direction: historyFactor.score > 0 ? "positive" : "negative" });
   else if (historyFactor && targetHistory[0]) {
+    const recent14Days = targetHistory.filter((entry) => now.getTime() - entry.workoutDate.getTime() <= 14 * dayMs).length;
+    if (recent14Days <= 1) evidence.push({ type: "low_body_part_frequency", title: `최근 ${getCategoryLabel(program.category)} 운동이 적었어요`, description: `최근 14일 동안 ${getCategoryLabel(program.category)} 운동은 ${recent14Days}회였습니다.`, impact: Math.abs(historyFactor.score), direction: historyFactor.score > 0 ? "positive" : "negative" });
     const days = Math.max(0, Math.floor((now.getTime() - targetHistory[0].workoutDate.getTime()) / dayMs));
     if (days >= 7) evidence.push({ type: "body_part_rest_days", title: "충분한 회복 시간이 지났어요", description: `마지막 ${getCategoryLabel(program.category)} 운동 후 ${days}일이 지났습니다.`, impact: Math.abs(historyFactor.score), direction: historyFactor.score > 0 ? "positive" : "negative" });
   }

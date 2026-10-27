@@ -44,16 +44,16 @@ const main = async (): Promise<void> => {
   await Promise.resolve();
   assert.equal(pendingGetStarted, true);
   let autoPrintStarted = false;
-  if (!autoPrintStarted && isPrintDispatchReady("windows-agent", postOnly, false)) {
+  if (!autoPrintStarted && isPrintDispatchReady("windows-agent", postOnly, true)) {
     autoPrintStarted = true;
-    assert.equal(await dispatchIfReady(adapter, false, postOnly), true);
+    assert.equal(await dispatchIfReady(adapter, true, postOnly), true);
   }
   assert.equal(calls, 1);
   // A second effect pass cannot duplicate the same automatic print.
   void visualPdfStillPending;
   await assert.rejects(fetchVisualPdfPreview({ endpoint: "http://agent", artifactId: postOnly.artifactId, fetchImpl: async () => { throw new Error("pdf_get_failed"); } }), /pdf_get_failed/);
   // A user-requested same-session reprint remains a separate deliberate dispatch.
-  assert.equal(await dispatchIfReady(adapter, false, postOnly), true);
+  assert.equal(await dispatchIfReady(adapter, true, postOnly), true);
   assert.equal(calls, 2);
   await assert.rejects(createPrintArtifactPreview({ endpoint: "http://agent", jobId: "session-2", artifact, fetchImpl: async () => new Response(JSON.stringify({ reason: "preview_failed" }), { status: 502 }) }), /preview_failed/);
   await assert.rejects(createPrintArtifactPreview({ endpoint: "http://agent", jobId: "session-3", artifact, fetchImpl: async () => { throw new TypeError("fetch failed"); } }), /print_agent_unavailable/);
@@ -61,7 +61,7 @@ const main = async (): Promise<void> => {
   assert.equal(calls, 2);
   assert.equal(isPrintDispatchReady("browser", postOnly, false), false);
   assert.equal(isPrintDispatchReady("browser", postOnly, true), true);
-  assert.equal(isPrintDispatchReady("windows-agent", postOnly, false), true);
+  assert.equal(isPrintDispatchReady("windows-agent", postOnly, false), false);
   assert.equal(isPrintDispatchReady("windows-agent", null, true), false);
   let downloaded = false;
   let appended = false;
@@ -90,7 +90,7 @@ const main = async (): Promise<void> => {
   assert.ok(runCleanup);
   runCleanup();
   assert.equal(revoked, true);
-  console.log("Print preview readiness checks: PASS (visual PDF failure does not block Windows artifact print; artifact failure blocks dispatch)");
+  console.log("Print preview readiness checks: PASS (Windows printing waits for the visual PDF and artifact; artifact failure blocks dispatch)");
 };
 
 void main().catch((error) => { console.error(error); process.exitCode = 1; });

@@ -79,4 +79,4 @@ export const fetchVisualPdfPreview = async ({ endpoint, artifactId, fetchImpl = 
 };
 
 export const isPrintDispatchReady = (runtime: PrintRuntime, artifact: PrintArtifactPreview | null, visualPdfReady: boolean): boolean =>
-  runtime === "windows-agent" ? Boolean(artifact) : visualPdfReady;
+  runtime === "windows-agent" ? Boolean(artifact) && visualPdfReady : visualPdfReady;

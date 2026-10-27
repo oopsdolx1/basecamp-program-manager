@@ -32,6 +32,9 @@ assert.match(flow, /welcomeCopyOptions = \[/);
 assert.match(welcome, /height: \{ md: 132, xs: 86 \}/);
 assert.match(welcome, /WebkitLineClamp: 2/);
 assert.doesNotMatch(welcome, /whiteSpace: "nowrap"/);
+assert.match(welcome, /whiteSpace: "normal"/);
+assert.match(welcome, /wordBreak: "keep-all"/);
+assert.match(welcome, /overflowWrap: "normal"/);
 assert.doesNotMatch(welcome, /BASECAMP PROGRAM MANAGER/);
 assert.doesNotMatch(welcome, /translateY/);
 
@@ -44,6 +47,9 @@ assert.doesNotMatch(flow, /Grid container spacing=\{2\}><Grid item md=\{6\} xs=\
 assert.match(flow, /<Stack spacing=\{2\}><Stack spacing=\{1\}><Typography fontWeight=\{900\}>확인 사항/);
 assert.match(flow, /border: 1/);
 assert.doesNotMatch(flow, /border: selected \? 2/);
+assert.match(flow, /position: "relative"/);
+assert.match(flow, /position: "absolute"/);
+assert.match(flow, /pointerEvents: "none"/);
 
 assert.match(printPreview, /height: "100%"/);
 assert.match(printPreview, /minHeight: 0/);

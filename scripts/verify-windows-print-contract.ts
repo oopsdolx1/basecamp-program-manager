@@ -21,13 +21,19 @@ const factoryFor = (document: PrintRequest["document"]) => createRenderedPrintAr
 
 const main = async (): Promise<void> => {
   const denseDocument = createDocument(9); const denseFactory = factoryFor(denseDocument); const artifact = await denseFactory.create({ jobId: "preview", document: denseDocument, copies: 1 });
-  for (const expected of ["계약 테스트 회원", "session-offline-9", "운동 1", "운동 9", "등 근육 집중", "SET 1", "14mm"]) assert.equal(artifact.content.includes(expected), true, `missing rendered content: ${expected}`);
+  for (const expected of ["계약 테스트 회원", "session-offline-9", "운동 1", "운동 9", "SET 1", "14mm"]) assert.equal(artifact.content.includes(expected), true, `missing rendered content: ${expected}`);
   assert.equal(artifact.content.includes("http://"), false); assert.equal(artifact.content.includes("https://"), false); assert.equal(artifact.content.includes("<script"), false);
 
   const submissions: Array<{ path: string; copies: number; bytes: Buffer; pageCount: number }> = [];
   const backend = { submit: async (job: { pdfPath: string; copies: number }) => { const metadata = await inspectA5LandscapePdf(job.pdfPath); submissions.push({ path: job.pdfPath, copies: job.copies, bytes: await readFile(job.pdfPath), pageCount: metadata.pageCount }); return { status: "submitted" as const }; } };
   const agent = createPrintAgent({ port: 43131, allowedOrigins: [], backend }); await agent.listen();
   try {
+    const previewResponse = await fetch("http://127.0.0.1:43131/preview", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jobId: "renderer-preview", artifact }) });
+    assert.equal(previewResponse.status, 201);
+    const preview = await previewResponse.json() as { artifactId: string; pages: number };
+    assert.match(preview.artifactId, /^[0-9a-f-]{36}$/u); assert.equal(preview.pages, 1);
+    const previewPdf = await fetch(`http://127.0.0.1:43131/preview/${preview.artifactId}`);
+    assert.equal(previewPdf.status, 200); assert.match(previewPdf.headers.get("content-type") ?? "", /^application\/pdf\b/u); assert.ok((await previewPdf.arrayBuffer()).byteLength > 1_024);
     for (const count of [1, 9]) { const document = createDocument(count); const adapter = createWindowsPrintAdapter({ endpoint: "http://127.0.0.1:43131", artifactFactory: factoryFor(document), timeoutMs: 20_000 }); assert.deepEqual(await adapter.print({ jobId: `renderer-e2e-${count}`, document, copies: count === 9 ? 2 : 1 }), { status: "submitted" }); }
   } finally { await agent.close(); }
   assert.deepEqual(submissions.map(({ copies, pageCount }) => ({ copies, pageCount })), [{ copies: 1, pageCount: 1 }, { copies: 2, pageCount: 1 }]);

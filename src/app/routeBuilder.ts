@@ -15,9 +15,10 @@ export const routeBuilder = {
     if (autoPrint) params.set("autoPrint", "1");
     return `/program-manager/print/${programId}?${params.toString()}`;
   },
-  printPreviewSession: (memberId: string, workoutSessionId: string, autoPrint = false): string => {
+  printPreviewSession: (memberId: string, workoutSessionId: string, autoPrint = false, reprint = false): string => {
     const params = new URLSearchParams({ memberId });
     if (autoPrint) params.set("autoPrint", "1");
+    if (reprint) params.set("reprint", "1");
     return `/program-manager/print/session/${workoutSessionId}?${params.toString()}`;
   },
   printHistory: (filters?: { memberId?: string; programId?: string; category?: string; search?: string }): string => {

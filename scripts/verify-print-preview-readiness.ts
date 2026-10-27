@@ -18,7 +18,8 @@ const main = async (): Promise<void> => {
   const factory = readFileSync("src/features/printing/gateways/printArtifactFactory.ts", "utf8");
   const css = readFileSync("src/features/printing/styles/print.css", "utf8");
   assert.equal(page.includes("const PrintSourceDocument"), true);
-  assert.equal(page.match(/<PrintSourceDocument document=\{state\.document\} \/>/g)?.length, 4);
+  assert.equal(page.match(/<PrintSourceDocument document=\{state\.document\} \/>/g)?.length, 6, "auto-print failures and reprint success retain the canonical source document");
+  assert.equal(page.includes("재출력을 요청했습니다."), true);
   assert.equal(page.includes("isRenderedPrintDocumentReady(artifactRequest)"), true);
   assert.equal(factory.includes("element.isConnected"), true);
   assert.equal(factory.includes("bounds.width > 0 && bounds.height > 0"), true);

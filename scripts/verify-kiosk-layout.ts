@@ -50,6 +50,11 @@ assert.doesNotMatch(flow, /border: selected \? 2/);
 assert.match(flow, /position: "relative"/);
 assert.match(flow, /position: "absolute"/);
 assert.match(flow, /pointerEvents: "none"/);
+const alcoholSection = flow.slice(flow.indexOf('title="음주 여부"'), flow.indexOf("오늘 상태 요약"));
+assert.match(alcoholSection, /variant="outlined"/);
+assert.match(alcoholSection, /position: "absolute"/);
+assert.match(alcoholSection, /opacity: selected \? 1 : 0/);
+assert.doesNotMatch(alcoholSection, /selected \? <CheckCircleIcon/);
 
 assert.match(printPreview, /height: "100%"/);
 assert.match(printPreview, /minHeight: 0/);

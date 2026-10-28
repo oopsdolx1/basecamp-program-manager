@@ -251,37 +251,55 @@
 }
 
 .exercise-print-table {
-  border-collapse: collapse;
   font-size: 7.2pt;
   page-break-inside: avoid;
   break-inside: avoid;
-  table-layout: fixed;
   width: 100%;
 }
 
-.exercise-print-table th,
-.exercise-print-table td {
+.exercise-table-header,
+.exercise-row > div {
   border: 0.2mm solid #999;
 }
 
-.exercise-print-table th {
+.exercise-table-header {
   background: #efefec;
+  display: grid;
   font-weight: 800;
   font-size: 7.6pt;
   height: 6.5mm;
+  grid-template-columns: 50mm 1fr;
+}
+
+.exercise-table-header span {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+}
+
+.exercise-table-header span + span {
+  border-left: 0.2mm solid #999;
 }
 
 .exercise-name-cell {
   padding: 1.5mm;
   vertical-align: top;
-  width: 50mm;
 }
 
 .exercise-row {
+  display: grid;
   height: auto;
   min-height: 12.1mm;
   page-break-inside: avoid;
   break-inside: avoid;
+}
+
+.exercise-row.four-set-row {
+  grid-template-columns: 50mm minmax(34mm, 1.35fr) repeat(4, minmax(18mm, 1fr));
+}
+
+.exercise-row.five-set-row {
+  grid-template-columns: 50mm repeat(5, minmax(18mm, 1fr));
 }
 
 .exercise-row:nth-child(even) {
@@ -292,52 +310,71 @@
   display: -webkit-box;
   font-size: 8.4pt;
   font-weight: 800;
-  -webkit-line-clamp: 1;
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   line-height: 1.15;
-  max-height: 3.2mm;
+  max-height: 7mm;
   overflow: hidden;
-  text-overflow: ellipsis;
+  word-break: keep-all;
 }
 
 .set-cell {
-  padding: 1mm;
-  vertical-align: top;
-}
-
-.set-cell.inactive {
-  background: #eeeeea;
-}
-
-.handwrite-grid {
-  display: grid;
-  gap: 0;
-  grid-template-columns: repeat(3, 1fr);
-  height: 9mm;
-}
-
-.handwrite-grid span {
-  border-right: 0.2mm solid #aaa;
-  color: #777;
+  align-items: center;
   display: flex;
-  font-size: 5.8pt;
-  justify-content: center;
-  padding-top: 0.45mm;
-  position: relative;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 1.1mm 0.7mm 0.9mm;
+}
+
+.set-label {
+  font-size: 6.6pt;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.set-fields {
+  color: #666;
+  font-size: 5.7pt;
+  line-height: 1.1;
   text-align: center;
+  white-space: nowrap;
 }
 
-.handwrite-grid span::after {
-  border-bottom: 0.2mm solid #999;
-  bottom: 0.55mm;
-  content: "";
-  left: 0.7mm;
-  position: absolute;
-  right: 0.7mm;
+.exercise-point-cell {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 0.9mm 1.2mm;
 }
 
-.handwrite-grid span:last-child {
-  border-right: 0;
+.exercise-point-label {
+  color: #555;
+  font-size: 5.6pt;
+  font-weight: 800;
+  line-height: 1;
+  margin-bottom: 0.5mm;
+}
+
+.exercise-point-text {
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  display: -webkit-box;
+  font-size: 6.4pt;
+  line-height: 1.2;
+  overflow: hidden;
+  word-break: keep-all;
+}
+
+.exercise-row > div + div {
+  border-left: 0;
+}
+
+.exercise-row > .exercise-name-cell,
+.exercise-row > .exercise-point-cell,
+.exercise-row > .set-cell {
+  box-sizing: border-box;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .print-footer {

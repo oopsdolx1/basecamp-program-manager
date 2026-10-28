@@ -32,8 +32,10 @@ const toRows = (program: Program, minimumRowCount: number): PrintExerciseRow[] =
   const rows: PrintExerciseRow[] = program.exercises
     .map((exercise) => ({
       order: exercise.order,
-      exerciseName: truncateText(resolved.get(exercise.id)?.name ?? exercise.name, 34),
-      exerciseMemo: truncateText(exercise.memo ?? "", 28),
+      // The print template owns visual truncation so Korean names can wrap at
+      // word boundaries before its two-line clamp is applied.
+      exerciseName: resolved.get(exercise.id)?.name ?? exercise.name,
+      exerciseMemo: exercise.memo ?? "",
       memberWhy: truncateText(resolved.get(exercise.id)?.memberWhy ?? "", 72),
       configuredSets: exercise.sets,
       isBlank: false,
@@ -108,8 +110,8 @@ export const createWorkoutPrintDocument = ({
         .map((exercise) => ({
           id: exercise.id,
           exerciseId: resolved.get(exercise.id)?.id ?? exercise.catalogExerciseId ?? exercise.id,
-          name: truncateText(resolved.get(exercise.id)?.name ?? exercise.name, 34),
-          memo: truncateText(exercise.memo ?? "", 28),
+          name: resolved.get(exercise.id)?.name ?? exercise.name,
+          memo: exercise.memo ?? "",
           memberWhy: truncateText(resolved.get(exercise.id)?.memberWhy ?? "", 72),
           order: exercise.order,
           configuredSets: exercise.sets,

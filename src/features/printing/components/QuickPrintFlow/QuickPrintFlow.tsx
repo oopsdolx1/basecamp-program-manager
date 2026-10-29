@@ -279,6 +279,40 @@ const RecommendationSummarySplit = ({ condition, recommendation, trace }: { cond
   return <Box><Typography sx={{ fontSize: { md: 28, xs: 22 }, fontWeight: 900 }}>추천 분석</Typography><Typography color="text.secondary">최근 운동기록과 오늘의 컨디션을 함께 확인하세요.</Typography><Grid container spacing={2} sx={{ mt: 0.5 }}><Grid item md={6} xs={12}><Card sx={{ ...infoCardSx, height: "100%" }}><CardContent><Stack spacing={1}><Typography fontWeight={900}>확인사항</Typography>{summary?.confirmations.length ? summary.confirmations.slice(0, 2).map((message) => <Stack key={message} direction="row" spacing={1}><CheckCircleIcon color="success" fontSize="small" /><Typography fontWeight={700}>{message}</Typography></Stack>) : <Typography color="text.secondary">최근 운동기록을 바탕으로 추천했습니다.</Typography>}</Stack></CardContent></Card></Grid><Grid item md={6} xs={12}><Card sx={{ ...infoCardSx, height: "100%" }}><CardContent><Stack spacing={1}><Typography fontWeight={900}>주의사항</Typography>{summary?.cautions.length ? summary.cautions.slice(0, 2).map((caution) => <Stack key={caution.message} direction="row" spacing={1}><WarningAmberIcon color="warning" fontSize="small" /><Typography fontWeight={700}>{caution.message}</Typography></Stack>) : <Typography color="text.secondary">특별한 주의 사항이 없습니다.</Typography>}</Stack></CardContent></Card></Grid></Grid></Box>;
 };
 
+const RecommendationAlternativeCards = ({
+  rankedPrograms,
+  recommendedProgramId,
+  selectedProgramId,
+  onSelect,
+}: {
+  rankedPrograms: Array<{ program: Program }>;
+  recommendedProgramId: Program["id"];
+  selectedProgramId: Program["id"];
+  onSelect: (program: Program) => void;
+}): JSX.Element | null => {
+  const alternatives = rankedPrograms.filter(({ program }) => program.id !== recommendedProgramId).slice(0, 2);
+  if (alternatives.length === 0) return null;
+
+  return <Box>
+    <Typography sx={{ fontSize: { md: 21, xs: 18 }, fontWeight: 900, mb: 1 }}>다른 추천 프로그램</Typography>
+    <Stack spacing={1}>
+      {alternatives.map(({ program }) => {
+        const rank = rankedPrograms.findIndex(({ program: ranked }) => ranked.id === program.id) + 1;
+        const selected = selectedProgramId === program.id;
+        return <CardActionArea key={program.id} aria-label={`${rank}순위 ${program.title} 선택`} aria-pressed={selected} onClick={() => onSelect(program)} sx={{ bgcolor: selected ? palette.primaryGoldMuted : palette.surfaceInteractive, border: 1, borderColor: selected ? "primary.main" : "divider", borderRadius: `${palette.radiusSm}px`, minHeight: { md: 68, xs: 62 }, px: { md: 2, xs: 1.5 }, "&:hover": { borderColor: "primary.main" }, "&:focus-visible": { outline: `3px solid ${palette.primaryGoldGlowStrong}`, outlineOffset: 3 } }}>
+          <Stack alignItems="center" direction="row" justifyContent="space-between" spacing={1.5}>
+            <Stack alignItems="center" direction="row" spacing={1.25} sx={{ minWidth: 0 }}>
+              <Typography color="primary.main" sx={{ fontSize: { md: 19, xs: 17 }, fontWeight: 900 }}>{String(rank).padStart(2, "0")}</Typography>
+              <Box sx={{ minWidth: 0 }}><Typography noWrap sx={{ fontSize: { md: 20, xs: 17 }, fontWeight: 800 }}>{program.title}</Typography><Typography color="text.secondary" noWrap sx={{ fontSize: { md: 14, xs: 12 } }}>{getCategoryLabel(program.category)} · {getDifficultyLabel(program.difficulty)} · {program.exercises.length}개 운동 · {program.exercises.reduce((sum, exercise) => sum + exercise.sets, 0)}세트</Typography></Box>
+            </Stack>
+            {selected ? <CheckCircleIcon color="primary" sx={{ fontSize: 25 }} /> : null}
+          </Stack>
+        </CardActionArea>;
+      })}
+    </Stack>
+  </Box>;
+};
+
 export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }: QuickPrintFlowProps): JSX.Element => {
   const navigate = useNavigate();
   const { programState, programs } = usePrograms(appId);
@@ -559,7 +593,16 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
         </Box>
       ) : null}
 
-      {currentStep === 3 ? <Box sx={{ ...centeredWorkflowSx(1080), height: "100%", minHeight: 0, overflow: "hidden" }}><Stack spacing={2.25} sx={{ height: "100%", justifyContent: "center", minHeight: 0 }}><Stack direction="row" justifyContent="space-between" spacing={2}><Box><Typography sx={{ fontSize: { md: 46, xs: 34 }, fontWeight: 900 }}>오늘의 추천 프로그램</Typography><Typography color="text.secondary">컨디션을 기준으로 가장 적합한 프로그램입니다.</Typography></Box><Button startIcon={<ArrowBackIcon />} variant="outlined" onClick={() => setCurrentStep(2)}>컨디션 수정</Button></Stack>{recommendation && selectedRecommendationProgram ? <Stack spacing={2} sx={{ minHeight: 0 }}><Card sx={{ bgcolor: palette.primaryGoldMuted, border: 2, borderColor: "primary.main", boxShadow: palette.shadowAccentStrong }}><CardContent sx={{ p: { md: 3, xs: 2 } }}><Stack spacing={2}><Stack direction="row" spacing={2}><Box sx={{ alignItems: "center", bgcolor: "rgba(0,0,0,.16)", border: 1, borderColor: "primary.main", borderRadius: `${palette.radiusMd}px`, display: "flex", justifyContent: "center", minWidth: 150 }}><MuscleSilhouette active area={categoryToBodyArea(selectedRecommendationProgram.category)} large /></Box><Box sx={{ flex: 1 }}><Typography color="primary.main" fontWeight={900}>{selectedRecommendationRank === 1 ? "BEST" : "추천 프로그램"}</Typography><Typography sx={{ fontSize: { md: 42, xs: 30 }, fontWeight: 900 }}>{selectedRecommendationProgram.title}</Typography><Typography color="text.secondary">{getCategoryLabel(selectedRecommendationProgram.category)} · {getDifficultyLabel(selectedRecommendationProgram.difficulty)} · {selectedRecommendationProgram.exercises.length}개 운동 · {selectedRecommendationProgram.exercises.reduce((sum, exercise) => sum + exercise.sets, 0)}세트</Typography><Typography color="text.secondary" sx={{ mt: 1 }}>오늘 가장 추천하는 프로그램입니다.</Typography></Box></Stack><Stack sx={{ border: 1, borderColor: "divider", borderRadius: `${palette.radiusMd}px`, overflow: "hidden" }}>{selectedRecommendationProgram.exercises.slice(0, 4).map((exercise, index) => <Stack key={exercise.id} alignItems="center" direction="row" justifyContent="space-between" sx={{ borderTop: index ? 1 : 0, borderColor: "divider", minHeight: 52, px: 2 }}><Stack direction="row" spacing={1.25}><Typography color="primary.main" fontWeight={900}>{String(index + 1).padStart(2, "0")}</Typography><Typography fontWeight={800}>{exercise.displayName ?? exercise.name}</Typography></Stack><Typography color="text.secondary" fontWeight={800}>{exercise.sets} SET</Typography></Stack>)}</Stack><Stack direction="row" justifyContent="space-between"><Button variant="text" onClick={() => setCurrentStep(4)}>운동 구성 편집하기</Button><Button endIcon={<ArrowForwardIcon />} variant="contained" onClick={() => { selectProgramForBuilder(selectedRecommendationProgram); setCurrentStep(4); }} sx={{ minHeight: 78, minWidth: 330 }}>이 프로그램으로 진행하기</Button></Stack></Stack></CardContent></Card><RecommendationSummarySplit condition={condition} recommendation={recommendation} trace={recommendationTrace} /></Stack> : <EmptyState title="추천 프로그램이 없습니다." description="컨디션을 조정해 주세요." />}</Stack></Box> : null}
+      {currentStep === 3 ? <Box sx={{ ...centeredWorkflowSx(1080), height: "100%", minHeight: 0, overflow: "hidden" }}>
+        <Stack spacing={2} sx={{ height: "100%", minHeight: 0 }}>
+          <Stack direction="row" justifyContent="space-between" spacing={2}><Box><Typography sx={{ fontSize: { md: 46, xs: 34 }, fontWeight: 900 }}>오늘의 추천 프로그램</Typography><Typography color="text.secondary">컨디션을 기준으로 가장 적합한 프로그램입니다.</Typography></Box><Button startIcon={<ArrowBackIcon />} variant="outlined" onClick={() => setCurrentStep(2)}>컨디션 수정</Button></Stack>
+          {recommendation && selectedRecommendationProgram ? <Stack spacing={1.5} sx={{ minHeight: 0, overflowY: "auto", pr: 0.5 }}>
+            <Card sx={{ bgcolor: palette.primaryGoldMuted, border: 2, borderColor: "primary.main", boxShadow: palette.shadowAccentStrong }}><CardContent sx={{ p: { md: 2.5, xs: 2 } }}><Stack spacing={1.5}><Stack direction="row" spacing={2}><Box sx={{ alignItems: "center", bgcolor: "rgba(0,0,0,.16)", border: 1, borderColor: "primary.main", borderRadius: `${palette.radiusMd}px`, display: "flex", justifyContent: "center", minWidth: 132 }}><MuscleSilhouette active area={categoryToBodyArea(selectedRecommendationProgram.category)} large /></Box><Box sx={{ flex: 1 }}><Typography color="primary.main" fontWeight={900}>{selectedRecommendationRank === 1 ? "BEST" : `${String(selectedRecommendationRank).padStart(2, "0")} · 추천 프로그램`}</Typography><Typography sx={{ fontSize: { md: 38, xs: 29 }, fontWeight: 900 }}>{selectedRecommendationProgram.title}</Typography><Typography color="text.secondary">{getCategoryLabel(selectedRecommendationProgram.category)} · {getDifficultyLabel(selectedRecommendationProgram.difficulty)} · {selectedRecommendationProgram.exercises.length}개 운동 · {selectedRecommendationProgram.exercises.reduce((sum, exercise) => sum + exercise.sets, 0)}세트</Typography></Box></Stack><Stack sx={{ border: 1, borderColor: "divider", borderRadius: `${palette.radiusMd}px`, overflow: "hidden" }}>{selectedRecommendationProgram.exercises.slice(0, 4).map((exercise, index) => <Stack key={exercise.id} alignItems="center" direction="row" justifyContent="space-between" sx={{ borderTop: index ? 1 : 0, borderColor: "divider", minHeight: 44, px: 1.5 }}><Stack direction="row" spacing={1.25}><Typography color="primary.main" fontWeight={900}>{String(index + 1).padStart(2, "0")}</Typography><Typography fontWeight={800}>{exercise.displayName ?? exercise.name}</Typography></Stack><Typography color="text.secondary" fontWeight={800}>{exercise.sets} SET</Typography></Stack>)}</Stack><Stack direction="row" justifyContent="space-between"><Button variant="text" onClick={() => setCurrentStep(4)}>운동 구성 편집하기</Button><Button endIcon={<ArrowForwardIcon />} variant="contained" onClick={() => { selectProgramForBuilder(selectedRecommendationProgram); setCurrentStep(4); }} sx={{ minHeight: 66, minWidth: 300 }}>이 프로그램으로 진행하기</Button></Stack></Stack></CardContent></Card>
+            <RecommendationAlternativeCards rankedPrograms={rankedPrograms} recommendedProgramId={recommendation.program.id} selectedProgramId={selectedRecommendationProgram.id} onSelect={selectProgramForBuilder} />
+            <RecommendationSummarySplit condition={condition} recommendation={recommendation} trace={recommendationTrace} />
+          </Stack> : <EmptyState title="추천 프로그램이 없습니다." description="컨디션을 조정해 주세요." />}
+        </Stack>
+      </Box> : null}
       {currentStep === 3 ? (
         <Box sx={{ ...centeredWorkflowSx(1080), display: "none", maxHeight: "100%", minHeight: 0, overflow: "hidden" }}>
           <Stack spacing={{ md: 3, xs: 2.5 }} sx={{ maxHeight: "100%" }}>

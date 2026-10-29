@@ -593,8 +593,8 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
         </Box>
       ) : null}
 
-      {currentStep === 3 ? <Box sx={{ ...centeredWorkflowSx(1080), height: "100%", minHeight: 0, overflow: "hidden" }}>
-        <Stack spacing={2} sx={{ height: "100%", minHeight: 0 }}>
+      {currentStep === 3 ? <Box sx={{ ...centeredWorkflowSx(1080), display: "flex", flexDirection: "column", height: "100%", minHeight: 0, overflow: "hidden" }}>
+        <Stack spacing={2} sx={{ height: "100%", justifyContent: "center", minHeight: 0 }}>
           <Stack direction="row" justifyContent="space-between" spacing={2}><Box><Typography sx={{ fontSize: { md: 46, xs: 34 }, fontWeight: 900 }}>오늘의 추천 프로그램</Typography><Typography color="text.secondary">컨디션을 기준으로 가장 적합한 프로그램입니다.</Typography></Box><Button startIcon={<ArrowBackIcon />} variant="outlined" onClick={() => setCurrentStep(2)}>컨디션 수정</Button></Stack>
           {recommendation && selectedRecommendationProgram ? <Stack spacing={1.5} sx={{ minHeight: 0, overflowY: "auto", pr: 0.5 }}>
             <Card sx={{ bgcolor: palette.primaryGoldMuted, border: 2, borderColor: "primary.main", boxShadow: palette.shadowAccentStrong }}><CardContent sx={{ p: { md: 2.5, xs: 2 } }}><Stack spacing={1.5}><Stack direction="row" spacing={2}><Box sx={{ alignItems: "center", bgcolor: "rgba(0,0,0,.16)", border: 1, borderColor: "primary.main", borderRadius: `${palette.radiusMd}px`, display: "flex", justifyContent: "center", minWidth: 132 }}><MuscleSilhouette active area={categoryToBodyArea(selectedRecommendationProgram.category)} large /></Box><Box sx={{ flex: 1 }}><Typography color="primary.main" fontWeight={900}>{selectedRecommendationRank === 1 ? "BEST" : `${String(selectedRecommendationRank).padStart(2, "0")} · 추천 프로그램`}</Typography><Typography sx={{ fontSize: { md: 38, xs: 29 }, fontWeight: 900 }}>{selectedRecommendationProgram.title}</Typography><Typography color="text.secondary">{getCategoryLabel(selectedRecommendationProgram.category)} · {getDifficultyLabel(selectedRecommendationProgram.difficulty)} · {selectedRecommendationProgram.exercises.length}개 운동 · {selectedRecommendationProgram.exercises.reduce((sum, exercise) => sum + exercise.sets, 0)}세트</Typography></Box></Stack><Stack sx={{ border: 1, borderColor: "divider", borderRadius: `${palette.radiusMd}px`, overflow: "hidden" }}>{selectedRecommendationProgram.exercises.slice(0, 4).map((exercise, index) => <Stack key={exercise.id} alignItems="center" direction="row" justifyContent="space-between" sx={{ borderTop: index ? 1 : 0, borderColor: "divider", minHeight: 44, px: 1.5 }}><Stack direction="row" spacing={1.25}><Typography color="primary.main" fontWeight={900}>{String(index + 1).padStart(2, "0")}</Typography><Typography fontWeight={800}>{exercise.displayName ?? exercise.name}</Typography></Stack><Typography color="text.secondary" fontWeight={800}>{exercise.sets} SET</Typography></Stack>)}</Stack><Stack direction="row" justifyContent="space-between"><Button variant="text" onClick={() => setCurrentStep(4)}>운동 구성 편집하기</Button><Button endIcon={<ArrowForwardIcon />} variant="contained" onClick={() => { selectProgramForBuilder(selectedRecommendationProgram); setCurrentStep(4); }} sx={{ minHeight: 66, minWidth: 300 }}>이 프로그램으로 진행하기</Button></Stack></Stack></CardContent></Card>
@@ -616,15 +616,15 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
         </Box>
       ) : null}
       {currentStep === 4 ? (
-        <Box sx={{ ...centeredWorkflowSx(1180), maxHeight: "100%", minHeight: 0, overflow: "hidden", px: { md: 3, xs: 0 } }}>
-          <Box sx={{ maxHeight: "100%", py: { md: 2, xs: 1 } }}>
-            <Stack spacing={2.5} sx={{ maxHeight: "100%" }}>
+        <Box sx={{ ...centeredWorkflowSx(1180), display: "flex", flexDirection: "column", height: "100%", minHeight: 0, overflow: "hidden", px: { md: 3, xs: 0 } }}>
+          <Box sx={{ display: "flex", flex: "1 1 auto", flexDirection: "column", minHeight: 0, overflow: "hidden", py: { md: 2, xs: 1 } }}>
+            <Stack spacing={2.5} sx={{ height: "100%", justifyContent: "center", minHeight: 0 }}>
               <Stack direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1.5}>
                 <Stack spacing={0.75}>
                   <Typography sx={{ fontSize: { md: 46, xs: 34 }, fontWeight: 900, lineHeight: 1.15 }}>운동 구성</Typography>
                   <Typography color="text.secondary" sx={{ fontSize: { md: 23, xs: 18 }, lineHeight: 1.5 }}>추천된 운동을 확인하고 필요한 부분을 조정하세요.</Typography>
                 </Stack>
-                <Button startIcon={<ArrowBackIcon />} variant="outlined" onClick={() => { setCurrentStep(3); if (manualMode) { setManualMode(false); setBuilderHistory(null); } }}>다른 프로그램 보기</Button>
+                <Stack direction="row" spacing={1}><Button startIcon={<ArrowBackIcon />} variant="text" onClick={() => setCurrentStep(3)}>추천으로 돌아가기</Button><Button startIcon={<ArrowBackIcon />} variant="outlined" onClick={() => { setCurrentStep(3); if (manualMode) { setManualMode(false); setBuilderHistory(null); } }}>다른 프로그램 보기</Button></Stack>
               </Stack>
               <Stack alignItems="center" direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1} sx={{ bgcolor: palette.surfaceInteractive, borderBottom: 1, borderColor: "divider", px: { md: 2, xs: 1 }, py: 1.5 }}><Typography sx={{ fontSize: { md: 22, xs: 18 }, fontWeight: 800 }}>{builderState?.title}</Typography><Typography color="text.secondary" sx={{ fontSize: { md: 21, xs: 17 }, fontWeight: 700 }}>{builderState?.exercises.length ?? 0}개 운동 · {builderState?.exercises.reduce((sum, exercise) => sum + exercise.plannedSets, 0) ?? 0}세트</Typography></Stack>
               <Stack spacing={1.5} sx={{ flex: "1 1 auto", minHeight: 0, overflowY: { md: "auto", xs: "visible" }, pr: { md: 1, xs: 0 } }}>

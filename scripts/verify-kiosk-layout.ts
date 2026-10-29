@@ -10,6 +10,8 @@ const history = read("src/features/workout-sessions/pages/WorkoutSessionsPage.ts
 const welcome = flow.slice(flow.indexOf("const KioskWelcomeScreen"), flow.indexOf("const ConditionChoiceLabel"));
 const workflowStart = flow.indexOf('<Stack alignItems="center" spacing={{ md: 4, xs: 3 }} sx={{ ...centeredWorkflowSx(1360)');
 const workflow = flow.slice(workflowStart, flow.indexOf("<StepIndicator", workflowStart));
+const stepThree = flow.slice(flow.indexOf("{currentStep === 3 ? <Box"), flow.indexOf("{currentStep === 3 ? ("));
+const stepFour = flow.slice(flow.indexOf("{currentStep === 4 ?"), flow.indexOf("{currentStep === 5 ?"));
 
 assert.match(appLayout, /location\.pathname === "\/program-manager\/print" \|\| location\.pathname\.startsWith\("\/program-manager\/workout-sessions"\)/);
 assert.match(appLayout, /height: "100dvh"/);
@@ -19,6 +21,13 @@ assert.match(appLayout, /overflowY: isFixedHeightKioskRoute \? "hidden" : "auto"
 assert.match(workflow, /<Stack alignItems="center" spacing=\{\{ md: 4, xs: 3 \}\}/);
 assert.doesNotMatch(workflow, /justifyContent="center"/);
 assert.match(flow, /currentStep === 3[\s\S]*?height: "100%", minHeight: 0, overflow: "hidden"/);
+assert.match(stepThree, /display: "flex", flexDirection: "column", height: "100%", minHeight: 0, overflow: "hidden"/);
+assert.match(stepThree, /height: "100%", justifyContent: "center", minHeight: 0/);
+assert.match(stepFour, /display: "flex", flexDirection: "column", height: "100%", minHeight: 0, overflow: "hidden"/);
+assert.match(stepFour, /height: "100%", justifyContent: "center", minHeight: 0/);
+assert.match(stepFour, />추천으로 돌아가기<\/Button>/);
+assert.match(stepFour, /onClick=\{\(\) => setCurrentStep\(3\)\}/);
+assert.match(stepFour, />다른 프로그램 보기<\/Button>/);
 assert.match(flow, /if \(memberInitial\) return sortMembersByName\(filterMembersByInitial\(members, memberInitial\)\);\s+return sortMembersByName\(members\);/);
 assert.match(flow, /setMemberInitial\(\(current\) => current === option\.value \? null : option\.value\)/);
 assert.match(flow, /members\.length === 0 \? <EmptyState title="등록된 회원이 없습니다\."/);

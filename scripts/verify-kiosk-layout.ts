@@ -47,7 +47,7 @@ assert.match(flow, /const rank = rankedPrograms\.findIndex\(\(\{ program: ranked
 assert.match(flow, /recommendedProgramId=\{recommendation\.program\.id\}/);
 assert.match(flow, /onSelect=\{selectProgramForBuilder\}/);
 assert.match(flow, /selectedRecommendationRank === 1 \? "BEST" : `\$\{String\(selectedRecommendationRank\)\.padStart\(2, "0"\)\} · 추천 프로그램`/);
-assert.match(flow, /<RecommendationAlternativeCards[\s\S]*?<RecommendationSummarySplit/);
+assert.match(flow, /<RecommendationSummarySplit[\s\S]*?<RecommendationAlternativeCards/);
 assert.match(flow, /maxHeight: \{ md: 290, xs: 260 \}, overflowY: "auto"/);
 assert.match(flow, /Grid item md=\{4\} xs=\{12\}/);
 assert.match(flow, /Grid item md=\{8\} xs=\{12\}/);

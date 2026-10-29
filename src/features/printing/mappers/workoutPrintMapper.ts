@@ -82,7 +82,7 @@ export const createWorkoutPrintDocument = ({
     throw new PrintMapperError("Archive된 프로그램은 출력할 수 없습니다.");
   }
 
-  const layout = resolveA5WorkoutLayout(program.exercises.length);
+  const layout = resolveA5WorkoutLayout(program.exercises.length, program.exercises.map((exercise) => exercise.sets));
   const rows = toRows(program, layout.minimumRowCount);
   const resolved = resolveProgramExerciseKnowledge(program);
 

@@ -94,6 +94,10 @@ const run = async (): Promise<void> => {
   assert.deepEqual(document.program.exercises.map((exercise) => exercise.configuredSets), [5, 2, 4]);
   assert.deepEqual(document.program.exercises.map((exercise) => exercise.memo), ["Tempo", "Added cue", "Pause"]);
   assert.deepEqual(document.rows.slice(0, 3).map((row) => row.configuredSets), [5, 2, 4]);
+  assert.equal(document.rows.length, 5, "three exercises receive two blank handwritten rows");
+  assert.equal(document.layout.setLayout, "five-set", "a five-set exercise selects one document-wide layout");
+  assert.equal(document.layout.showExerciseMemo, false, "five-set layout removes the note column for every row");
+  assert.equal(document.rows[3]?.isBlank, true, "blank rows are real writable exercise rows");
   assert.equal(document.rows[1]?.exerciseMemo, "Added cue", "4-set rows retain their program memo for the print point cell");
   assert.equal(document.rows[0]?.exerciseMemo, "Tempo", "5-set rows retain data even though the point cell is omitted");
   const categoryLabels = new Map([ ["LOWER_BODY", "하체"], ["BACK", "등"], ["CHEST", "가슴"], ["FULL_BODY", "전신"] ]);

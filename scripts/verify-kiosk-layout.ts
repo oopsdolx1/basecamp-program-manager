@@ -22,6 +22,7 @@ assert.doesNotMatch(flow, /translateY\(7vh\)|pt: 10|height: 960/);
 assert.match(welcome, /display: "flex", flexDirection: "column"/);
 assert.match(welcome, /justifyContent: "center"/);
 assert.match(welcome, /radial-gradient/);
+assert.doesNotMatch(welcome, /ellipse 48% 32% at 50% 55%/);
 assert.match(welcome, /borderRadius: "50%"/);
 assert.match(welcome, /pointerEvents: "none"/);
 assert.match(welcome, /프로그램 시작/);

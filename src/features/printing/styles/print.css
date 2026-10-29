@@ -118,7 +118,7 @@
 }
 
 .a5-workout-document[data-layout-density="standard"] .exercise-row {
-  height: 12.1mm;
+  height: calc(96.8mm / var(--a5-exercise-row-count, 8));
 }
 
 .print-session-code {
@@ -251,6 +251,7 @@
 }
 
 .exercise-print-table {
+  --a5-exercise-row-count: 8;
   font-size: 7.2pt;
   page-break-inside: avoid;
   break-inside: avoid;
@@ -334,10 +335,23 @@
 
 .set-fields {
   color: #666;
+  display: grid;
   font-size: 5.7pt;
-  line-height: 1.1;
+  grid-template-columns: repeat(3, 1fr);
+  line-height: 1;
   text-align: center;
-  white-space: nowrap;
+  width: 100%;
+}
+
+.set-fields span {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-height: 6.5mm;
+}
+
+.set-fields span + span {
+  border-left: 0.18mm solid #aaa;
 }
 
 .exercise-point-cell {

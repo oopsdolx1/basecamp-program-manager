@@ -8,13 +8,22 @@ const printPreview = read("src/features/printing/pages/PrintPreviewPage.tsx");
 const picker = read("src/features/programs/components/ExercisePicker/ExercisePicker.tsx");
 const history = read("src/features/workout-sessions/pages/WorkoutSessionsPage.tsx");
 const welcome = flow.slice(flow.indexOf("const KioskWelcomeScreen"), flow.indexOf("const ConditionChoiceLabel"));
+const workflowStart = flow.indexOf('<Stack alignItems="center" spacing={{ md: 4, xs: 3 }} sx={{ ...centeredWorkflowSx(1360)');
+const workflow = flow.slice(workflowStart, flow.indexOf("<StepIndicator", workflowStart));
 
 assert.match(appLayout, /location\.pathname === "\/program-manager\/print" \|\| location\.pathname\.startsWith\("\/program-manager\/workout-sessions"\)/);
 assert.match(appLayout, /height: "100dvh"/);
 assert.match(appLayout, /flex: "1 1 auto", minHeight: 0/);
 assert.match(appLayout, /overflowY: isFixedHeightKioskRoute \? "hidden" : "auto"/);
 
-assert.match(flow, /alignItems="center" justifyContent="center" spacing=\{\{ md: 4, xs: 3 \}\}/);
+assert.match(workflow, /<Stack alignItems="center" spacing=\{\{ md: 4, xs: 3 \}\}/);
+assert.doesNotMatch(workflow, /justifyContent="center"/);
+assert.match(flow, /currentStep === 3[\s\S]*?height: "100%", minHeight: 0, overflow: "hidden"/);
+assert.match(flow, /if \(memberInitial\) return sortMembersByName\(filterMembersByInitial\(members, memberInitial\)\);\s+return sortMembersByName\(members\);/);
+assert.match(flow, /setMemberInitial\(\(current\) => current === option\.value \? null : option\.value\)/);
+assert.match(flow, /members\.length === 0 \? <EmptyState title="등록된 회원이 없습니다\."/);
+assert.match(flow, /members\.length > 0 && filteredMembers\.length === 0 && \(hasSearchQuery \|\| memberInitial\)/);
+assert.doesNotMatch(flow, /초성을 선택하거나 이름을 검색해 주세요\./);
 assert.match(flow, /height: "100%", minHeight: 0, overflow: "hidden"/);
 assert.match(flow, /maxHeight: \{ md: "32vh", xs: "36vh" \}, overflowY: "auto"/);
 assert.match(flow, /overflowY: \{ md: "auto", xs: "visible" \}/);

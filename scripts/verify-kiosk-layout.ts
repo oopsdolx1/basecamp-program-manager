@@ -24,11 +24,14 @@ assert.match(flow, /currentStep === 3[\s\S]*?height: "100%", minHeight: 0, overf
 assert.match(stepThree, /display: "flex", flexDirection: "column", height: "100%", minHeight: 0, overflow: "hidden"/);
 assert.match(stepThree, /height: "100%", justifyContent: "center", minHeight: 0/);
 assert.match(stepFour, /display: "flex", flexDirection: "column", height: "100%", minHeight: 0, overflow: "hidden"/);
-assert.match(stepFour, /height: "100%", justifyContent: "center", minHeight: 0/);
+assert.match(stepFour, /alignItems: "stretch", display: "flex", flex: "1 1 auto", flexDirection: "column", justifyContent: "center", minHeight: 0/);
+assert.match(stepFour, /flex: "0 1 auto", maxHeight: "100%", minHeight: 0, width: "100%"/);
+assert.match(stepFour, /maxHeight: \{ md: "42vh", xs: "36vh" \}, minHeight: 0, overflowY: "auto"/);
+assert.doesNotMatch(stepFour, /<Stack spacing=\{1\.5\} sx=\{\{ flex: "1 1 auto"/);
 assert.match(stepFour, />추천으로 돌아가기<\/Button>/);
 assert.match(stepFour, /onClick=\{\(\) => setCurrentStep\(3\)\}/);
 assert.match(stepFour, />다른 프로그램 보기<\/Button>/);
-assert.match(flow, /if \(memberInitial\) return sortMembersByName\(filterMembersByInitial\(members, memberInitial\)\);\s+return sortMembersByName\(members\);/);
+assert.match(flow, /filterQuickPrintMembers\(members, memberQuery, memberInitial\)/);
 assert.match(flow, /setMemberInitial\(\(current\) => current === option\.value \? null : option\.value\)/);
 assert.match(flow, /members\.length === 0 \? <EmptyState title="등록된 회원이 없습니다\."/);
 assert.match(flow, /members\.length > 0 && filteredMembers\.length === 0 && \(hasSearchQuery \|\| memberInitial\)/);

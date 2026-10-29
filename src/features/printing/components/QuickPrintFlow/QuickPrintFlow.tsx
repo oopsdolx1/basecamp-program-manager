@@ -32,8 +32,7 @@ import { useExerciseCatalog } from "../../../exercise-catalog";
 import { toCatalogOptions } from "../../../exercise-catalog/services/exerciseCatalogService";
 import { ExercisePicker } from "../../../programs/components/ExercisePicker/ExercisePicker";
 import type { MemberSelectionItem } from "../../../members";
-import { filterMembers, sortMembersByName } from "../../../members/services/memberService";
-import { filterMembersByInitial, KOREAN_INITIALS, type MemberInitialFilter } from "../../../members/utils/koreanInitial";
+import { KOREAN_INITIALS, type MemberInitialFilter } from "../../../members/utils/koreanInitial";
 import { getCategoryLabel, getDifficultyLabel } from "../../../programs/config/programOptions";
 import { usePrograms } from "../../../programs/hooks/usePrograms";
 import { hydrateProgramExerciseKnowledge, resolveProgramExerciseKnowledge } from "../../../../shared-knowledge/resolveProgramExercises";
@@ -56,6 +55,7 @@ import { mapSessionPrescriptionExercises } from "../../../workout-sessions/servi
 import { kiosk } from "../../../../design-system";
 import { SnapshotExerciseBuilderRow } from "../SnapshotExerciseBuilderRow/SnapshotExerciseBuilderRow";
 import { addExerciseBatch, buildExerciseAddCandidates } from "../../services/exerciseAddCandidateService";
+import { filterQuickPrintMembers } from "../../services/memberSelectionFilterService";
 
 type PrintStep = 1 | 2 | 3 | 4 | 5;
 type IntelligenceStatus = "idle" | "loading" | "ready" | "error";
@@ -348,11 +348,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
   const [manualPickerOpen, setManualPickerOpen] = useState(false);
   const [manualMode, setManualMode] = useState(false);
   const hasSearchQuery = memberQuery.trim().length > 0;
-  const filteredMembers = useMemo(() => {
-    if (hasSearchQuery) return sortMembersByName(filterMembers(members, memberQuery));
-    if (memberInitial) return sortMembersByName(filterMembersByInitial(members, memberInitial));
-    return sortMembersByName(members);
-  }, [hasSearchQuery, memberInitial, memberQuery, members]);
+  const filteredMembers = useMemo(() => filterQuickPrintMembers(members, memberQuery, memberInitial), [memberInitial, memberQuery, members]);
   const rankedPrograms = useMemo(() => (recommendationTrace?.candidatePrograms ?? [])
     .map((candidate) => ({ candidate, program: runtimePrograms.find((program) => program.id === candidate.programId) }))
     .filter((item): item is { candidate: RecommendationTrace["candidatePrograms"][number]; program: Program } => Boolean(item.program))
@@ -568,6 +564,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
             {memberStatus === "ready" && members.length === 0 ? <EmptyState title="등록된 회원이 없습니다." description="회원을 등록한 뒤 다시 시도해 주세요." /> : null}
             {memberStatus === "ready" && members.length > 0 && filteredMembers.length === 0 && (hasSearchQuery || memberInitial) ? <EmptyState title={hasSearchQuery ? "검색 결과가 없습니다." : `${memberInitial === "OTHER" ? "기타" : memberInitial}로 시작하는 회원이 없습니다.`} description={hasSearchQuery ? "다른 이름이나 전화번호로 다시 검색해 주세요." : "다른 초성을 선택해 주세요."} /> : null}
             {memberStatus === "ready" && filteredMembers.length > 0 ? <Box sx={{ maxHeight: { md: "32vh", xs: "36vh" }, overflowY: "auto", pr: 0.75 }}><Grid container columnSpacing={2} rowSpacing={1.25}>{filteredMembers.map((member) => { const selected = selectedMember?.memberId === member.memberId; return <Grid item key={member.memberId} md={6} xs={12}><CardActionArea aria-label={`${member.displayName} 회원 선택`} aria-pressed={selected} onClick={() => selectMember(member)} sx={{ bgcolor: selected ? palette.primaryGoldMuted : palette.surfaceInteractive, border: 1, borderColor: selected ? "primary.main" : "divider", borderRadius: `${palette.radiusSm}px`, minHeight: { md: 86, xs: 76 }, px: { md: 2.5, xs: 2 }, transition: "background-color 150ms ease, border-color 150ms ease", "&:hover": { bgcolor: selected ? palette.primaryGoldMuted : palette.surfaceRaised, borderColor: "primary.main" }, "&:focus-visible": { outline: `3px solid ${palette.primaryGoldGlowStrong}`, outlineOffset: 3 } }}><Stack alignItems="center" direction="row" justifyContent="space-between" spacing={2}><Typography sx={{ fontSize: { md: 29, xs: 23 }, fontWeight: 800, textAlign: "left" }}>{member.displayName}</Typography>{selected ? <CheckCircleIcon color="primary" sx={{ fontSize: { md: 34, xs: 28 } }} /> : <ArrowForwardIcon color="primary" sx={{ fontSize: { md: 32, xs: 26 } }} />}</Stack></CardActionArea></Grid>; })}</Grid></Box> : null}
+            {memberStatus === "ready" && members.length > 0 && !hasSearchQuery && !memberInitial ? <Typography color="text.secondary" sx={{ fontSize: { md: 19, xs: 16 }, textAlign: "center" }}>초성을 선택하거나 이름 또는 전화번호로 검색해 주세요.</Typography> : null}
             {selectedMember ? <Button endIcon={<ArrowForwardIcon sx={{ fontSize: 32 }} />} variant="contained" onClick={() => setCurrentStep(2)} sx={{ alignSelf: "center", fontSize: { md: 29, xs: 23 }, minHeight: { md: 92, xs: 78 }, minWidth: { md: 520, xs: "100%" }, px: 4 }}>{selectedMember.displayName} 회원으로 계속하기</Button> : <Typography color="text.secondary" sx={{ fontSize: { md: 19, xs: 16 }, textAlign: "center" }}>회원을 선택해 주세요.</Typography>}
           </Stack>
         </Box>
@@ -617,8 +614,8 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
       ) : null}
       {currentStep === 4 ? (
         <Box sx={{ ...centeredWorkflowSx(1180), display: "flex", flexDirection: "column", height: "100%", minHeight: 0, overflow: "hidden", px: { md: 3, xs: 0 } }}>
-          <Box sx={{ display: "flex", flex: "1 1 auto", flexDirection: "column", minHeight: 0, overflow: "hidden", py: { md: 2, xs: 1 } }}>
-            <Stack spacing={2.5} sx={{ height: "100%", justifyContent: "center", minHeight: 0 }}>
+          <Box sx={{ alignItems: "stretch", display: "flex", flex: "1 1 auto", flexDirection: "column", justifyContent: "center", minHeight: 0, overflow: "hidden", py: { md: 2, xs: 1 } }}>
+            <Stack spacing={2.5} sx={{ flex: "0 1 auto", maxHeight: "100%", minHeight: 0, width: "100%" }}>
               <Stack direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1.5}>
                 <Stack spacing={0.75}>
                   <Typography sx={{ fontSize: { md: 46, xs: 34 }, fontWeight: 900, lineHeight: 1.15 }}>운동 구성</Typography>
@@ -627,7 +624,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
                 <Stack direction="row" spacing={1}><Button startIcon={<ArrowBackIcon />} variant="text" onClick={() => setCurrentStep(3)}>추천으로 돌아가기</Button><Button startIcon={<ArrowBackIcon />} variant="outlined" onClick={() => { setCurrentStep(3); if (manualMode) { setManualMode(false); setBuilderHistory(null); } }}>다른 프로그램 보기</Button></Stack>
               </Stack>
               <Stack alignItems="center" direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1} sx={{ bgcolor: palette.surfaceInteractive, borderBottom: 1, borderColor: "divider", px: { md: 2, xs: 1 }, py: 1.5 }}><Typography sx={{ fontSize: { md: 22, xs: 18 }, fontWeight: 800 }}>{builderState?.title}</Typography><Typography color="text.secondary" sx={{ fontSize: { md: 21, xs: 17 }, fontWeight: 700 }}>{builderState?.exercises.length ?? 0}개 운동 · {builderState?.exercises.reduce((sum, exercise) => sum + exercise.plannedSets, 0) ?? 0}세트</Typography></Stack>
-              <Stack spacing={1.5} sx={{ flex: "1 1 auto", minHeight: 0, overflowY: { md: "auto", xs: "visible" }, pr: { md: 1, xs: 0 } }}>
+              <Stack spacing={1.5} sx={{ maxHeight: { md: "42vh", xs: "36vh" }, minHeight: 0, overflowY: "auto", pr: { md: 1, xs: 0 } }}>
                 {(builderState?.exercises ?? []).map((exercise, index, exercises) => (
                   <SnapshotExerciseBuilderRow
                     catalogOptions={catalogOptions}

@@ -2,7 +2,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import { Alert, Box, Stack, Typography } from "@mui/material";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Card, Chip, EmptyState, Input, Loading, colors, spacing } from "../../../design-system";
+import { Button, Card, Chip, EmptyState, Input, KioskMemberKeyboard, Loading, colors, spacing } from "../../../design-system";
 import { routeBuilder } from "../../../app/routeBuilder";
 import { toAppId } from "../../../types/brandedIds";
 import { createConditionLabMemberProvider } from "../../printing/providers/conditionLabProviders";
@@ -21,8 +21,8 @@ const periods: Array<{value: WorkoutHistoryPeriod; label: string}> = [{value:"mo
 const categoriesFor = (r: WorkoutSessionRecord) => r.prescription?.categories ?? r.programSnapshot.categories ?? (r.prescription?.category ?? r.programSnapshot.category ? [r.prescription?.category ?? r.programSnapshot.category!] : []);
 const categoryLabel = (r: WorkoutSessionRecord) => categoriesFor(r).map(getCategoryLabel).join(" · ") || getCategoryLabel("CUSTOM");
 const sourceLabel = (r: WorkoutSessionRecord) => r.source?.type === "manual" || r.prescription?.source?.type === "manual" ? "직접 구성 운동" : r.programSnapshot.title;
+const Keyboard = ({ value, onChange }: { value: string; onChange: (value: string) => void; onClose: () => void }) => <KioskMemberKeyboard value={value} onChange={onChange} />;
 const kioskViewportSx = { display: "flex", height: "100%", minHeight: 0, overflow: "hidden" };
-const Keyboard = ({value,onChange,onClose}:{value:string;onChange:(x:string)=>void;onClose:()=>void}) => <Card><Stack spacing={1}><Stack direction="row" flexWrap="wrap" gap={.75}>{["ㄱ","ㄴ","ㄷ","ㄹ","ㅁ","ㅂ","ㅅ","ㅇ","ㅈ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ","ㅏ","ㅓ","ㅗ","ㅜ","ㅡ","ㅣ","0","1","2","3","4","5","6","7","8","9"].map(k=><Button key={k} onClick={()=>onChange(value+k)} sx={{minHeight:48,minWidth:48}}>{k}</Button>)}</Stack><Stack direction="row" spacing={1}><Button onClick={()=>onChange(value.slice(0,-1))} variant="secondary">지우기</Button><Button onClick={()=>onChange("")} variant="secondary">전체 삭제</Button><Button onClick={onClose}>완료</Button></Stack></Stack></Card>;
 
 export const WorkoutSessionsPage = ({initialSessionId: _initialSessionId=null}:{initialSessionId?:string|null}): JSX.Element => {
   const navigate=useNavigate(); const [records,setRecords]=useState<WorkoutSessionRecord[]>([]); const [status,setStatus]=useState<"loading"|"ready"|"error">("loading"); const [members,setMembers]=useState<MemberSelectionItem[]>([]); const [query,setQuery]=useState(""); const [initial,setInitial]=useState<MemberInitialFilter|null>(null); const [member,setMember]=useState<MemberSelectionItem|null>(null); const [keyboard,setKeyboard]=useState(false); const [period,setPeriod]=useState<WorkoutHistoryPeriod>("month"); const [selectedId,setSelectedId]=useState<string|null>(null); const [reprinting,setReprinting]=useState(false); const inFlight=useRef(false);

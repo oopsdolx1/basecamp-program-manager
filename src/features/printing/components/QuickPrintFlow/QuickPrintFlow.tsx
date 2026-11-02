@@ -52,7 +52,7 @@ import type { AlcoholStatus, ConditionInput, ConditionStatus, FatigueArea, Membe
 import { palette } from "../../../../theme/palette";
 import { createWorkoutSession } from "../../../workout-sessions/services/workoutSessionService";
 import { mapSessionPrescriptionExercises } from "../../../workout-sessions/services/sessionPrescriptionMapper";
-import { kiosk } from "../../../../design-system";
+import { kiosk, KioskMemberKeyboard } from "../../../../design-system";
 import { SnapshotExerciseBuilderRow } from "../SnapshotExerciseBuilderRow/SnapshotExerciseBuilderRow";
 import { addExerciseBatch, buildExerciseAddCandidates } from "../../services/exerciseAddCandidateService";
 import { filterQuickPrintMembers } from "../../services/memberSelectionFilterService";
@@ -587,7 +587,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
         <Box sx={centeredWorkflowSx(1160)}>
           <Stack spacing={{ md: 3.5, xs: 2.5 }}>
             <Stack spacing={1}><Typography sx={{ fontSize: { md: 46, xs: 34 }, fontWeight: 900, lineHeight: 1.15 }}>회원 선택</Typography><Typography color="text.secondary" sx={{ fontSize: { md: 23, xs: 18 }, lineHeight: 1.5 }}>이름이나 전화번호로 회원을 찾아보세요.</Typography></Stack>
-            <Box sx={{ "& .MuiOutlinedInput-root": { minHeight: { md: 80, xs: 68 } }, "& .MuiOutlinedInput-input": { fontSize: { md: 24, xs: 19 }, fontWeight: 700 }, "& .MuiInputAdornment-root .MuiSvgIcon-root": { fontSize: { md: 30, xs: 24 } } }}><SearchField label="이름 또는 전화번호로 검색" showLabel={false} value={memberQuery} onChange={setMemberQuery} /></Box>
+            <Box sx={{ minHeight: 68 }}><KioskMemberKeyboard value={memberQuery} onChange={(value) => { setMemberQuery(value); setMemberInitial(null); }} /></Box>
             <Stack spacing={1.5}><Typography sx={{ fontSize: { md: 21, xs: 18 }, fontWeight: 900 }}>초성 선택</Typography><Box sx={{ display: "grid", gap: { md: 1.5, xs: 1 }, gridTemplateColumns: { md: "repeat(8, minmax(0, 1fr))", xs: "repeat(4, minmax(0, 1fr))" } }}>{([...KOREAN_INITIALS.map((initial) => ({ value: initial, label: initial })), { value: "OTHER", label: "기타" }] as Array<{ value: MemberInitialFilter; label: string }>).map((option) => { const selected = !hasSearchQuery && memberInitial === option.value; return <Button key={option.value} aria-pressed={selected} color={selected ? "primary" : "inherit"} variant={selected ? "contained" : "outlined"} onClick={() => { setMemberInitial((current) => current === option.value ? null : option.value); setMemberQuery(""); }} sx={{ fontSize: { md: 24, xs: 20 }, fontWeight: 800, minHeight: { md: 70, xs: 62 }, p: 0 }}>{option.label}</Button>; })}</Box></Stack>
             {memberStatus === "loading" ? <LoadingState message="회원 목록을 불러오는 중입니다." /> : null}
             {memberStatus === "error" ? <ErrorState message={memberError} /> : null}

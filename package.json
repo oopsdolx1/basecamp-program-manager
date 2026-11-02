@@ -51,6 +51,7 @@
     "@emotion/styled": "^11.11.5",
     "@mui/icons-material": "^5.15.20",
     "@mui/material": "^5.15.20",
+    "@uiwwsw/virtual-keyboard": "^2.2.1",
     "firebase": "^10.12.2",
     "pdfjs-dist": "^4.10.38",
     "qrcode.react": "^4.2.0",

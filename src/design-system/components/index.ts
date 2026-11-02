@@ -10,3 +10,4 @@ export * from "./Drawer/Drawer";
 export * from "./EmptyState/EmptyState";
 export * from "./Loading/Loading";
 export * from "./StatusChip/StatusChip";
+export * from "./KioskMemberKeyboard/KioskMemberKeyboard";

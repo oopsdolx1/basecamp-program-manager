@@ -313,7 +313,7 @@ export const PrintPreviewPage = (): JSX.Element => {
   const ready = checklist.every(([, valid]) => valid) && isPrintDispatchReady(configuredPrintRuntime, printArtifact, Boolean(visualPdfPreview));
 
   return (
-    <><PrintSourceDocument document={state.document} /><Box sx={printStateSx}>
+    <><PrintSourceDocument document={state.document} /><Box sx={{ ...printStateSx, alignItems: "center", display: "flex", justifyContent: "center" }}>
       <Box className="no-print" sx={{ margin: "0 auto", maxWidth: 1660, p: { lg: `${spacing[6]}px`, md: `${spacing[4]}px`, xs: `${spacing[3]}px` }, "@media (orientation: portrait)": { maxWidth: kiosk.portraitContentWidth } }}>
         <Stack spacing={`${spacing[3]}px`}>
           {printRequest.error ? <Alert severity="error">출력할 수 없습니다. 프린터 연결 상태를 확인한 뒤 다시 시도해 주세요.</Alert> : null}

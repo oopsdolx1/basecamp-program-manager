@@ -64,7 +64,7 @@ export const usePrintPreview = ({ appId, memberId, programId, workoutSessionId }
           if (!fallbackProgramId) throw new PrintMapperError("Manual Workout Session에는 Prescription이 필요합니다.");
           return isSnapshotProgramId(fallbackProgramId) ? Promise.resolve(createSnapshotProgram(fallbackProgramId)) : programRepository.getProgram(appId, fallbackProgramId) as Promise<Program>;
         });
-        const document = createWorkoutPrintDocument({ member, program: authoritativeProgram, workoutSessionId });
+        const document = createWorkoutPrintDocument({ member, program: authoritativeProgram, workoutSessionId, categories: workoutSession.prescription?.categories ?? workoutSession.programSnapshot.categories ?? (workoutSession.prescription?.category ?? workoutSession.programSnapshot.category ? [workoutSession.prescription?.category ?? workoutSession.programSnapshot.category!] : []) });
         setState({ status: "ready", document, member: member as MemberSelectionItem, program: authoritativeProgram, workoutSession });
       } catch (caught) {
         if (!active) return;

@@ -2,11 +2,12 @@ import { Button as MuiButton, CircularProgress, type ButtonProps as MuiButtonPro
 import { colors, motion, radius, spacing } from "../../tokens";
 
 export interface ButtonProps extends Omit<MuiButtonProps, "variant" | "color"> {
-  variant?: "primary" | "secondary" | "tertiary";
+  variant?: "primary" | "secondary" | "tertiary" | "outlined";
   loading?: boolean;
 }
 
 export const Button = ({ variant = "primary", loading = false, disabled, children, ...props }: ButtonProps): JSX.Element => {
+  variant = variant === "outlined" ? "secondary" : variant;
   const primary = variant === "primary";
   const secondary = variant === "secondary";
   return <MuiButton {...props} disabled={disabled || loading} aria-busy={loading} sx={{

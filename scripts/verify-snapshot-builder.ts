@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { createSnapshotBuilderHistory, snapshotBuilderService } from "../src/features/printing/services/snapshotBuilderService";
+import { createMergedSnapshotBuilderHistory, createSnapshotBuilderHistory, snapshotBuilderService } from "../src/features/printing/services/snapshotBuilderService";
 import type { Program } from "../src/features/programs/types/program.types";
 const program: Program = { id: "program" as Program["id"], schemaVersion: 1, title: "Fixture", category: "BACK", difficulty: "GENERAL", memo: "", favorite: false, usageCount: 0, createdAt: new Date(), updatedAt: new Date(), isArchived: false, exercises: Array.from({ length: 9 }, (_, i) => ({ id: `e${i}`, name: `Exercise ${i}`, displayName: `Exercise ${i}`, catalogExerciseId: `c${i}`, order: i + 1, sets: 1, memo: i === 0 ? "keep memo" : "" })) };
 const original = JSON.stringify(program);
@@ -14,4 +14,11 @@ const added = history.present.exercises.at(-1)!; history = snapshotBuilderServic
 history = snapshotBuilderService.move(history, movedId, "down"); assert.equal(history.present.exercises[1].id, movedId);
 history = snapshotBuilderService.patchExercise(history, movedId, { plannedSets: 1 }); const fiveId = history.present.exercises[2].id; history = snapshotBuilderService.patchExercise(history, fiveId, { plannedSets: 5 });
 assert.equal(history.present.exercises.find(x => x.id === movedId)?.plannedSets, 1); assert.equal(history.present.exercises.find(x => x.id === fiveId)?.plannedSets, 5); assert.equal(firstMemo, "keep memo"); assert.equal(JSON.stringify(program), original);
+const four = { ...program, id: "four" as Program["id"], exercises: program.exercises.slice(0, 4) };
+const otherFour = { ...program, id: "other" as Program["id"], exercises: program.exercises.slice(4, 8).map((exercise, index) => ({ ...exercise, order: index + 1 })) };
+assert.equal(createMergedSnapshotBuilderHistory([four, otherFour]).present.exercises.length, 8, "4 + 4 stays editable at the canonical limit");
+const duplicate = { ...otherFour, exercises: [{ ...four.exercises[0], order: 1 }, ...otherFour.exercises] };
+assert.equal(createMergedSnapshotBuilderHistory([four, duplicate]).present.exercises.length, 8, "catalog identity duplicates are removed during merge");
+const second = { ...program, id: "second" as Program["id"], exercises: program.exercises.map((exercise) => ({ ...exercise, catalogExerciseId: `${exercise.catalogExerciseId}-other` })) };
+assert.equal(createMergedSnapshotBuilderHistory([program, second]).present.exercises.length, 18, "overflow remains intact for user edits");
 console.log("snapshotBuilderService checks: PASS");

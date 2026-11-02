@@ -9,6 +9,7 @@ const asDate = (value: unknown): Date => value instanceof Timestamp ? value.toDa
 const statuses = new Set(["created", "printed", "ocr_pending", "ocr_completed", "ai_completed", "confirmed"]);
 const categories = new Set<ProgramCategory>(["FULL_BODY", "CHEST", "BACK", "LOWER_BODY", "SHOULDER", "ARMS", "RECOVERY", "ETC", "CUSTOM"]);
 const categoryOf = (value: unknown): ProgramCategory | undefined => typeof value === "string" && categories.has(value as ProgramCategory) ? value as ProgramCategory : undefined;
+const categoriesOf = (value: unknown): ProgramCategory[] => Array.isArray(value) ? value.map(categoryOf).filter((item): item is ProgramCategory => Boolean(item)) : [];
 const optionalString = (value: unknown): string | undefined => {
   if (typeof value !== "string") return undefined;
   const normalized = value.trim();
@@ -29,9 +30,9 @@ export const mapWorkoutSessionRecord = (id: string, data: DocumentData): Workout
     status: statuses.has(data.status) ? data.status : data.status === "preview" ? "created" : "created",
     exerciseIds: Array.isArray(data.exerciseIds) ? data.exerciseIds.map(String) : [],
     memberSnapshot: data.memberSnapshot,
-    programSnapshot: { title: String(data.programSnapshot?.title ?? ""), ...(categoryOf(data.programSnapshot?.category) ? { category: categoryOf(data.programSnapshot?.category) } : {}) },
+    programSnapshot: { title: String(data.programSnapshot?.title ?? ""), ...(categoryOf(data.programSnapshot?.category) ? { category: categoryOf(data.programSnapshot?.category) } : {}), ...(categoriesOf(data.programSnapshot?.categories).length ? { categories: categoriesOf(data.programSnapshot?.categories) } : {}) },
     exercises: Array.isArray(data.exercises) ? data.exercises : [],
-    prescription: data.prescription && Array.isArray(data.prescription.exercises) ? { source: data.prescription.source, ...(sourceProgramId ? { sourceProgramId } : {}), sourceProgramName: String(data.prescription.sourceProgramName), ...(categoryOf(data.prescription.category) ? { category: categoryOf(data.prescription.category) } : {}), exercises: data.prescription.exercises } : undefined,
+    prescription: data.prescription && Array.isArray(data.prescription.exercises) ? { source: data.prescription.source, ...(sourceProgramId ? { sourceProgramId } : {}), sourceProgramName: String(data.prescription.sourceProgramName), ...(categoryOf(data.prescription.category) ? { category: categoryOf(data.prescription.category) } : {}), ...(categoriesOf(data.prescription.categories).length ? { categories: categoriesOf(data.prescription.categories) } : {}), exercises: data.prescription.exercises } : undefined,
     print: {
       format: "A5-landscape",
       templateKey: "basecamp-workout-log-v1",

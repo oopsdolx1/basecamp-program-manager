@@ -11,6 +11,8 @@ export interface ConditionInput {
   condition: ConditionStatus | null;
   sleep: SleepQuality | null;
   workoutTarget: WorkoutTarget | null;
+  /** Canonical selection. `workoutTarget` remains readable for saved legacy snapshots. */
+  workoutTargets?: WorkoutTarget[];
   targetFatigue: TargetFatigue | null;
   /** Compatibility field for existing analysis envelopes. New UI uses workoutTarget. */
   fatigueAreas: FatigueArea[];

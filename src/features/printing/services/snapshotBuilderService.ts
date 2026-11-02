@@ -111,6 +111,21 @@ export const createSnapshotBuilderHistory = (program: Program, prescriptionInput
   future: [],
 });
 
+/** Joins recommendation programs without silently dropping duplicate or excess rows. */
+export const createMergedSnapshotBuilderHistory = (programs: Program[], prescriptionInput?: Parameters<typeof recommendPlannedSets>[0]): SnapshotBuilderHistory => {
+  const [first, ...rest] = programs;
+  if (!first) throw new Error("병합할 프로그램이 없습니다.");
+  let history = createSnapshotBuilderHistory(first, prescriptionInput);
+  for (const program of rest) {
+    for (const exercise of createSnapshotBuilderState(program, prescriptionInput).exercises) {
+      const candidate = exercise.catalogExerciseId ? { id: exercise.catalogExerciseId, name: exercise.name, displayName: exercise.displayName } : exercise.name;
+      const added = snapshotBuilderService.addExercise(history, candidate);
+      history = added.history;
+    }
+  }
+  return { ...history, present: { ...history.present, title: programs.map((program) => program.title).join(" · "), exercises: reorder(history.present.exercises) } };
+};
+
 export const snapshotBuilderService = {
   updateMeta(history: SnapshotBuilderHistory, patch: Partial<Omit<SnapshotBuilderState, "exercises">>): SnapshotBuilderHistory {
     return pushHistory(history, { ...history.present, ...patch });

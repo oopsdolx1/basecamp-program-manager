@@ -30,9 +30,9 @@ export interface WorkoutSessionRecord {
   status: WorkoutSessionStatus;
   exerciseIds: string[];
   memberSnapshot: { name: string };
-  programSnapshot: { title: string; category?: ProgramCategory };
+  programSnapshot: { title: string; category?: ProgramCategory; categories?: ProgramCategory[] };
   exercises: WorkoutSessionExerciseSnapshot[];
-  prescription?: { source?: WorkoutSource; sourceProgramId?: string; sourceProgramName: string; category?: ProgramCategory; exercises: WorkoutSessionExerciseSnapshot[] };
+  prescription?: { source?: WorkoutSource; sourceProgramId?: string; sourceProgramName: string; category?: ProgramCategory; categories?: ProgramCategory[]; exercises: WorkoutSessionExerciseSnapshot[] };
   print: {
     format: "A5-portrait" | "A5-landscape";
     templateKey: "basecamp-workout-log-v1";
@@ -55,5 +55,6 @@ export interface CreateWorkoutSessionInput {
   source?: WorkoutSource;
   programTitle: string;
   category?: ProgramCategory;
+  categories?: ProgramCategory[];
   exercises: WorkoutSessionExerciseSnapshot[];
 }

@@ -22,6 +22,7 @@ interface CreateWorkoutPrintDocumentParams {
   program: Program | null;
   workoutSessionId: string;
   printDate?: Date;
+  categories?: Program["category"][];
 }
 
 const truncateText = (value: string, maxLength: number): string =>
@@ -65,6 +66,7 @@ export const createWorkoutPrintDocument = ({
   program,
   printDate,
   workoutSessionId,
+  categories,
 }: CreateWorkoutPrintDocumentParams): WorkoutPrintDocument => {
   if (!member) {
     throw new PrintMapperError("회원을 선택해 주세요.");
@@ -91,7 +93,7 @@ export const createWorkoutPrintDocument = ({
     templateVersion: PRINT_TEMPLATE_VERSION,
     format: PRINT_FORMAT,
     workoutSessionId,
-    bodyParts: [...new Set(program.exercises
+    bodyParts: categories?.length ? categories.map(getCategoryLabel) : [...new Set(program.exercises
       .map((exercise) => resolved.get(exercise.id)?.bodyPart ?? "")
       .filter(Boolean))],
     member: {

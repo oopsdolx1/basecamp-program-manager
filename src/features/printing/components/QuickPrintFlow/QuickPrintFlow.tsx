@@ -19,7 +19,7 @@ import TrendingDownIcon from "@mui/icons-material/TrendingDown";
 import TrendingFlatIcon from "@mui/icons-material/TrendingFlat";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
-import { Alert, Box, Button, Card, CardActionArea, CardContent, Chip, CircularProgress, Collapse, Grid, LinearProgress, Stack, Typography } from "@mui/material";
+import { Alert, Box, Button, Card, CardActionArea, CardContent, Chip, CircularProgress, Collapse, Dialog, DialogActions, DialogContent, DialogTitle, Grid, LinearProgress, Stack, Typography } from "@mui/material";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { routeBuilder } from "../../../../app/routeBuilder";
@@ -46,7 +46,7 @@ import { analyzePeriodization } from "../../services/periodizationEngine";
 import { buildRecommendationReason, recommendProgram } from "../../services/conditionRecommendationService";
 import { buildRecommendationSummary } from "../../services/recommendationSummaryService";
 import { savePrintSnapshot } from "../../services/printSnapshotSession";
-import { createSnapshotBuilderHistory, snapshotBuilderService, type SnapshotBuilderExercise, type SnapshotBuilderHistory } from "../../services/snapshotBuilderService";
+import { createMergedSnapshotBuilderHistory, createSnapshotBuilderHistory, snapshotBuilderService, type SnapshotBuilderExercise, type SnapshotBuilderHistory } from "../../services/snapshotBuilderService";
 import { createManualWorkoutBuilderHistory } from "../../services/manualWorkoutBuilderService";
 import type { AlcoholStatus, ConditionInput, ConditionStatus, FatigueArea, MemberIntelligenceMetadata, MemberIntelligenceSummary, PeriodizationSummary, RecommendationResult, RecommendationTrace, RecentWorkoutSummary, SleepQuality, TargetFatigue, WorkoutTarget } from "../../types/condition.types";
 import { palette } from "../../../../theme/palette";
@@ -60,6 +60,7 @@ import { filterQuickPrintMembers } from "../../services/memberSelectionFilterSer
 type PrintStep = 1 | 2 | 3 | 4 | 5;
 type IntelligenceStatus = "idle" | "loading" | "ready" | "error";
 type MemberLoadStatus = "loading" | "ready" | "error";
+type TargetRecommendationGroup = { target: WorkoutTarget; recommendation: RecommendationResult; rankedPrograms: Program[]; selectedProgramId: string };
 
 interface QuickPrintFlowProps {
   appId: AppId;
@@ -125,7 +126,7 @@ const targetFatigueOptions: Array<{ value: TargetFatigue; label: string; descrip
   { value: "NORMAL", label: "보통", description: "평균적인 피로 상태", stress: 3 },
   { value: "HIGH", label: "높음", description: "강도 조절이 필요한 상태", stress: 5 },
 ];
-const defaultCondition: ConditionInput = { condition: null, sleep: null, workoutTarget: null, targetFatigue: null, fatigueAreas: [], stress: 3, alcohol: null };
+const defaultCondition: ConditionInput = { condition: null, sleep: null, workoutTarget: null, workoutTargets: [], targetFatigue: null, fatigueAreas: [], stress: 3, alcohol: null };
 // The workflow steps deliberately use different readable widths. Keep those widths,
 // but center every bounded step within the full PageContainer on desktop.
 const centeredWorkflowSx = (maxWidth: number) => ({ marginInline: "auto", maxWidth, width: "100%" });
@@ -313,6 +314,16 @@ const RecommendationAlternativeCards = ({
   </Box>;
 };
 
+const MultiTargetRecommendations = ({ groups, onSelect, onProceed, onBack }: { groups: TargetRecommendationGroup[]; onSelect: (target: WorkoutTarget, programId: string) => void; onProceed: () => void; onBack: () => void }): JSX.Element => (
+  <Box sx={{ ...centeredWorkflowSx(1080), display: "flex", flexDirection: "column", height: "100%", minHeight: 0, overflow: "hidden" }}>
+    <Stack spacing={2} sx={{ minHeight: 0, width: "100%" }}>
+      <Stack direction="row" justifyContent="space-between"><Box><Typography sx={{ fontSize: { md: 42, xs: 30 }, fontWeight: 900 }}>오늘의 추천 프로그램</Typography><Typography color="text.secondary">부위별 추천을 각각 선택해 주세요.</Typography></Box><Button onClick={onBack} variant="outlined">컨디션 수정</Button></Stack>
+      <Stack spacing={1.5} sx={{ minHeight: 0, overflowY: "auto" }}>{groups.map((group) => <Card key={group.target}><CardContent><Stack spacing={1}><Typography color="primary.main" fontWeight={900}>{getCategoryLabel(group.target)} 추천</Typography>{group.rankedPrograms.map((program, index) => { const selected = group.selectedProgramId === program.id; return <CardActionArea aria-pressed={selected} key={program.id} onClick={() => onSelect(group.target, program.id)} sx={{ bgcolor: selected ? palette.primaryGoldMuted : palette.surfaceInteractive, border: 1, borderColor: selected ? "primary.main" : "divider", borderRadius: `${palette.radiusSm}px`, p: 1.25 }}><Stack direction="row" justifyContent="space-between"><Box><Typography fontWeight={900}>{String(index + 1).padStart(2, "0")} {index === 0 ? "BEST" : ""} · {program.title}</Typography><Typography color="text.secondary" variant="body2">{getDifficultyLabel(program.difficulty)} · {program.exercises.length}개 운동 · {program.exercises.reduce((sum, exercise) => sum + exercise.sets, 0)}세트</Typography></Box>{selected ? <CheckCircleIcon color="primary" /> : null}</Stack></CardActionArea>; })}</Stack></CardContent></Card>)}</Stack>
+      <Button disabled={groups.some((group) => !group.selectedProgramId)} endIcon={<ArrowForwardIcon />} onClick={onProceed} sx={{ minHeight: 76 }}>선택한 2개 프로그램으로 진행하기</Button>
+    </Stack>
+  </Box>
+);
+
 export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }: QuickPrintFlowProps): JSX.Element => {
   const navigate = useNavigate();
   const { programState, programs } = usePrograms(appId);
@@ -338,6 +349,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
   const [recommendation, setRecommendation] = useState<RecommendationResult | null>(null);
   const [recommendationTrace, setRecommendationTrace] = useState<RecommendationTrace | null>(null);
   const [recommendationReason, setRecommendationReason] = useState("");
+  const [targetRecommendationGroups, setTargetRecommendationGroups] = useState<TargetRecommendationGroup[]>([]);
   const [snapshotSourceProgram, setSnapshotSourceProgram] = useState<Program | null>(null);
   const [builderHistory, setBuilderHistory] = useState<SnapshotBuilderHistory | null>(null);
   const [showRecommendationBasis, setShowRecommendationBasis] = useState(false);
@@ -347,6 +359,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
   const [addPickerOpen, setAddPickerOpen] = useState(false);
   const [manualPickerOpen, setManualPickerOpen] = useState(false);
   const [manualMode, setManualMode] = useState(false);
+  const [overflowDialogOpen, setOverflowDialogOpen] = useState(false);
   const hasSearchQuery = memberQuery.trim().length > 0;
   const filteredMembers = useMemo(() => filterQuickPrintMembers(members, memberQuery, memberInitial), [memberInitial, memberQuery, members]);
   const rankedPrograms = useMemo(() => (recommendationTrace?.candidatePrograms ?? [])
@@ -371,8 +384,9 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
   }, [recommendationTrace, selectedRecommendationProgram]);
   const snapshotValues = useMemo(() => (builderState ? snapshotBuilderService.toProgramFormValues(builderState) : null), [builderState]);
   const snapshotValidation = useMemo(() => (snapshotValues ? validateProgramForm(snapshotValues) : { valid: false, errors: ["Snapshot이 준비되지 않았습니다."] }), [snapshotValues]);
-  const canRecommend = Boolean(selectedMember && condition.workoutTarget && condition.targetFatigue && condition.condition && condition.sleep && condition.alcohol);
-  const completedConditionCount = [condition.workoutTarget, condition.targetFatigue, condition.condition, condition.sleep, condition.alcohol].filter(Boolean).length;
+  const selectedTargets = condition.workoutTargets?.length ? condition.workoutTargets : condition.workoutTarget ? [condition.workoutTarget] : [];
+  const canRecommend = Boolean(selectedMember && selectedTargets.length && condition.targetFatigue && condition.condition && condition.sleep && condition.alcohol);
+  const completedConditionCount = [selectedTargets.length, condition.targetFatigue, condition.condition, condition.sleep, condition.alcohol].filter(Boolean).length;
   useEffect(() => {
     let active = true;
     setMemberStatus("loading");
@@ -436,6 +450,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
     setRecommendationReason("");
     setSnapshotSourceProgram(null);
     setBuilderHistory(null);
+    setTargetRecommendationGroups([]);
   };
 
   const selectMember = (member: MemberSelectionItem) => {
@@ -450,11 +465,13 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
   };
 
   const selectWorkoutTarget = (target: WorkoutTarget) => {
-    setCondition((current) => ({
-      ...current,
-      workoutTarget: target,
-      fatigueAreas: [],
-    }));
+    setCondition((current) => {
+      const targets = current.workoutTargets?.length ? current.workoutTargets : current.workoutTarget ? [current.workoutTarget] : [];
+      if (targets.includes(target)) { const next = targets.filter((item) => item !== target); return { ...current, workoutTarget: next[0] ?? null, workoutTargets: next, fatigueAreas: [] }; }
+      if (target === "FULL_BODY" || target === "RECOVERY" || targets.includes("FULL_BODY") || targets.includes("RECOVERY")) { setSessionError("전신과 회복은 다른 운동 부위와 함께 선택할 수 없습니다."); return current; }
+      if (targets.length >= 2) { setSessionError("운동 부위는 최대 2개까지 선택할 수 있습니다."); return current; }
+      const next = [...targets, target]; return { ...current, workoutTarget: next[0], workoutTargets: next, fatigueAreas: [] };
+    });
   };
 
   const selectProgramForBuilder = (program: Program) => {
@@ -491,7 +508,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
   };
 
   const runRecommendation = async () => {
-    const next = recommendProgram(runtimePrograms, condition, recentWorkout, intelligence, periodization, workoutHistory, catalogState.data);
+    const next = recommendProgram(runtimePrograms, { ...condition, workoutTarget: selectedTargets[0] ?? null }, recentWorkout, intelligence, periodization, workoutHistory, catalogState.data);
     if (!next) {
       setRecommendation(null);
       setRecommendationReason("추천 가능한 프로그램을 찾을 수 없습니다.");
@@ -501,7 +518,10 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
       return;
     }
     const ruleReason = buildRecommendationReason(next, condition, recentWorkout, intelligence, periodization);
-    const baseHistory = createSnapshotBuilderHistory(next.program, condition);
+    const grouped = selectedTargets.slice(1).map((target) => recommendProgram(runtimePrograms, { ...condition, workoutTarget: target }, recentWorkout, intelligence, periodization, workoutHistory, catalogState.data)).filter((item): item is RecommendationResult => Boolean(item));
+    const allResults = [next, ...grouped];
+    setTargetRecommendationGroups(allResults.map((result, index) => ({ target: selectedTargets[index], recommendation: result, rankedPrograms: result.trace.candidatePrograms.map((candidate) => runtimePrograms.find((program) => program.id === candidate.programId)).filter((program): program is Program => Boolean(program)).slice(0, 3), selectedProgramId: result.program.id })));
+    const baseHistory = createMergedSnapshotBuilderHistory([next.program, ...grouped.map((item) => item.program)], condition);
     setRecommendation(next);
     setRecommendationTrace(next.trace);
     setRecommendationReason(ruleReason);
@@ -509,6 +529,14 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
     setSnapshotSourceProgram(next.program);
     setBuilderHistory(baseHistory);
     setCurrentStep(3);
+  };
+
+  const selectTargetRecommendation = (target: WorkoutTarget, programId: string) => setTargetRecommendationGroups((groups) => groups.map((group) => group.target === target ? { ...group, selectedProgramId: programId } : group));
+  const enterMultiTargetBuilder = () => {
+    const programs = targetRecommendationGroups.map((group) => group.rankedPrograms.find((program) => program.id === group.selectedProgramId)).filter((program): program is Program => Boolean(program));
+    if (programs.length !== selectedTargets.length) return;
+    const merged = createMergedSnapshotBuilderHistory(programs, condition);
+    setManualMode(false); setSnapshotSourceProgram(programs[0]); setBuilderHistory(merged); setCurrentStep(4); setOverflowDialogOpen(merged.present.exercises.length > 8);
   };
 
   const goPrintPreview = async () => {
@@ -530,7 +558,8 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
         memberId: selectedMember.memberId,
         memberName: selectedMember.displayName,
         programTitle: sanitized.title,
-        category: manualMode ? condition.workoutTarget ?? sanitized.category : sanitized.category,
+        category: manualMode ? selectedTargets[0] ?? sanitized.category : sanitized.category,
+        categories: selectedTargets,
         ...(manualMode ? { source: { type: "manual" as const } } : { programId: snapshotSourceProgram!.id }),
         exercises: mapSessionPrescriptionExercises(builderState?.exercises ?? [], resolved),
       });
@@ -552,6 +581,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
       <StepIndicator currentStep={currentStep} />
       {sessionError ? <Alert severity="error" sx={{ maxWidth: 1180, width: "100%" }}>{sessionError}</Alert> : null}
       {sessionSaving ? <Alert icon={<CircularProgress size={20} />} severity="info" sx={{ maxWidth: 1180, width: "100%" }}>운동 세션을 저장하고 있습니다.</Alert> : null}
+      <Dialog open={overflowDialogOpen} onClose={() => setOverflowDialogOpen(false)}><DialogTitle>운동 종목을 조정해 주세요</DialogTitle><DialogContent><Typography>선택한 프로그램을 합치면 운동 종목이 최대 출력 가능 수를 초과합니다.</Typography><Typography sx={{ mt: 1 }} fontWeight={900}>현재 {builderState?.exercises.length ?? 0}개 / 최대 8개</Typography><Typography sx={{ mt: 1 }}>불필요한 운동을 삭제한 뒤 출력을 준비해 주세요.</Typography></DialogContent><DialogActions><Button onClick={() => setOverflowDialogOpen(false)}>운동 구성 수정하기</Button></DialogActions></Dialog>
 
       {currentStep === 1 ? (
         <Box sx={centeredWorkflowSx(1160)}>
@@ -590,7 +620,8 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
         </Box>
       ) : null}
 
-      {currentStep === 3 ? <Box sx={{ ...centeredWorkflowSx(1080), display: "flex", flexDirection: "column", height: "100%", minHeight: 0, overflow: "hidden" }}>
+      {currentStep === 3 && selectedTargets.length > 1 ? <MultiTargetRecommendations groups={targetRecommendationGroups} onBack={() => setCurrentStep(2)} onProceed={enterMultiTargetBuilder} onSelect={selectTargetRecommendation} /> : null}
+      {currentStep === 3 && selectedTargets.length <= 1 ? <Box sx={{ ...centeredWorkflowSx(1080), display: "flex", flexDirection: "column", height: "100%", minHeight: 0, overflow: "hidden" }}>
         <Stack spacing={2} sx={{ height: "100%", justifyContent: "center", minHeight: 0 }}>
           <Stack direction="row" justifyContent="space-between" spacing={2}><Box><Typography sx={{ fontSize: { md: 46, xs: 34 }, fontWeight: 900 }}>오늘의 추천 프로그램</Typography><Typography color="text.secondary">컨디션을 기준으로 가장 적합한 프로그램입니다.</Typography></Box><Button startIcon={<ArrowBackIcon />} variant="outlined" onClick={() => setCurrentStep(2)}>컨디션 수정</Button></Stack>
           {recommendation && selectedRecommendationProgram ? <Stack spacing={1.5} sx={{ minHeight: 0, overflowY: "auto", pr: 0.5 }}>
@@ -600,7 +631,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
           </Stack> : <EmptyState title="추천 프로그램이 없습니다." description="컨디션을 조정해 주세요." />}
         </Stack>
       </Box> : null}
-      {currentStep === 3 ? (
+      {currentStep === 3 && selectedTargets.length <= 1 ? (
         <Box sx={{ ...centeredWorkflowSx(1080), display: "none", maxHeight: "100%", minHeight: 0, overflow: "hidden" }}>
           <Stack spacing={{ md: 3, xs: 2.5 }} sx={{ maxHeight: "100%" }}>
             <Stack direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={2}><Box><Typography sx={{ fontSize: { md: 46, xs: 34 }, fontWeight: 900, lineHeight: 1.15 }}>오늘의 추천 프로그램</Typography><Typography color="text.secondary" sx={{ fontSize: { md: 23, xs: 18 }, lineHeight: 1.5, mt: 1 }}>컨디션을 기준으로 가장 적합한 순서로 추천했어요.</Typography></Box><Button startIcon={<ArrowBackIcon />} variant="outlined" onClick={() => setCurrentStep(2)} sx={{ alignSelf: { sm: "center", xs: "flex-start" }, fontSize: 18, minHeight: 58 }}>컨디션 수정</Button></Stack>
@@ -643,7 +674,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
                   />
                 ))}
               </Stack>
-              <Stack alignItems="center" spacing={1.5}><Button disabled={(builderState?.exercises.length ?? 0) >= 8} startIcon={<AddIcon sx={{ fontSize: 28 }} />} variant="outlined" onClick={() => setAddPickerOpen(true)} sx={{ fontSize: { md: 25, xs: 21 }, minHeight: { md: 78, xs: 68 }, minWidth: { md: 300, xs: "100%" } }}>{(builderState?.exercises.length ?? 0) >= 8 ? "운동은 최대 8개까지" : "운동 추가"}</Button><Button disabled={!builderState?.exercises.length} endIcon={<ArrowForwardIcon sx={{ fontSize: 32 }} />} variant="contained" onClick={() => setCurrentStep(5)} sx={{ fontSize: { md: 30, xs: 24 }, minHeight: { md: 94, xs: 80 }, minWidth: { md: 540, xs: "100%" } }}>출력 준비하기</Button></Stack>
+              <Stack alignItems="center" spacing={1.5}><Button disabled={(builderState?.exercises.length ?? 0) >= 8} startIcon={<AddIcon sx={{ fontSize: 28 }} />} variant="outlined" onClick={() => setAddPickerOpen(true)} sx={{ fontSize: { md: 25, xs: 21 }, minHeight: { md: 78, xs: 68 }, minWidth: { md: 300, xs: "100%" } }}>{(builderState?.exercises.length ?? 0) >= 8 ? "운동은 최대 8개까지" : "운동 추가"}</Button>{(builderState?.exercises.length ?? 0) > 8 ? <Alert severity="warning">운동 {builderState?.exercises.length}개 / 최대 8개 — 운동 종목을 8개 이하로 조정해 주세요.</Alert> : null}<Button disabled={!builderState?.exercises.length || (builderState?.exercises.length ?? 0) > 8} endIcon={<ArrowForwardIcon sx={{ fontSize: 32 }} />} variant="contained" onClick={() => setCurrentStep(5)} sx={{ fontSize: { md: 30, xs: 24 }, minHeight: { md: 94, xs: 80 }, minWidth: { md: 540, xs: "100%" } }}>출력 준비하기</Button></Stack>
               <ExercisePicker disabledExerciseIds={duplicateCatalogIds} errorMessage={catalogState.status === "error" ? catalogState.message : undefined} exercises={catalogOptions} loading={catalogState.status === "loading"} open={addPickerOpen} onClose={() => setAddPickerOpen(false)} onConfirmSelection={addExercisesToBuilder} onSelect={() => undefined} selectionLimit={Math.max(0, 8 - (builderState?.exercises.length ?? 0))} selectionMode="multiple" />
             </Stack>
           </Box>

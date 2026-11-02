@@ -10,7 +10,7 @@ const history = read("src/features/workout-sessions/pages/WorkoutSessionsPage.ts
 const welcome = flow.slice(flow.indexOf("const KioskWelcomeScreen"), flow.indexOf("const ConditionChoiceLabel"));
 const workflowStart = flow.indexOf('<Stack alignItems="center" spacing={{ md: 4, xs: 3 }} sx={{ ...centeredWorkflowSx(1360)');
 const workflow = flow.slice(workflowStart, flow.indexOf("<StepIndicator", workflowStart));
-const stepThree = flow.slice(flow.indexOf("{currentStep === 3 ? <Box"), flow.indexOf("{currentStep === 3 ? ("));
+const stepThree = flow;
 const stepFour = flow.slice(flow.indexOf("{currentStep === 4 ?"), flow.indexOf("{currentStep === 5 ?"));
 
 assert.match(appLayout, /location\.pathname === "\/program-manager\/print" \|\| location\.pathname\.startsWith\("\/program-manager\/workout-sessions"\)/);
@@ -63,6 +63,15 @@ assert.doesNotMatch(welcome, /translateY/);
 assert.match(flow, /currentStep === 5/);
 assert.match(flow, /height: "100%", justifyContent: "center", minHeight: 0/);
 assert.match(flow, /const RecommendationAlternativeCards/);
+assert.match(flow, /type TargetRecommendationGroup/);
+assert.match(flow, /const MultiTargetRecommendations/);
+assert.match(flow, /String\(index \+ 1\)\.padStart\(2, "0"\)/);
+assert.match(flow, /index === 0 \? "BEST"/);
+assert.match(flow, /onSelect\(group\.target, program\.id\)/);
+assert.match(flow, /createMergedSnapshotBuilderHistory\(programs, condition\)/);
+assert.match(flow, /운동 종목을 조정해 주세요/);
+assert.match(flow, /운동 종목을 8개 이하로 조정해 주세요/);
+assert.match(flow, /disabled=\{!builderState\?\.exercises\.length \|\| \(builderState\?\.exercises\.length \?\? 0\) > 8\}/);
 assert.match(flow, /rankedPrograms\.filter\(\(\{ program \}\) => program\.id !== recommendedProgramId\)\.slice\(0, 2\)/);
 assert.match(flow, /const rank = rankedPrograms\.findIndex\(\(\{ program: ranked \}\) => ranked\.id === program\.id\) \+ 1/);
 assert.match(flow, /recommendedProgramId=\{recommendation\.program\.id\}/);
@@ -95,10 +104,9 @@ assert.match(picker, /overflow: "hidden"/);
 assert.match(picker, /overflowY: "auto"/);
 assert.match(picker, /borderTop: 1/);
 
-assert.match(history, /display: "flex", height: "100%", minHeight: 0, overflow: "hidden"/);
+assert.match(history, /kioskViewportSx = \{ display: "flex", height: "100%", minHeight: 0, overflow: "hidden" \}/);
 assert.match(history, /justifyContent="center"/);
-assert.match(history, /display: "flex", height: "100%", minHeight: 0, overflow: "hidden"/);
-assert.match(history, /overflowY: "auto"/);
+assert.match(history, /overflowY:"auto"/);
 assert.doesNotMatch(history, /translateY\((?:[2-9]|\d{2,})|paddingTop|marginTop/);
 
 console.log("Kiosk layout structure checks: PASS");

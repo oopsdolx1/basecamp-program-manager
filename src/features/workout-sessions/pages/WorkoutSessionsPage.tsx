@@ -2,107 +2,35 @@ import SearchIcon from "@mui/icons-material/Search";
 import { Alert, Box, Stack, Typography } from "@mui/material";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  Button,
-  Card,
-  Chip,
-  EmptyState,
-  Input,
-  Loading,
-  colors,
-  motion,
-  shadows,
-  spacing,
-} from "../../../design-system";
+import { Button, Card, Chip, EmptyState, Input, Loading, colors, spacing } from "../../../design-system";
 import { routeBuilder } from "../../../app/routeBuilder";
 import { toAppId } from "../../../types/brandedIds";
+import { createConditionLabMemberProvider } from "../../printing/providers/conditionLabProviders";
+import { filterQuickPrintMembers } from "../../printing/services/memberSelectionFilterService";
+import type { MemberSelectionItem } from "../../members";
+import { KOREAN_INITIALS, type MemberInitialFilter } from "../../members/utils/koreanInitial";
 import { getCategoryLabel } from "../../programs/config/programOptions";
 import type { WorkoutSessionRecord } from "../domain/workoutSession.types";
 import { formatSessionDate } from "../presentation/workoutSessionPresentation";
-import { filterWorkoutHistory, isRecordedWorkoutSession, type WorkoutHistoryPeriod, workoutHistoryDate } from "../services/workoutSessionHistoryService";
+import { filterWorkoutHistory, type WorkoutHistoryPeriod, workoutHistoryDate } from "../services/workoutSessionHistoryService";
 import { subscribeWorkoutSessions } from "../services/workoutSessionService";
 
-const conditionLabAppId = toAppId(import.meta.env.VITE_CONDITION_LAB_APP_ID ?? "");
-const periodFilters: Array<{ value: WorkoutHistoryPeriod; label: string }> = [
-  { value: "month", label: "최근 1개월" },
-  { value: "quarter", label: "최근 3개월" },
-  { value: "all", label: "전체" },
-];
+const appId = toAppId(import.meta.env.VITE_CONDITION_LAB_APP_ID ?? "");
+const membersApi = createConditionLabMemberProvider(appId);
+const periods: Array<{value: WorkoutHistoryPeriod; label: string}> = [{value:"month",label:"최근 1개월"},{value:"quarter",label:"최근 3개월"},{value:"all",label:"전체"}];
+const categoriesFor = (r: WorkoutSessionRecord) => r.prescription?.categories ?? r.programSnapshot.categories ?? (r.prescription?.category ?? r.programSnapshot.category ? [r.prescription?.category ?? r.programSnapshot.category!] : []);
+const categoryLabel = (r: WorkoutSessionRecord) => categoriesFor(r).map(getCategoryLabel).join(" · ") || getCategoryLabel("CUSTOM");
+const sourceLabel = (r: WorkoutSessionRecord) => r.source?.type === "manual" || r.prescription?.source?.type === "manual" ? "직접 구성 운동" : r.programSnapshot.title;
+const kioskViewportSx = { display: "flex", height: "100%", minHeight: 0, overflow: "hidden" };
+const Keyboard = ({value,onChange,onClose}:{value:string;onChange:(x:string)=>void;onClose:()=>void}) => <Card><Stack spacing={1}><Stack direction="row" flexWrap="wrap" gap={.75}>{["ㄱ","ㄴ","ㄷ","ㄹ","ㅁ","ㅂ","ㅅ","ㅇ","ㅈ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ","ㅏ","ㅓ","ㅗ","ㅜ","ㅡ","ㅣ","0","1","2","3","4","5","6","7","8","9"].map(k=><Button key={k} onClick={()=>onChange(value+k)} sx={{minHeight:48,minWidth:48}}>{k}</Button>)}</Stack><Stack direction="row" spacing={1}><Button onClick={()=>onChange(value.slice(0,-1))} variant="secondary">지우기</Button><Button onClick={()=>onChange("")} variant="secondary">전체 삭제</Button><Button onClick={onClose}>완료</Button></Stack></Stack></Card>;
 
-const isManual = (record: WorkoutSessionRecord): boolean => record.source?.type === "manual" || record.prescription?.source?.type === "manual";
-const sourceLabel = (record: WorkoutSessionRecord): string => isManual(record) ? "직접 구성 운동" : record.programSnapshot.title;
-const categoryLabel = (record: WorkoutSessionRecord): string => getCategoryLabel(record.prescription?.category ?? record.programSnapshot.category ?? "CUSTOM");
-const plannedSetCount = (record: WorkoutSessionRecord): number => record.exercises.reduce((total, exercise) => total + (exercise.plannedSets ?? 0), 0);
-const listDate = (record: WorkoutSessionRecord): string => new Intl.DateTimeFormat("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).format(workoutHistoryDate(record));
-
-export const WorkoutSessionsPage = ({ initialSessionId = null }: { initialSessionId?: string | null }): JSX.Element => {
-  const navigate = useNavigate();
-  const [records, setRecords] = useState<WorkoutSessionRecord[]>([]);
-  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
-  const [query, setQuery] = useState("");
-  const [period, setPeriod] = useState<WorkoutHistoryPeriod>("month");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [reprinting, setReprinting] = useState(false);
-  const reprintInFlight = useRef(false);
-
-  useEffect(() => subscribeWorkoutSessions(conditionLabAppId, (next) => {
-    setRecords(next);
-    setSelectedId((current) => {
-      if (current && next.some(({ sessionId }) => sessionId === current)) return current;
-      if (initialSessionId && next.some((record) => record.sessionId === initialSessionId && isRecordedWorkoutSession(record))) return initialSessionId;
-      return next.find(isRecordedWorkoutSession)?.sessionId ?? null;
-    });
-    setStatus("ready");
-  }, () => {
-    setStatus("error");
-  }), [initialSessionId]);
-
-  const filtered = useMemo(() => filterWorkoutHistory(records, { period, search: query }), [period, query, records]);
-  const selected = useMemo(() => filtered.find(({ sessionId }) => sessionId === selectedId) ?? null, [filtered, selectedId]);
-  const reprint = (): void => {
-    if (!selected || reprintInFlight.current) return;
-    reprintInFlight.current = true;
-    setReprinting(true);
-    navigate(routeBuilder.printPreviewSession(selected.memberId, selected.sessionId, true, true));
-  };
-
-  return (
-    <Box sx={{ bgcolor: colors.neutral.black, display: "flex", height: "100%", minHeight: 0, overflow: "hidden", p: { md: `${spacing[6]}px`, xs: `${spacing[4]}px` } }}>
-      <Stack justifyContent="center" spacing={`${spacing[4]}px`} sx={{ flex: "1 1 auto", margin: "0 auto", maxHeight: "100%", maxWidth: 1040, minHeight: 0, overflow: "hidden" }}>
-        <Box textAlign="center"><Typography color={colors.primary.gold} fontWeight={800} variant="overline">WORKOUT HISTORY</Typography><Typography fontWeight={800} variant="h4">이전 운동기록</Typography><Typography color={colors.neutral.gray400}>회원의 출력·저장된 운동 기록을 확인할 수 있습니다.</Typography></Box>
-        <Card><Stack spacing={`${spacing[3]}px`}><Input fullWidth label="회원명 또는 운동명으로 검색" value={query} onChange={(event) => setQuery(event.target.value)} InputProps={{ startAdornment: <SearchIcon sx={{ mr: 1 }} /> }} /><Stack direction="row" flexWrap="wrap" gap={`${spacing[2]}px`} justifyContent="center">{periodFilters.map((item) => <Chip key={item.value} clickable label={item.label} selected={period === item.value} onClick={() => setPeriod(item.value)} sx={{ minHeight: 48 }} />)}</Stack></Stack></Card>
-        {status === "loading" ? <Card><Loading label="운동기록을 불러오는 중" /></Card> : null}
-        {status === "error" ? <Alert severity="error">운동기록을 불러오지 못했습니다.</Alert> : null}
-        {status === "ready" && records.length === 0 ? <Card><EmptyState title="저장된 운동기록이 없습니다." description="운동을 출력하면 이곳에서 기록을 확인할 수 있습니다." /></Card> : null}
-        {status === "ready" && records.length > 0 && filtered.length === 0 ? <Card><EmptyState title="조건에 맞는 운동기록이 없습니다." description="검색어 또는 기간을 변경해 보세요. 출력 전 초안은 이력에 표시되지 않습니다." /></Card> : null}
-        {filtered.length > 0 ? (
-          <Box sx={{ display: "grid", flex: "1 1 auto", gap: `${spacing[4]}px`, gridTemplateColumns: { lg: "minmax(0, 3fr) minmax(340px, 2fr)", xs: "minmax(0, 1fr)" }, minHeight: 0, "& > *": { minWidth: 0 } }}>
-            <Stack spacing={`${spacing[3]}px`} sx={{ minHeight: 0, overflowY: "auto", pr: { lg: 1 } }}>
-              {filtered.map((record) => {
-                const isSelected = selectedId === record.sessionId;
-                return <Card aria-pressed={isSelected} key={record.sessionId} onClick={() => setSelectedId(record.sessionId)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedId(record.sessionId); } }} role="button" sx={{ bgcolor: isSelected ? colors.alpha.goldMuted : colors.neutral.gray900, borderColor: isSelected ? colors.primary.gold : colors.neutral.gray700, boxShadow: isSelected ? shadows.md : shadows.sm, cursor: "pointer", minHeight: 154, transition: motion.transition, "&:focus-visible": { outline: `3px solid ${colors.alpha.goldFocus}`, outlineOffset: 2 }, "&:hover": { borderColor: colors.primary.goldDark, transform: "translateY(-1px)" } }} tabIndex={0}>
-                  <Stack spacing={`${spacing[2]}px`}>
-                    <Typography color={isSelected ? colors.primary.goldLight : colors.neutral.gray300} fontWeight={800} variant="body1">{listDate(record)}</Typography>
-                    <Typography fontWeight={900} variant="h6">{record.memberSnapshot.name}</Typography>
-                    <Typography color={colors.neutral.gray100} fontWeight={700}>{categoryLabel(record)} · {record.exercises.length}종목</Typography>
-                    <Typography color={colors.neutral.gray400} variant="body2">{sourceLabel(record)}</Typography>
-                  </Stack>
-                </Card>;
-              })}
-            </Stack>
-            <Card sx={{ display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden" }}>
-              {!selected ? <EmptyState title="운동기록을 선택하세요." description="목록에서 기록을 선택하면 운동 구성을 볼 수 있습니다." /> : <>
-                <Stack spacing={`${spacing[3]}px`} sx={{ minHeight: 0, overflowY: "auto", p: `${spacing[2]}px` }}>
-                  <Box><Typography color={colors.neutral.gray400} variant="body2">{formatSessionDate(workoutHistoryDate(selected))}</Typography><Typography fontWeight={900} variant="h5">{selected.memberSnapshot.name}</Typography><Typography color={colors.primary.gold} fontWeight={800}>{sourceLabel(selected)}</Typography></Box>
-                  <Stack direction="row" flexWrap="wrap" gap={`${spacing[2]}px`}><Chip label={categoryLabel(selected)} /><Chip label={`운동 ${selected.exercises.length}종목`} /><Chip label={`총 ${plannedSetCount(selected)}세트`} /></Stack>
-                  <Box><Typography color={colors.neutral.gray400} fontWeight={800} variant="body2">운동 목록</Typography><Stack spacing={`${spacing[2]}px`} sx={{ mt: `${spacing[2]}px` }}>{selected.exercises.slice().sort((left, right) => left.order - right.order).map((exercise) => <Box key={`${exercise.programExerciseId}-${exercise.order}`} sx={{ borderBottom: `1px solid ${colors.neutral.gray700}`, pb: `${spacing[2]}px` }}><Typography fontWeight={800}>{exercise.order}. {exercise.name}</Typography><Typography color={colors.neutral.gray400} variant="body2">{exercise.plannedSets ?? 0}세트{exercise.memo ? ` · ${exercise.memo}` : ""}</Typography></Box>)}</Stack></Box>
-                </Stack>
-                <Box sx={{ borderTop: `1px solid ${colors.neutral.gray700}`, p: `${spacing[3]}px` }}><Button fullWidth loading={reprinting} onClick={reprint} sx={{ fontSize: { md: 24, xs: 21 }, minHeight: { md: 84, xs: 76 } }}>이 운동기록 다시 출력</Button></Box>
-              </>}
-            </Card>
-          </Box>
-        ) : null}
-      </Stack>
-    </Box>
-  );
+export const WorkoutSessionsPage = ({initialSessionId: _initialSessionId=null}:{initialSessionId?:string|null}): JSX.Element => {
+  const navigate=useNavigate(); const [records,setRecords]=useState<WorkoutSessionRecord[]>([]); const [status,setStatus]=useState<"loading"|"ready"|"error">("loading"); const [members,setMembers]=useState<MemberSelectionItem[]>([]); const [query,setQuery]=useState(""); const [initial,setInitial]=useState<MemberInitialFilter|null>(null); const [member,setMember]=useState<MemberSelectionItem|null>(null); const [keyboard,setKeyboard]=useState(false); const [period,setPeriod]=useState<WorkoutHistoryPeriod>("month"); const [selectedId,setSelectedId]=useState<string|null>(null); const [reprinting,setReprinting]=useState(false); const inFlight=useRef(false);
+  const reprintInFlight = inFlight;
+  useEffect(()=>{void membersApi.listMembers().then(setMembers);},[]); useEffect(()=>subscribeWorkoutSessions(appId,(next)=>{setRecords(next);setStatus("ready");},()=>setStatus("error")),[]); useEffect(()=>{if(!member)setSelectedId(null);},[member]);
+  const found=useMemo(()=>filterQuickPrintMembers(members,query,initial),[members,query,initial]); const owned=useMemo(()=>member?records.filter(r=>r.memberId===member.memberId):[],[records,member]); const filtered=useMemo(()=>filterWorkoutHistory(owned,{period,search:""}),[owned,period]); const selected=filtered.find(r=>r.sessionId===selectedId)??null;
+  const shell={bgcolor:colors.neutral.black,display:"flex",height:"100%",minHeight:0,overflow:"hidden",p:{md:`${spacing[6]}px`,xs:`${spacing[4]}px`}};
+  const select=(m:MemberSelectionItem)=>{setMember(m);setSelectedId(null);setQuery("");setInitial(null);setKeyboard(false);}; const reset=()=>{setMember(null);setSelectedId(null);setQuery("");setInitial(null);setKeyboard(false);};
+  if(!member)return <Box sx={shell}><Stack justifyContent="center" spacing={2.5} sx={{m:"auto",maxWidth:760,width:"100%"}}><Box textAlign="center"><Typography color={colors.primary.gold} fontWeight={800} variant="overline">WORKOUT HISTORY</Typography><Typography fontWeight={800} variant="h4">이전 운동기록</Typography><Typography color={colors.neutral.gray400}>내 기록을 확인하려면 이름이나 전화번호를 검색하거나 초성을 선택하세요.</Typography></Box><Card><Stack spacing={2}><Input fullWidth label="회원명 또는 전화번호 검색" value={query} onClick={()=>setKeyboard(true)} onChange={e=>{setQuery(e.target.value);setInitial(null);}} InputProps={{startAdornment:<SearchIcon sx={{mr:1}}/>}}/><Stack direction="row" flexWrap="wrap" gap={1} justifyContent="center">{KOREAN_INITIALS.map(x=><Chip clickable key={x} label={x} selected={initial===x} onClick={()=>{setInitial(v=>v===x?null:x);setQuery("");}}/>)}</Stack></Stack></Card>{keyboard?<Keyboard value={query} onChange={x=>{setQuery(x);setInitial(null);}} onClose={()=>setKeyboard(false)}/>:null}{query||initial?<Card sx={{maxHeight:420,overflowY:"auto"}}><Stack spacing={1}>{found.length?found.map(m=><Button key={m.memberId} onClick={()=>select(m)} variant="outlined">{m.displayName}</Button>):<EmptyState title="일치하는 회원이 없습니다." description="이름, 전화번호 또는 초성을 다시 확인하세요."/>}</Stack></Card>:null}</Stack></Box>;
+  return <Box sx={shell}><Stack justifyContent="center" spacing={2.5} sx={{flex:1,m:"0 auto",maxHeight:"100%",maxWidth:1040,minHeight:0,overflow:"hidden"}}><Stack alignItems="center" direction="row" justifyContent="space-between"><Box><Typography color={colors.primary.gold} fontWeight={800} variant="overline">WORKOUT HISTORY</Typography><Typography fontWeight={800} variant="h4">{member.displayName}님의 이전 운동기록</Typography></Box><Button onClick={reset} variant="outlined">회원 변경</Button></Stack><Card><Stack direction="row" flexWrap="wrap" gap={1} justifyContent="center">{periods.map(x=><Chip clickable key={x.value} label={x.label} selected={period===x.value} onClick={()=>setPeriod(x.value)}/>)}</Stack></Card>{status==="loading"?<Loading label="운동기록을 불러오는 중"/>:null}{status==="error"?<Alert severity="error">운동기록을 불러오지 못했습니다.</Alert>:null}{status==="ready"&&!filtered.length?<Card><EmptyState title="저장된 운동기록이 없습니다." description="선택한 회원의 기록만 표시합니다."/></Card>:null}{filtered.length?<Box sx={{display:"grid",flex:1,gap:2,gridTemplateColumns:{lg:"minmax(0,3fr) minmax(340px,2fr)",xs:"1fr"},minHeight:0}}><Stack spacing={2} sx={{minHeight:0,overflowY:"auto"}}>{filtered.map(r=><Card aria-pressed={selectedId===r.sessionId} key={r.sessionId} onClick={()=>setSelectedId(r.sessionId)} role="button" sx={{cursor:"pointer",minHeight:128}} tabIndex={0}><Typography color={colors.primary.gold} fontWeight={800}>{new Intl.DateTimeFormat("ko-KR",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false}).format(workoutHistoryDate(r))}</Typography><Typography fontWeight={900}>{categoryLabel(r)} · {r.exercises.length}종목</Typography><Typography color={colors.neutral.gray400}>{sourceLabel(r)}</Typography></Card>)}</Stack><Card sx={{minHeight:0,overflowY:"auto"}}>{!selected?<EmptyState title="운동기록을 선택하세요." description="선택한 회원의 기록만 표시됩니다."/>:<Stack spacing={2}><Typography color={colors.neutral.gray400}>{formatSessionDate(workoutHistoryDate(selected))}</Typography><Typography fontWeight={900} variant="h5">{member.displayName}</Typography><Typography color={colors.primary.gold} fontWeight={800}>{sourceLabel(selected)}</Typography><Stack direction="row" flexWrap="wrap" gap={1}><Chip label={categoryLabel(selected)}/><Chip label={`운동 ${selected.exercises.length}종목`}/></Stack>{selected.exercises.map(e=><Typography key={`${e.programExerciseId}-${e.order}`}>{e.order}. {e.name} · {e.plannedSets??0}세트</Typography>)}<Button fullWidth loading={reprinting} onClick={()=>{if(selected&&!inFlight.current){inFlight.current=true;setReprinting(true);navigate(routeBuilder.printPreviewSession(selected.memberId,selected.sessionId,true,true));}}}>이 운동기록 다시 출력</Button></Stack>}</Card></Box>:null}</Stack></Box>;
 };

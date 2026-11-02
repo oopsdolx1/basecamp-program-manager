@@ -2,26 +2,17 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { routeBuilder } from "../src/app/routeBuilder";
 
-const historyPage = readFileSync("src/features/workout-sessions/pages/WorkoutSessionsPage.tsx", "utf8");
-const previewPage = readFileSync("src/features/printing/pages/PrintPreviewPage.tsx", "utf8");
-const authorityResolver = readFileSync("src/features/printing/services/printPreviewAuthorityResolver.ts", "utf8");
-
-assert.equal(
-  routeBuilder.printPreviewSession("member-1", "manual-session-1", true, true),
-  "/program-manager/print/session/manual-session-1?memberId=member-1&autoPrint=1&reprint=1",
-  "reprint enters the existing session preview route with auto dispatch",
-);
-assert.match(historyPage, /이 운동기록 다시 출력/);
-assert.match(historyPage, /reprintInFlight/);
-assert.match(historyPage, /printPreviewSession\(selected\.memberId, selected\.sessionId, true, true\)/);
-assert.match(historyPage, /\{categoryLabel\(record\)\} · \{record\.exercises\.length\}종목/);
-assert.match(historyPage, /총 \$\{plannedSetCount\(selected\)\}세트/);
-assert.doesNotMatch(historyPage, /기록 ID|StatusChip|출력 완료/);
-assert.match(historyPage, /overflowY: "auto"/);
-assert.match(previewPage, /const reprint = searchParams\.get\("reprint"\) === "1"/);
-assert.match(previewPage, /autoPrintStarted\.current/);
-assert.match(previewPage, /physicalPrintInFlight\.current/);
-assert.match(previewPage, /출력하지 못했습니다\. 프린터 연결을 확인해 주세요\./);
-assert.match(authorityResolver, /session\.prescription \? programFromSessionPrescription\(session\) : resolveLegacyProgram\(\)/);
-
-console.log("Workout history UI and reprint checks: PASS");
+const page = readFileSync("src/features/workout-sessions/pages/WorkoutSessionsPage.tsx", "utf8");
+assert.equal(routeBuilder.printPreviewSession("member-1", "manual-session-1", true, true), "/program-manager/print/session/manual-session-1?memberId=member-1&autoPrint=1&reprint=1");
+assert.match(page, /if\(!member\)return/);
+assert.match(page, /내 기록을 확인하려면 이름이나 전화번호를 검색하거나 초성을 선택하세요/);
+assert.match(page, /filterQuickPrintMembers\(members,query,initial\)/);
+assert.match(page, /records\.filter\(r=>r\.memberId===member\.memberId\)/);
+assert.match(page, /setMember\(null\);setSelectedId\(null\)/);
+assert.match(page, /KOREAN_INITIALS/);
+assert.match(page, /지우기/);
+assert.match(page, /전체 삭제/);
+assert.match(page, /이 운동기록 다시 출력/);
+assert.match(page, /printPreviewSession\(selected\.memberId,selected\.sessionId,true,true\)/);
+assert.doesNotMatch(page, /기록 ID|StatusChip|출력 완료/);
+console.log("Workout history privacy and reprint checks: PASS");

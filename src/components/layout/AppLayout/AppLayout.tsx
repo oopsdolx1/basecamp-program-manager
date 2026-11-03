@@ -21,7 +21,7 @@ export const AppLayout = ({ children }: PropsWithChildren): JSX.Element => {
       }}
     >
       <AppHeader />
-      <Box sx={{ "& > *": isFixedHeightKioskRoute ? { height: "100%", minHeight: 0 } : undefined, flex: "1 1 auto", minHeight: 0, overflowX: "hidden", overflowY: isFixedHeightKioskRoute ? "hidden" : "auto" }}>
+      <Box sx={{ "& > *": isFixedHeightKioskRoute ? { display: "flex", flex: 1, flexDirection: "column", minHeight: 0 } : undefined, display: "flex", flex: "1 1 auto", flexDirection: "column", minHeight: 0, overflow: "hidden" }}>
         {children}
       </Box>
     </Box>

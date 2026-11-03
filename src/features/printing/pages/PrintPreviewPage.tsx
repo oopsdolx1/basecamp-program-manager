@@ -46,8 +46,12 @@ const PrintSourceDocument = ({ document }: { document: WorkoutPrintDocument }): 
 // header.  Every state view must consume that area rather than creating a new
 // viewport-height box, which would make the document scroll behind the header.
 const printStateSx = {
+  alignItems: "center",
   bgcolor: colors.neutral.black,
-  height: "100%",
+  display: "flex",
+  flex: 1,
+  flexDirection: "column",
+  justifyContent: "center",
   minHeight: 0,
   overflow: "hidden",
 };

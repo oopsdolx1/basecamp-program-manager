@@ -588,7 +588,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
     return <KioskWelcomeScreen headline={welcomeCopy.headline} subtitle={welcomeCopy.subtitle} onHistory={() => navigate(routeBuilder.workoutSessions())} onStart={() => setStarted(true)} />;
   }
   return (
-    <Stack alignItems="center" spacing={{ md: 4, xs: 3 }} sx={{ ...centeredWorkflowSx(1360), height: "100%", minHeight: 0, overflow: "hidden", pb: 0 }}>
+    <Stack alignItems="center" spacing={{ md: 4, xs: 3 }} sx={{ ...centeredWorkflowSx(1360), flex: 1, minHeight: 0, overflow: "hidden", pb: 0 }}>
       <StepIndicator currentStep={currentStep} />
       {sessionError ? <Alert severity="error" sx={{ maxWidth: 1180, width: "100%" }}>{sessionError}</Alert> : null}
       {sessionSaving ? <Alert icon={<CircularProgress size={20} />} severity="info" sx={{ maxWidth: 1180, width: "100%" }}>운동 세션을 저장하고 있습니다.</Alert> : null}

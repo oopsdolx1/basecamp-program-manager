@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 
 const read = (path: string): string => readFileSync(path, "utf8");
 const appLayout = read("src/components/layout/AppLayout/AppLayout.tsx");
+const pageContainer = read("src/components/layout/PageContainer/PageContainer.tsx");
 const flow = read("src/features/printing/components/QuickPrintFlow/QuickPrintFlow.tsx");
 const printPreview = read("src/features/printing/pages/PrintPreviewPage.tsx");
 const picker = read("src/features/programs/components/ExercisePicker/ExercisePicker.tsx");
@@ -15,10 +16,14 @@ const stepFour = flow.slice(flow.indexOf("{currentStep === 4 ?"), flow.indexOf("
 
 assert.match(appLayout, /location\.pathname === "\/program-manager\/print" \|\| location\.pathname\.startsWith\("\/program-manager\/workout-sessions"\)/);
 assert.match(appLayout, /height: "100dvh"/);
-assert.match(appLayout, /flex: "1 1 auto", minHeight: 0/);
-assert.match(appLayout, /overflowY: isFixedHeightKioskRoute \? "hidden" : "auto"/);
+assert.match(appLayout, /flex: "1 1 auto", flexDirection: "column", minHeight: 0/);
+assert.match(appLayout, /display: "flex", flex: "1 1 auto", flexDirection: "column", minHeight: 0, overflow: "hidden"/);
+assert.match(appLayout, /display: "flex", flex: 1, flexDirection: "column", minHeight: 0/);
+assert.match(pageContainer, /display: "flex", flex: 1, flexDirection: "column"/);
+assert.match(pageContainer, /minHeight: 0/);
 
 assert.match(workflow, /<Stack alignItems="center" spacing=\{\{ md: 4, xs: 3 \}\}/);
+assert.match(workflow, /flex: 1, minHeight: 0, overflow: "hidden"/);
 assert.doesNotMatch(workflow, /justifyContent="center"/);
 assert.match(flow, /currentStep === 3[\s\S]*?height: "100%", minHeight: 0, overflow: "hidden"/);
 assert.match(stepThree, /display: "flex", flexDirection: "column", height: "100%", minHeight: 0, overflow: "hidden"/);
@@ -94,7 +99,10 @@ assert.match(alcoholSection, /position: "absolute"/);
 assert.match(alcoholSection, /opacity: selected \? 1 : 0/);
 assert.doesNotMatch(alcoholSection, /selected \? <CheckCircleIcon/);
 
-assert.match(printPreview, /height: "100%"/);
+assert.match(printPreview, /display: "flex"/);
+assert.match(printPreview, /flex: 1/);
+assert.match(printPreview, /flexDirection: "column"/);
+assert.match(printPreview, /justifyContent: "center"/);
 assert.match(printPreview, /minHeight: 0/);
 assert.match(printPreview, /overflow: "hidden"/);
 assert.doesNotMatch(printPreview, /minHeight: "100vh"/);

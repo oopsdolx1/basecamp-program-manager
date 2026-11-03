@@ -13,6 +13,8 @@ const workflowStart = flow.indexOf('<Stack alignItems="center" spacing={{ md: 4,
 const workflow = flow.slice(workflowStart, flow.indexOf("<StepIndicator", workflowStart));
 const stepThree = flow;
 const stepFour = flow.slice(flow.indexOf("{currentStep === 4 ?"), flow.indexOf("{currentStep === 5 ?"));
+const stepOne = flow.slice(flow.indexOf("{currentStep === 1 ?"), flow.indexOf("{currentStep === 2 ?"));
+const stepTwo = flow.slice(flow.indexOf("{currentStep === 2 ?"), flow.indexOf("{currentStep === 3"));
 
 assert.match(appLayout, /location\.pathname === "\/program-manager\/print" \|\| location\.pathname\.startsWith\("\/program-manager\/workout-sessions"\)/);
 assert.match(appLayout, /height: "100dvh"/);
@@ -25,6 +27,16 @@ assert.match(pageContainer, /minHeight: 0/);
 assert.match(workflow, /<Stack alignItems="center" spacing=\{\{ md: 4, xs: 3 \}\}/);
 assert.match(workflow, /flex: 1, minHeight: 0, overflow: "hidden"/);
 assert.doesNotMatch(workflow, /justifyContent="center"/);
+assert.match(stepOne, /display: "flex", flex: 1, flexDirection: "column", justifyContent: "center", minHeight: 0/);
+assert.match(stepOne, /<Stack spacing=\{\{ md: 3\.5, xs: 2\.5 \}\} sx=\{\{ flex: "0 1 auto" \}\}>/);
+assert.match(stepOne, />회원 선택<\/Typography>/);
+assert.match(stepOne, /maxHeight: \{ md: "32vh", xs: "36vh" \}, overflowY: "auto"/);
+assert.doesNotMatch(stepOne, /height: "100%"|minHeight: "100%"/);
+assert.match(stepTwo, /display: "flex", flex: 1, flexDirection: "column", justifyContent: "center", minHeight: 0, overflow: "hidden"/);
+assert.match(stepTwo, /<Stack spacing=\{\{ md: 2\.25, xs: 2\.5 \}\} sx=\{\{ flex: "0 1 auto", maxHeight: "100%", minHeight: 0 \}\}>/);
+assert.match(stepTwo, />컨디션 확인<\/Typography>/);
+assert.match(stepTwo, /flex: "0 1 auto"/);
+assert.doesNotMatch(stepTwo, /mt: "auto"/);
 assert.match(flow, /currentStep === 3[\s\S]*?height: "100%", minHeight: 0, overflow: "hidden"/);
 assert.match(stepThree, /display: "flex", flexDirection: "column", height: "100%", minHeight: 0, overflow: "hidden"/);
 assert.match(stepThree, /height: "100%", justifyContent: "center", minHeight: 0/);

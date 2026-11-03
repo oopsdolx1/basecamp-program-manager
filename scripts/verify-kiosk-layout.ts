@@ -37,9 +37,10 @@ assert.match(stepTwo, /<Stack spacing=\{\{ md: 2\.25, xs: 2\.5 \}\} sx=\{\{ flex
 assert.match(stepTwo, />컨디션 확인<\/Typography>/);
 assert.match(stepTwo, /flex: "0 1 auto"/);
 assert.doesNotMatch(stepTwo, /mt: "auto"/);
-assert.match(flow, /currentStep === 3[\s\S]*?height: "100%", minHeight: 0, overflow: "hidden"/);
-assert.match(stepThree, /display: "flex", flexDirection: "column", height: "100%", minHeight: 0, overflow: "hidden"/);
-assert.match(stepThree, /height: "100%", justifyContent: "center", minHeight: 0/);
+assert.match(flow, /currentStep === 3[\s\S]*?display: "flex", flex: 1, flexDirection: "column", justifyContent: "center", minHeight: 0, overflow: "hidden"/);
+assert.match(stepThree, /<Box sx=\{\{ \.\.\.centeredWorkflowSx\(1080\), display: "flex", flex: 1, flexDirection: "column", justifyContent: "center", minHeight: 0, overflow: "hidden" \}\}>/);
+assert.match(stepThree, /<Stack spacing=\{2\} sx=\{\{ flex: "0 1 auto", maxHeight: "100%", minHeight: 0/);
+assert.doesNotMatch(stepThree, /mt: "auto"/);
 assert.match(stepFour, /display: "flex", flexDirection: "column", height: "100%", minHeight: 0, overflow: "hidden"/);
 assert.match(stepFour, /alignItems: "stretch", display: "flex", flex: "1 1 auto", flexDirection: "column", justifyContent: "center", minHeight: 0/);
 assert.match(stepFour, /flex: "0 1 auto", maxHeight: "100%", minHeight: 0, width: "100%"/);

@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
 $sourceRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $runtimeRoot = 'C:\ProgramData\BaseCamp\PrintAgent'
-$runtimeFiles = @('server.mjs', 'windows-printer-backend.mjs', 'html-pdf-renderer.mjs', 'start-print-agent.ps1')
+$runtimeFiles = @('server.mjs', 'windows-printer-backend.mjs', 'html-pdf-renderer.mjs', 'diagnostics.mjs', 'start-print-agent.ps1')
 $sourceBin = Join-Path $sourceRoot 'bin'
 $sourceRenderer = Join-Path $sourceBin 'SumatraPDF.exe'
 if (-not (Test-Path -LiteralPath $sourceRenderer -PathType Leaf)) { throw "Missing required runtime renderer: $sourceRenderer" }

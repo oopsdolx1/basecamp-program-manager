@@ -3,15 +3,16 @@ import { createReadStream } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { createHtmlPdfPipeline, validateHtmlArtifact } from "./html-pdf-renderer.mjs";
 import { createWindowsPrinterBackend } from "./windows-printer-backend.mjs";
+import { createDiagnosticLogger, diagnosticCodeFor } from "./diagnostics.mjs";
 export const DEFAULT_PORT = 43127;
 export const DEFAULT_ALLOWED_ORIGINS = ["https://basecamp-program-manager.vercel.app", "http://localhost:5173"];
 const MAX_COPIES = 10;
 const MAX_REQUEST_BYTES = 2_200_000;
 const DEFAULT_PREVIEW_TTL_MS = 5 * 60_000;
-export const createPrintAgent = ({ backend, pdfPipeline, port = DEFAULT_PORT, allowedOrigins = DEFAULT_ALLOWED_ORIGINS, previewTtlMs = DEFAULT_PREVIEW_TTL_MS } = {}) => {
+export const createPrintAgent = ({ backend, pdfPipeline, logger = createDiagnosticLogger(), port = DEFAULT_PORT, allowedOrigins = DEFAULT_ALLOWED_ORIGINS, previewTtlMs = DEFAULT_PREVIEW_TTL_MS } = {}) => {
   const jobs = new Map();
   const previews = new Map();
-  const printerBackend = backend ?? createWindowsPrinterBackend();
+  const printerBackend = backend ?? createWindowsPrinterBackend({ logger });
   const renderer = pdfPipeline ?? createHtmlPdfPipeline();
   const send = (res, code, body, origin) => { const headers = { "content-type": "application/json; charset=utf-8" }; if (origin) headers["access-control-allow-origin"] = origin; res.writeHead(code, headers); res.end(JSON.stringify(body)); };
   const disposePreview = async (artifactId) => { const preview = previews.get(artifactId); if (!preview) return; previews.delete(artifactId); clearTimeout(preview.timer); await preview.cleanup().catch(() => undefined); };
@@ -19,11 +20,11 @@ export const createPrintAgent = ({ backend, pdfPipeline, port = DEFAULT_PORT, al
     const origin = req.headers.origin;
     if (origin && !allowedOrigins.includes(origin)) return send(res, 403, { status: "failed", reason: "origin_not_allowed" });
     if (req.method === "OPTIONS") { res.writeHead(204, { "access-control-allow-origin": origin ?? "", "access-control-allow-methods": "GET,POST,OPTIONS", "access-control-allow-headers": "content-type" }); return res.end(); }
-    if (req.method === "GET" && req.url === "/health") { const printer = await printerBackend.getStatus?.() ?? { printerAvailable: false, defaultPrinter: null }; return send(res, 200, { status: "ok", service: "basecamp-print-agent", ...printer }, origin); }
+    if (req.method === "GET" && req.url === "/health") { const printer = await printerBackend.getStatus?.() ?? { printerAvailable: false, defaultPrinter: null }; await logger.info("agent", "health", printer); return send(res, 200, { status: "ok", service: "basecamp-print-agent", ...printer }, origin); }
     const previewMatch = req.url?.match(/^\/preview\/([0-9a-f-]{36})$/iu);
     if (req.method === "GET" && previewMatch) { const preview = previews.get(previewMatch[1]); if (!preview || preview.expiresAt <= Date.now()) { if (preview) await disposePreview(previewMatch[1]); return send(res, 404, { status: "failed", reason: "preview_not_found" }, origin); } res.writeHead(200, { "content-type": "application/pdf", "cache-control": "no-store", ...(origin ? { "access-control-allow-origin": origin } : {}) }); return createReadStream(preview.path).pipe(res); }
     if (req.method === "POST" && req.url === "/preview") {
-      let raw = ""; let tooLarge = false; req.setEncoding("utf8"); req.on("data", (chunk) => { if (tooLarge) return; raw += chunk; if (Buffer.byteLength(raw, "utf8") > MAX_REQUEST_BYTES) { tooLarge = true; raw = ""; } }); req.on("end", async () => { try { if (tooLarge) return send(res, 413, { status: "failed", reason: "request_too_large" }, origin); const payload = JSON.parse(raw); if (!payload || typeof payload.jobId !== "string" || !payload.jobId.trim()) return send(res, 400, { status: "failed", reason: "job_id_required" }, origin); validateHtmlArtifact(payload.artifact); const rendered = await renderer.create({ jobId: payload.jobId, artifact: payload.artifact }); const artifactId = randomUUID(); const timer = setTimeout(() => void disposePreview(artifactId), previewTtlMs); previews.set(artifactId, { path: rendered.path, cleanup: rendered.cleanup, timer, expiresAt: Date.now() + previewTtlMs, pages: rendered.metadata?.pageCount ?? 1 }); return send(res, 201, { status: "ready", artifactId, pages: rendered.metadata?.pageCount ?? 1 }, origin); } catch (error) { return send(res, 502, { status: "failed", reason: error instanceof Error ? error.message : "pdf_generation_failed" }, origin); } }); return;
+      let raw = ""; let tooLarge = false; req.setEncoding("utf8"); req.on("data", (chunk) => { if (tooLarge) return; raw += chunk; if (Buffer.byteLength(raw, "utf8") > MAX_REQUEST_BYTES) { tooLarge = true; raw = ""; } }); req.on("end", async () => { const startedAt = Date.now(); try { if (tooLarge) return send(res, 413, { status: "failed", reason: "request_too_large" }, origin); const payload = JSON.parse(raw); if (!payload || typeof payload.jobId !== "string" || !payload.jobId.trim()) return send(res, 400, { status: "failed", reason: "job_id_required" }, origin); await logger.info("preview", "request_received", { jobId: payload.jobId, origin: origin ?? null, htmlBytes: Buffer.byteLength(payload.artifact?.content ?? "", "utf8") }); validateHtmlArtifact(payload.artifact); const rendered = await renderer.create({ jobId: payload.jobId, artifact: payload.artifact }); const artifactId = randomUUID(); const timer = setTimeout(() => void disposePreview(artifactId), previewTtlMs); previews.set(artifactId, { path: rendered.path, cleanup: rendered.cleanup, timer, expiresAt: Date.now() + previewTtlMs, pages: rendered.metadata?.pageCount ?? 1 }); await logger.info("preview", "rendered", { jobId: payload.jobId, artifactId, pdfPath: rendered.path, pages: rendered.metadata?.pageCount ?? 1, pdfBytes: rendered.metadata?.bytes ?? null, expiresAt: new Date(Date.now() + previewTtlMs).toISOString(), durationMs: Date.now() - startedAt }); return send(res, 201, { status: "ready", artifactId, pages: rendered.metadata?.pageCount ?? 1 }, origin); } catch (error) { await logger.error("error", "preview_failed", { durationMs: Date.now() - startedAt, errorName: error?.name ?? "Error", message: error instanceof Error ? error.message : String(error) }); return send(res, 502, { status: "failed", reason: error instanceof Error ? error.message : "pdf_generation_failed" }, origin); } }); return;
     }
     if (req.method !== "POST" || req.url !== "/print") return send(res, 404, { status: "failed", reason: "not_found" }, origin);
     let raw = ""; let tooLarge = false; req.setEncoding("utf8"); req.on("data", (chunk) => { if (tooLarge) return; raw += chunk; if (Buffer.byteLength(raw, "utf8") > MAX_REQUEST_BYTES) { tooLarge = true; raw = ""; } });
@@ -31,7 +32,7 @@ export const createPrintAgent = ({ backend, pdfPipeline, port = DEFAULT_PORT, al
       if (tooLarge) return send(res, 413, { status: "failed", reason: "request_too_large" }, origin);
       const payload = JSON.parse(raw);
       if (!payload || typeof payload.jobId !== "string" || !payload.jobId.trim()) return send(res, 400, { status: "failed", reason: "job_id_required" }, origin);
-      console.log(`[print] job=${payload.jobId} request received`);
+      await logger.info("print", "request_received", { jobId: payload.jobId, artifactId: payload.artifactId ?? null, copies: payload.copies ?? 1, origin: origin ?? null }); console.log(`[print] job=${payload.jobId} request received`);
       const copies = payload.copies ?? 1;
       if (!Number.isInteger(copies) || copies < 1 || copies > MAX_COPIES) return send(res, 400, { status: "failed", reason: "invalid_copies" }, origin);
       const preview = typeof payload.artifactId === "string" ? previews.get(payload.artifactId) : null;
@@ -47,8 +48,8 @@ export const createPrintAgent = ({ backend, pdfPipeline, port = DEFAULT_PORT, al
         console.log(`[print] job=${payload.jobId} artifact resolved id=${payload.artifactId ?? "inline"} path=${rendered.path}`);
         const result = await printerBackend.submit({ jobId: payload.jobId, pdfPath: rendered.path, copies });
         console.log(`[print] job=${payload.jobId} backend completed status=${result?.status ?? "unknown"}`);
-        response = result?.status === "submitted" ? { status: "submitted", jobId: payload.jobId, printer: result.printer ?? null } : { status: "failed", jobId: payload.jobId, reason: result?.reason ?? "backend_failed" };
-      } catch (error) { response = { status: "failed", jobId: payload.jobId, reason: error instanceof Error ? error.message : "pdf_generation_failed" }; }
+        response = result?.status === "submitted" ? { status: "submitted", jobId: payload.jobId, printer: result.printer ?? null } : { status: "failed", jobId: payload.jobId, reason: result?.reason ?? "backend_failed", diagnosticCode: result?.diagnosticCode ?? diagnosticCodeFor(result?.reason ?? "backend_failed") };
+      } catch (error) { const reason = error instanceof Error ? error.message : "pdf_generation_failed"; response = { status: "failed", jobId: payload.jobId, reason, diagnosticCode: diagnosticCodeFor(reason) }; }
       finally {
         // A preview artifact is also the source for the success-screen PDF download.
         // Keep it available until its normal TTL expires; inline artifacts are still
@@ -56,7 +57,7 @@ export const createPrintAgent = ({ backend, pdfPipeline, port = DEFAULT_PORT, al
         if (!preview && rendered) await rendered.cleanup().catch(() => undefined);
       }
       jobs.set(payload.jobId, { fingerprint, result: response });
-      res.once("finish", () => console.log(`[print] job=${payload.jobId} response sent status=${response.status}`));
+      await (response.status === "submitted" ? logger.info("print", "completed", { jobId: payload.jobId, artifactId: payload.artifactId ?? null, printer: response.printer ?? null, copies, status: "submitted" }) : logger.error("error", "failed", { jobId: payload.jobId, artifactId: payload.artifactId ?? null, reason: response.reason, diagnosticCode: response.diagnosticCode })); res.once("finish", () => console.log(`[print] job=${payload.jobId} response sent status=${response.status}`));
       return send(res, response.status === "submitted" ? 200 : 502, response, origin);
     } catch { return send(res, 400, { status: "failed", reason: "invalid_json" }, origin); } });
   });

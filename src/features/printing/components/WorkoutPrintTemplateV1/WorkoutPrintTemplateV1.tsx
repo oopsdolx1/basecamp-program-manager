@@ -10,21 +10,22 @@ interface WorkoutPrintTemplateV1Props {
 export const WorkoutPrintTemplateV1 = ({ document }: WorkoutPrintTemplateV1Props): JSX.Element => {
   const runtimeBodyParts = document.bodyParts.map((value) => value.trim().replace(/[_\s]*\([^)]*\)$/u, "")).filter(Boolean);
   const bodyPartText = runtimeBodyParts.length > 0 ? runtimeBodyParts.join(" · ") : document.program.categoryLabel;
+  const hasPointColumn = document.layout.setLayout === "four-set-with-note";
   const setLabels = Array.from({ length: document.layout.setLayout === "five-set" ? 5 : 4 }, (_, index) => index + 1);
   return (
     <article className="a5-workout-document" aria-label="A5 가로 운동 일지" data-layout-density={document.layout.density} data-top-binding-safe-mm={document.layout.topBindingSafeAreaMm} style={{ "--a5-binding-safe-area": `${document.layout.topBindingSafeAreaMm}mm`, "--a5-exercise-row-count": document.rows.length } as CSSProperties}>
       <header className="print-header">
         <div className="print-brand-block">
           <div className="print-logo">BASECAMP</div>
-          <div className="print-subtitle">운동 프로그램</div>
+          <div className="print-member-name"><strong>회원 :</strong><span>{document.member.name}</span></div>
         </div>
-        <div className="print-meta print-meta-grid">
-          <div><strong>프로그램</strong><span>{document.program.title}</span></div>
-          <div><strong>회원</strong><span>{document.member.name}</span></div>
-          <div><strong>운동일</strong><span>{formatPrintDate(document.printDate)}</span></div>
-          <div><strong>운동 부위</strong><span>{bodyPartText}</span></div>
-          <div><strong>시작 시간</strong><span className="blank-line" /></div>
-          <div><strong>종료 시간</strong><span className="blank-line" /></div>
+        <div className="print-meta-grid" aria-label="운동 정보">
+          <div className="print-meta-field"><strong>운동일 :</strong><span>{formatPrintDate(document.printDate)}.</span></div>
+          <div className="print-meta-field"><strong>운동 부위 :</strong><span>{bodyPartText}</span></div>
+          <div className="print-meta-field print-meta-program"><strong>프로그램 :</strong><span>{document.program.title}</span></div>
+          <div className="print-meta-field"><strong>시작 시간 :</strong><span /></div>
+          <div className="print-meta-field"><strong>종료 시간 :</strong><span /></div>
+          <div className="print-meta-field print-meta-cardio"><strong>유산소 :</strong><span /></div>
         </div>
         <div className="print-session-code" aria-label={`Workout Session ${document.workoutSessionId}`}>
           <QRCodeSVG value={document.workoutSessionId} size={68} level="M" marginSize={0} />
@@ -33,17 +34,20 @@ export const WorkoutPrintTemplateV1 = ({ document }: WorkoutPrintTemplateV1Props
       </header>
 
       <section className="exercise-print-table" aria-label="운동 기록표" role="table">
-        <div className="exercise-table-header" role="row"><span role="columnheader">운동 종목</span><span role="columnheader">기록</span></div>
+        <div className={`exercise-table-header ${hasPointColumn ? "four-set-header" : "five-set-header"}`} role="row">
+          <span className="exercise-table-main-header" role="columnheader">운동종목</span>
+          {hasPointColumn ? <span className="exercise-table-point-header" role="columnheader">운동 포인트</span> : null}
+          <div className="record-group-header" role="columnheader"><strong>기록</strong><div className="set-header-grid">{setLabels.map((setNumber) => <div className="set-header-cell" key={setNumber}><strong>SET {setNumber}</strong><span><i>Kg</i><i>횟수</i><i>수축</i></span></div>)}</div></div>
+        </div>
         <div role="rowgroup">
           {document.rows.map((row) => {
-            const hasPointCell = document.layout.setLayout === "four-set-with-note";
             return (
-              <div className={`exercise-row ${hasPointCell ? "four-set-row" : "five-set-row"}`} key={row.order} role="row">
+              <div className={`exercise-row ${hasPointColumn ? "four-set-row" : "five-set-row"}`} key={row.order} role="row">
                 <div className="exercise-name-cell" role="cell">
                   <div className="exercise-title">{row.isBlank ? "" : `${row.order}. ${row.exerciseName}`}</div>
                 </div>
-                {hasPointCell ? <div className="exercise-point-cell" role="cell"><span className="exercise-point-label">운동 포인트</span><span className="exercise-point-text">{row.isBlank ? "" : row.exerciseMemo.trim() || "—"}</span></div> : null}
-                {setLabels.map((setNumber) => <div className="set-cell" key={setNumber} role="cell"><span className="set-label">SET {setNumber}</span><span className="set-fields"><span>kg</span><span>횟수</span><span>수축</span></span></div>)}
+                {hasPointColumn ? <div className="exercise-point-cell" role="cell"><span className="exercise-point-text">{row.isBlank ? "" : row.exerciseMemo.trim() || "—"}</span></div> : null}
+                {setLabels.map((setNumber) => <div className="set-cell" key={setNumber} role="cell"><span className="set-writing-fields"><span /><span /><span /></span></div>)}
               </div>
             );
           })}

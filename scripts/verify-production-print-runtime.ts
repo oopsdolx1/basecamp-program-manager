@@ -37,11 +37,11 @@ const main = async (): Promise<void> => {
   assert.equal((await injected.print(request)).status, "submitted");
   assert.equal(postedUrl, `${endpoint}/print`);
 
-  assert.match(page, /VITE_PRINT_AGENT_ENDPOINT\s*\?\?\s*"http:\/\/127\.0\.0\.1:43127"/u);
-  assert.match(page, /createPrintArtifactPreview\(\{ endpoint: printAgentEndpoint/u);
-  assert.match(page, /fetchVisualPdfPreview\(\{ endpoint: printAgentEndpoint/u);
+  assert.match(configured, /configuredPrintAgentEndpoint\s*=\s*import\.meta\.env\?\.VITE_PRINT_AGENT_ENDPOINT\s*\?\?\s*"http:\/\/127\.0\.0\.1:43127"/u);
+  assert.match(page, /createPrintArtifactPreview\(\{ endpoint: configuredPrintAgentEndpoint/u);
+  assert.match(page, /fetchVisualPdfPreview\(\{ endpoint: configuredPrintAgentEndpoint/u);
   assert.match(windows, /endpoint = "http:\/\/127\.0\.0\.1:43127"/u);
-  assert.equal(configured.includes("VITE_PRINT_AGENT_ENDPOINT"), false, "configured /print adapter currently has no endpoint override wiring");
+  assert.match(configured, /createWindowsPrintAdapter\(\{ endpoint: configuredPrintAgentEndpoint \}\)/u);
   assert.match(bundle, /127\.0\.0\.1:43127/u);
   assert.match(bundle, /\/preview/u);
   assert.match(bundle, /\/print/u);
@@ -52,7 +52,7 @@ const main = async (): Promise<void> => {
     defaultRuntime: "browser",
     artifactAdapter: "windows-agent",
     previewAndPrintFallbackMatch: true,
-    endpointOverrideWiredToPrint: false,
+    endpointOverrideWiredToPrint: true,
     runtimeDependsOnHostnameOrProtocol: false,
   }, null, 2));
 };

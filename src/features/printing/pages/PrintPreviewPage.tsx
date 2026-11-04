@@ -15,7 +15,7 @@ import { useCreatePrintRequest, type PrintRequestRecord } from "../../print-hist
 import { getPrintRequestsByIds } from "../../print-history/services/printRequestService";
 import { markWorkoutSessionPrinted } from "../../workout-sessions/services/workoutSessionService";
 import { WorkoutPrintTemplateV1 } from "../components/WorkoutPrintTemplateV1/WorkoutPrintTemplateV1";
-import { configuredPrintAdapter, configuredPrintRuntime, createArtifactPrintAdapter } from "../gateways/configuredPrintAdapter";
+import { configuredPrintAdapter, configuredPrintAgentEndpoint, configuredPrintRuntime, createArtifactPrintAdapter } from "../gateways/configuredPrintAdapter";
 import { createRenderedPrintArtifactFactory, isRenderedPrintDocumentReady } from "../gateways/printArtifactFactory";
 import { createPreparedPdfHandoff, type PreparedPdfHandoff } from "../gateways/preparedPdfHandoff";
 import { isUserGesturePdfPrintAdapter } from "../gateways/userGesturePdfPrintAdapter";
@@ -26,7 +26,6 @@ import type { WorkoutPrintDocument } from "../types/print.types";
 import "../styles/print.css";
 
 const conditionLabAppId = toAppId(import.meta.env.VITE_CONDITION_LAB_APP_ID ?? "");
-const printAgentEndpoint = import.meta.env.VITE_PRINT_AGENT_ENDPOINT ?? "http://127.0.0.1:43127";
 const formatDateTime = (date: Date): string => new Intl.DateTimeFormat("ko-KR", { dateStyle: "short", timeStyle: "short" }).format(date);
 const userFacingPrintError = (reason: string): string => {
   if (reason === "print_agent_unavailable" || reason === "preview_artifact_requires_windows_agent") return "인쇄 서비스를 연결하지 못했습니다.";
@@ -166,7 +165,7 @@ export const PrintPreviewPage = (): JSX.Element => {
     void (async () => {
       try {
         const artifact = await createRenderedPrintArtifactFactory().create(artifactRequest);
-        const preview = await createPrintArtifactPreview({ endpoint: printAgentEndpoint, jobId: workoutSessionId ?? state.document.workoutSessionId, artifact });
+        const preview = await createPrintArtifactPreview({ endpoint: configuredPrintAgentEndpoint, jobId: workoutSessionId ?? state.document.workoutSessionId, artifact });
         if (active) setPrintArtifact(preview);
       } catch (error) { if (active) setPrintArtifactError(error instanceof Error ? error.message : "print_artifact_creation_failed"); }
     })();
@@ -180,7 +179,7 @@ export const PrintPreviewPage = (): JSX.Element => {
     setVisualPdfPreviewError(null);
     void (async () => {
       try {
-        const bytes = await fetchVisualPdfPreview({ endpoint: printAgentEndpoint, artifactId: printArtifactId });
+        const bytes = await fetchVisualPdfPreview({ endpoint: configuredPrintAgentEndpoint, artifactId: printArtifactId });
         const pdfBuffer = new ArrayBuffer(bytes.byteLength);
         new Uint8Array(pdfBuffer).set(bytes);
         const prepared = createPreparedPdfHandoff(pdfBuffer, `basecamp-workout-${documentWorkoutSessionId ?? printArtifactId}.pdf`);
@@ -216,7 +215,7 @@ export const PrintPreviewPage = (): JSX.Element => {
     setDownloadError(null);
     setPdfSaveInProgress(true);
     const safe = String(pdfDownloadName ?? printArtifactId).replace(/[\\/:*?"<>|]/g, "_").trim() || printArtifactId;
-    try { await downloadPdfArtifact({ endpoint: printAgentEndpoint, artifactId: printArtifactId, filename: `BaseCamp_${safe}_${new Date().toISOString().slice(0, 10)}.pdf` }); }
+    try { await downloadPdfArtifact({ endpoint: configuredPrintAgentEndpoint, artifactId: printArtifactId, filename: `BaseCamp_${safe}_${new Date().toISOString().slice(0, 10)}.pdf` }); }
     catch { setDownloadError("PDF를 저장하지 못했습니다. 다시 시도해 주세요."); }
     finally { setPdfSaveInProgress(false); }
   };

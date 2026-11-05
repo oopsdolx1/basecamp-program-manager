@@ -99,7 +99,7 @@
   font-family: "Noto Sans KR", Arial, sans-serif;
   height: 148mm;
   overflow: hidden;
-  padding: var(--a5-binding-safe-area) 5mm 5mm;
+  padding: calc(var(--a5-binding-safe-area) + 2mm) 16mm 10mm;
   page-break-after: avoid;
   page-break-before: avoid;
   page-break-inside: avoid;
@@ -111,7 +111,7 @@
 
 .print-header {
   align-items: stretch;
-  border-bottom: 0.45mm solid #111;
+  border: 0.25mm solid #111;
   display: flex;
   justify-content: space-between;
   min-height: 25mm;
@@ -119,15 +119,16 @@
 }
 
 .a5-workout-document[data-layout-density="standard"] .exercise-row {
-  height: calc(91mm / var(--a5-exercise-row-count, 8));
+  height: calc(70mm / var(--a5-exercise-row-count, 8));
 }
 
 .print-session-code {
   align-items: center;
   display: flex;
   flex-direction: column;
+  justify-content: center;
   margin-left: 3mm;
-  width: 17mm;
+  width: 22mm;
 }
 
 .print-session-code svg {
@@ -152,14 +153,15 @@
 
 .print-brand-block {
   display: flex;
-  flex: 0 0 42mm;
+  flex: 0 0 75mm;
   flex-direction: column;
-  gap: 1.1mm;
-  justify-content: center;
+  gap: 0.7mm;
+  justify-content: flex-start;
   min-width: 0;
 }
 
 .print-member-name,
+.print-workout-date,
 .print-program-name {
   display: flex;
   font-size: 8pt;
@@ -168,9 +170,11 @@
 }
 
 .print-member-name strong,
+.print-workout-date strong,
 .print-program-name strong { flex: 0 0 auto; }
 
 .print-member-name span,
+.print-workout-date span,
 .print-program-name span {
   font-weight: 700;
   min-width: 0;
@@ -180,26 +184,25 @@
 }
 
 .print-meta-grid {
-  border: 0.25mm solid #555;
   display: grid;
   flex: 1 1 auto;
   font-size: 7pt;
   grid-template-columns: 1fr 1fr;
   grid-template-rows: repeat(3, 1fr);
   margin-left: 3mm;
-  min-width: 92mm;
+  min-width: 77mm;
 }
 
 .print-meta-field {
   align-items: center;
-  border-bottom: 0.2mm solid #777;
   display: flex;
   gap: 1mm;
   min-width: 0;
-  padding: 0 1.5mm;
+  padding: 0 1.7mm;
+  background: #f2f2f2;
 }
 
-.print-meta-field:nth-child(odd):not(.print-meta-cardio) { border-right: 0.2mm solid #777; }
+.print-meta-field:nth-child(odd):not(.print-meta-cardio):not(.print-meta-body-area) { border-right: 0.4mm solid #fff; }
 
 .print-meta-field strong {
   flex: 0 0 auto;
@@ -215,9 +218,17 @@
   white-space: nowrap;
 }
 
+.print-meta-body-area,
 .print-meta-cardio { grid-column: 1 / -1; }
 
-.print-meta-cardio { border-bottom: 0; }
+.print-meta-body-area {
+  background: #d8d8d8;
+  justify-content: center;
+}
+
+.print-meta-body-area span { display: none; }
+
+.print-meta-cardio { border-top: 0.4mm solid #fff; }
 
 .print-section {
   border-bottom: 0.25mm solid #c8c8c8;
@@ -285,6 +296,7 @@
 .exercise-print-table {
   --a5-exercise-row-count: 8;
   font-size: 7.2pt;
+  margin-top: 1.6mm;
   page-break-inside: avoid;
   break-inside: avoid;
   width: 100%;
@@ -300,15 +312,15 @@
   display: grid;
   font-weight: 800;
   font-size: 7pt;
-  height: 10mm;
+  height: 11mm;
 }
 
 .exercise-table-header.four-set-header {
-  grid-template-columns: 50mm minmax(34mm, 1.35fr) repeat(4, minmax(18mm, 1fr));
+  grid-template-columns: 47mm 29mm repeat(4, minmax(0, 1fr));
 }
 
 .exercise-table-header.five-set-header {
-  grid-template-columns: 50mm repeat(5, minmax(18mm, 1fr));
+  grid-template-columns: 47mm repeat(5, minmax(0, 1fr));
 }
 
 .exercise-table-main-header,
@@ -325,7 +337,7 @@
 .record-group-header {
   display: grid;
   grid-column: span 4;
-  grid-template-rows: 3.1mm 1fr;
+  grid-template-rows: 3.8mm 1fr;
   min-width: 0;
 }
 
@@ -342,7 +354,7 @@
 
 .set-header-cell {
   display: grid;
-  grid-template-rows: 3.1mm 1fr;
+  grid-template-rows: 3.8mm 1fr;
   min-width: 0;
   text-align: center;
 }
@@ -378,21 +390,21 @@
 .exercise-row {
   display: grid;
   height: auto;
-  min-height: 12.1mm;
+  min-height: 0;
   page-break-inside: avoid;
   break-inside: avoid;
 }
 
 .exercise-row.four-set-row {
-  grid-template-columns: 50mm minmax(34mm, 1.35fr) repeat(4, minmax(18mm, 1fr));
+  grid-template-columns: 47mm 29mm repeat(4, minmax(0, 1fr));
 }
 
 .exercise-row.five-set-row {
-  grid-template-columns: 50mm repeat(5, minmax(18mm, 1fr));
+  grid-template-columns: 47mm repeat(5, minmax(0, 1fr));
 }
 
 .exercise-row:nth-child(even) {
-  background: #f7f7f4;
+  background: #f2f2f2;
 }
 
 .exercise-title {

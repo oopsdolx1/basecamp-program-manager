@@ -17,15 +17,15 @@ export const WorkoutPrintTemplateV1 = ({ document }: WorkoutPrintTemplateV1Props
       <header className="print-header">
         <div className="print-brand-block">
           <div className="print-logo">BASECAMP</div>
-          <div className="print-member-name"><strong>회원 :</strong><span>{document.member.name}</span></div>
+          <div className="print-member-name"><strong>회원명 :</strong><span>{document.member.name}</span></div>
+          <div className="print-workout-date"><strong>운동일 :</strong><span>{formatPrintDate(document.printDate)}.</span></div>
           <div className="print-program-name"><strong>프로그램 :</strong><span>{document.program.title}</span></div>
         </div>
         <div className="print-meta-grid" aria-label="운동 정보">
-          <div className="print-meta-field"><strong>운동일 :</strong><span>{formatPrintDate(document.printDate)}.</span></div>
-          <div className="print-meta-field"><strong>운동 부위 :</strong><span>{bodyPartText}</span></div>
-          <div className="print-meta-field"><strong>시작 시간 :</strong><span /></div>
-          <div className="print-meta-field"><strong>종료 시간 :</strong><span /></div>
-          <div className="print-meta-field print-meta-cardio"><strong>유산소 :</strong><span /></div>
+          <div className="print-meta-field print-meta-body-area"><strong>[운동부위]</strong><span>{bodyPartText}</span></div>
+          <div className="print-meta-field"><strong>시작시간_</strong><span>:</span></div>
+          <div className="print-meta-field"><strong>종료시간_</strong><span>:</span></div>
+          <div className="print-meta-field print-meta-cardio"><strong>유산소_</strong><span>,&nbsp;&nbsp;&nbsp;:&nbsp;&nbsp;&nbsp;,&nbsp;&nbsp;&nbsp;km</span></div>
         </div>
         <div className="print-session-code" aria-label={`Workout Session ${document.workoutSessionId}`}>
           <QRCodeSVG value={document.workoutSessionId} size={68} level="M" marginSize={0} />

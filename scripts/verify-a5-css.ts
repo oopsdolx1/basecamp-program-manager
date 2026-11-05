@@ -15,6 +15,7 @@ assert(!mapper.includes("slice(0, 7)") && !mapper.includes("slice(0, 8)") && !ma
 assert(template.includes("document.layout.setLayout"));
 assert(template.includes("exercise-point-cell"));
 assert(template.includes("print-member-name"));
+assert(template.includes("print-program-name"));
 assert(template.includes("운동일 :"));
 assert(template.includes("운동 부위 :"));
 assert(template.includes("프로그램 :"));
@@ -32,6 +33,10 @@ assert(mapper.includes("resolveA5WorkoutLayout(program.exercises.length, program
 assert(!/display:\s*none[^;]*exercise/u.test(css));
 assert(css.includes("-webkit-line-clamp: 2"));
 assert(css.includes("word-break: keep-all"));
+assert(css.includes("font-size: 15pt"));
+assert(css.includes("text-overflow: ellipsis"));
+assert(css.includes("white-space: nowrap"));
+assert(css.includes("height: 64%"));
 assert(css.includes(".exercise-table-header.four-set-header"));
 assert(css.includes(".exercise-table-header.five-set-header"));
 assert(css.includes("grid-template-columns: 50mm minmax(34mm, 1.35fr) repeat(4"));

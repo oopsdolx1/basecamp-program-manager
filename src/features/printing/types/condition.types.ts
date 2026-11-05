@@ -16,6 +16,8 @@ export interface ConditionInput {
   targetFatigue: TargetFatigue | null;
   /** Compatibility field for existing analysis envelopes. New UI uses workoutTarget. */
   fatigueAreas: FatigueArea[];
+  /** Body areas currently fatigued. Kept separate from today's workout targets. */
+  fatigueTargets?: FatigueArea[];
   stress: number;
   alcohol: AlcoholStatus | null;
 }

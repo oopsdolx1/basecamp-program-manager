@@ -18,11 +18,11 @@ export const WorkoutPrintTemplateV1 = ({ document }: WorkoutPrintTemplateV1Props
         <div className="print-brand-block">
           <div className="print-logo">BASECAMP</div>
           <div className="print-member-name"><strong>회원 :</strong><span>{document.member.name}</span></div>
+          <div className="print-program-name"><strong>프로그램 :</strong><span>{document.program.title}</span></div>
         </div>
         <div className="print-meta-grid" aria-label="운동 정보">
           <div className="print-meta-field"><strong>운동일 :</strong><span>{formatPrintDate(document.printDate)}.</span></div>
           <div className="print-meta-field"><strong>운동 부위 :</strong><span>{bodyPartText}</span></div>
-          <div className="print-meta-field print-meta-program"><strong>프로그램 :</strong><span>{document.program.title}</span></div>
           <div className="print-meta-field"><strong>시작 시간 :</strong><span /></div>
           <div className="print-meta-field"><strong>종료 시간 :</strong><span /></div>
           <div className="print-meta-field print-meta-cardio"><strong>유산소 :</strong><span /></div>
@@ -44,7 +44,7 @@ export const WorkoutPrintTemplateV1 = ({ document }: WorkoutPrintTemplateV1Props
             return (
               <div className={`exercise-row ${hasPointColumn ? "four-set-row" : "five-set-row"}`} key={row.order} role="row">
                 <div className="exercise-name-cell" role="cell">
-                  <div className="exercise-title">{row.isBlank ? "" : `${row.order}. ${row.exerciseName}`}</div>
+                  <div className="exercise-title" title={row.isBlank ? undefined : row.exerciseName}>{row.isBlank ? "" : `${row.order}. ${row.exerciseName}`}</div>
                 </div>
                 {hasPointColumn ? <div className="exercise-point-cell" role="cell"><span className="exercise-point-text">{row.isBlank ? "" : row.exerciseMemo.trim() || "—"}</span></div> : null}
                 {setLabels.map((setNumber) => <div className="set-cell" key={setNumber} role="cell"><span className="set-writing-fields"><span /><span /><span /></span></div>)}

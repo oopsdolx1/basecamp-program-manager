@@ -136,17 +136,25 @@ const scoreCondition = (condition: ConditionInput, program: Program): ScoreResul
     if (delta !== 0) factors.push(createFactor({ key: "condition", label: "Today's Condition", score: delta, reason }));
   }
 
-  const blockedFatigueCategories = new Set(
-    condition.fatigueAreas.map((fatigueArea) =>
+  const fatigueTargets = condition.fatigueTargets ?? [];
+  const fatiguedCategories = new Set(
+    fatigueTargets.map((fatigueArea) =>
       Object.entries(categoryToFatigueArea).find(([, area]) => area === fatigueArea)?.[0],
     ),
   );
 
-  if (blockedFatigueCategories.has(program.category)) {
-    score -= 32;
-    const reason = `${getCategoryLabel(program.category)} 피로가 있어 해당 부위 프로그램 우선순위를 낮췄습니다.`;
+  if (fatiguedCategories.has(program.category)) {
+    const volume = program.exercises.reduce((sum, exercise) => sum + exercise.sets, 0);
+    let delta = 0;
+    if (program.difficulty === "ADVANCED") delta -= 20;
+    else if (program.difficulty === "INTERMEDIATE") delta -= 10;
+    else if (program.difficulty === "BEGINNER") delta += 8;
+    if (volume >= 20) delta -= 10;
+    else if (volume <= 12) delta += 5;
+    score += delta;
+    const reason = `선택한 ${getCategoryLabel(program.category)} 부위의 피로도를 고려해 운동량 부담을 조정했습니다.`;
     reasons.push(reason);
-    factors.push(createFactor({ key: "condition", label: "Today's Condition", score: -32, reason }));
+    if (delta !== 0) factors.push(createFactor({ key: "condition", label: "Fatigue Target", score: delta, reason }));
   }
 
   return { score, reasons, factors };

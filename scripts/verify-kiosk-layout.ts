@@ -88,6 +88,8 @@ assert.match(flow, /gridTemplateColumns: "repeat\(3, minmax\(0, 1fr\)\)"/);
 assert.match(flow, /group\.rankedPrograms\.slice\(0, 3\)\.map/);
 assert.match(flow, /String\(index \+ 1\)\.padStart\(2, "0"\)\} \{index === 0 \? "BEST" : ""\}/);
 assert.match(flow, /group\.selectedProgramId === program\.id/);
+assert.match(flow, /group\.rankedPrograms\.slice\(0, 3\)\.map\(\(program, index\).*onClick=\{\(\) => onSelect\(group\.target, program\.id\)\}/s, "rank 1 BEST uses the same selection handler as ranks 2 and 3");
+assert.match(flow, /selectedProgramId: result\.program\.id/, "BEST begins selected but remains an ordinary candidate ID");
 assert.match(flow, /selectedProgram\.exercises\.map/);
 assert.match(flow, /선택한 2개 프로그램으로 진행하기/);
 assert.match(flow, /String\(index \+ 1\)\.padStart\(2, "0"\)/);

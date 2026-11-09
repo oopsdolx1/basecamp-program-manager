@@ -14,7 +14,12 @@ export const diagnosticCodeFor = (reason, nativeCode) => {
   if (reason === "printer_submission_failed") return "SUMATRA_EXIT_5";
   if (reason === "print_timeout") return "SUMATRA_TIMEOUT";
   if (reason === "physical_printer_unavailable") return "PRINTER_NOT_FOUND";
+  if (reason === "printer_not_configured") return "PRINTER_NOT_CONFIGURED";
+  if (reason === "configured_printer_not_found") return "CONFIGURED_PRINTER_NOT_FOUND";
   if (reason === "spooler_stopped") return "SPOOLER_STOPPED";
+  if (reason === "printer_queue_recovery_required") return "PRINTER_QUEUE_RECOVERY_REQUIRED";
+  if (reason === "printer_queue_access_denied") return "PRINTER_QUEUE_ACCESS_DENIED";
+  if (reason === "printer_spooler_error") return "PRINTER_SPOOLER_ERROR";
   if (reason === "printer_query_failed") return "PRINTER_QUERY_FAILED";
   return nativeCode === 2 || nativeCode === 3 || nativeCode === 4 || nativeCode === 5 ? `SUMATRA_EXIT_${nativeCode}` : "SUMATRA_UNKNOWN_EXIT";
 };

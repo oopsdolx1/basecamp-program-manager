@@ -1,13 +1,15 @@
 $ErrorActionPreference = 'Stop'
 $sourceRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $runtimeRoot = 'C:\ProgramData\BaseCamp\PrintAgent'
-$runtimeFiles = @('server.mjs', 'windows-printer-backend.mjs', 'html-pdf-renderer.mjs', 'diagnostics.mjs', 'start-print-agent.ps1')
+$runtimeFiles = @('server.mjs', 'windows-printer-backend.mjs', 'html-pdf-renderer.mjs', 'diagnostics.mjs', 'print-agent-config.mjs', 'start-print-agent.ps1')
 $sourceBin = Join-Path $sourceRoot 'bin'
 $sourceRenderer = Join-Path $sourceBin 'SumatraPDF.exe'
 if (-not (Test-Path -LiteralPath $sourceRenderer -PathType Leaf)) { throw "Missing required runtime renderer: $sourceRenderer" }
 New-Item -ItemType Directory -Force -Path $runtimeRoot, (Join-Path $runtimeRoot 'logs') | Out-Null
 foreach ($file in $runtimeFiles) { Copy-Item -LiteralPath (Join-Path $sourceRoot $file) -Destination (Join-Path $runtimeRoot $file) -Force }
 Copy-Item -LiteralPath $sourceBin -Destination (Join-Path $runtimeRoot 'bin') -Recurse -Force
+$config = Join-Path $runtimeRoot 'config.json'
+if (-not (Test-Path -LiteralPath $config -PathType Leaf)) { Copy-Item -LiteralPath (Join-Path $sourceRoot 'config.json.example') -Destination $config }
 $currentUser = "$env:USERDOMAIN\$env:USERNAME"
 # Keep the inherited SYSTEM/Administrators ACLs and grant only the interactive
 # operator write access needed for logs and idempotent reinstalls.

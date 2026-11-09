@@ -30,6 +30,11 @@ const formatDateTime = (date: Date): string => new Intl.DateTimeFormat("ko-KR", 
 const userFacingPrintError = (reason: string): string => {
   if (reason === "print_agent_unavailable" || reason === "preview_artifact_requires_windows_agent") return "인쇄 서비스를 연결하지 못했습니다.";
   if (reason === "default_printer_unavailable" || reason === "physical_printer_unavailable") return "연결된 프린터를 찾을 수 없습니다. PDF 저장은 사용할 수 있습니다.";
+  if (reason === "printer_not_configured") return "출력 프린터가 설정되지 않았습니다. 관리자에게 문의해 주세요.";
+  if (reason === "configured_printer_not_found") return "설정된 프린터를 찾을 수 없습니다. 프린터 연결을 확인해 주세요.";
+  if (reason === "printer_queue_access_denied") return "프린터 오류 작업을 자동으로 정리할 수 없습니다. 관리자 점검이 필요합니다.";
+  if (reason === "printer_queue_recovery_required" || reason === "printer_spooler_error" || reason === "spooler_stopped") return "프린터 대기열에 오류가 있습니다. 프린터 상태를 확인해 주세요.";
+  if (reason === "printer_submission_failed" || reason === "print_timeout" || reason === "print_engine_failed") return "출력하지 못했습니다. 프린터 연결을 확인해 주세요.";
   return "인쇄 artifact를 준비하지 못했습니다.";
 };
 

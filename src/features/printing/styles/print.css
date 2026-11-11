@@ -223,12 +223,42 @@
 
 .print-meta-body-area {
   background: #d8d8d8;
+  gap: 2.2mm;
   justify-content: center;
 }
 
-.print-meta-body-area span { display: none; }
+.print-meta-body-area span {
+  flex: 0 1 auto;
+  font-weight: 800;
+  text-align: center;
+}
 
-.print-meta-cardio { border-top: 0.4mm solid #fff; }
+.print-meta-cardio {
+  border-top: 0.4mm solid #fff;
+  gap: 1.5mm;
+}
+
+.print-meta-cardio > strong,
+.print-meta-cardio > i { flex: 0 0 auto; }
+
+.print-meta-cardio > i {
+  font-size: 7pt;
+  font-style: normal;
+  font-weight: 700;
+  padding: 0 0.5mm;
+}
+
+.print-meta-cardio .cardio-write-line {
+  border-bottom: 0.25mm solid #777;
+  flex: 0 1 auto;
+  height: 4.5mm;
+  min-width: 0;
+}
+
+.print-meta-cardio .cardio-exercise-name { flex-basis: 31mm; }
+.print-meta-cardio .cardio-hours,
+.print-meta-cardio .cardio-minutes { flex-basis: 8mm; }
+.print-meta-cardio .cardio-distance { flex-basis: 15mm; }
 
 .print-section {
   border-bottom: 0.25mm solid #c8c8c8;

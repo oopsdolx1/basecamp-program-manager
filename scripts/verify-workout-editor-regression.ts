@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { createSnapshotBuilderHistory, snapshotBuilderService } from "../src/features/printing/services/snapshotBuilderService";
+import { sanitizeProgramForm, validateProgramForm } from "../src/features/programs/services/programService";
 import { mapSessionPrescriptionExercises } from "../src/features/workout-sessions/services/sessionPrescriptionMapper";
 import type { Program } from "../src/features/programs/types/program.types";
 
@@ -76,5 +77,8 @@ const nineHistory = createSnapshotBuilderHistory(programNine, condition);
 const nineSession = mapSessionPrescriptionExercises(nineHistory.present.exercises, new Map());
 assert.equal(nineHistory.present.exercises.length, 9, "all nine exercises reach editor and analysis input");
 assert.equal(nineSession.length, 9, "all nine exercises reach session mapping");
+const overLimitForm = sanitizeProgramForm({ title: "Recovery", category: "RECOVERY", difficulty: "BEGINNER", memo: "", favorite: false, exercises: programNine.exercises });
+assert.equal(overLimitForm.exercises.length, 9, "sanitization preserves an over-limit recovery program for explicit trainer edits");
+assert.equal(validateProgramForm(overLimitForm).valid, false, "an over-limit recovery program cannot be saved or printed before rows are removed");
 
 console.log("Workout Editor regression checks: PASS");

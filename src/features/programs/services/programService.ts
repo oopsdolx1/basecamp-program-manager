@@ -75,10 +75,9 @@ export const sanitizeProgramForm = (values: ProgramFormValues): ProgramFormValue
   ...values,
   title: values.title.trim(),
   memo: values.memo.trim(),
-  exercises: reorderExercises(values.exercises.filter((exercise) => exercise.name.trim())).slice(
-    0,
-    PROGRAM_EXERCISE_LIMIT,
-  ),
+  // Normalization must not discard exercises. The editor needs to surface an
+  // over-limit program so the trainer can choose which rows to remove.
+  exercises: reorderExercises(values.exercises.filter((exercise) => exercise.name.trim())),
 });
 
 export const createCopyTitle = (sourceTitle: string, programs: Program[]): string => {

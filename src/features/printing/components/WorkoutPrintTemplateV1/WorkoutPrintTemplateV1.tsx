@@ -25,7 +25,17 @@ export const WorkoutPrintTemplateV1 = ({ document }: WorkoutPrintTemplateV1Props
           <div className="print-meta-field print-meta-body-area"><strong>[운동부위]</strong><span>{bodyPartText}</span></div>
           <div className="print-meta-field"><strong>시작시간_</strong><span>:</span></div>
           <div className="print-meta-field"><strong>종료시간_</strong><span>:</span></div>
-          <div className="print-meta-field print-meta-cardio"><strong>유산소_</strong><span>,&nbsp;&nbsp;&nbsp;:&nbsp;&nbsp;&nbsp;,&nbsp;&nbsp;&nbsp;km</span></div>
+          <div className="print-meta-field print-meta-cardio">
+            <strong>유산소_</strong>
+            <span className="cardio-write-line cardio-exercise-name" />
+            <i>,</i>
+            <span className="cardio-write-line cardio-hours" />
+            <i>:</i>
+            <span className="cardio-write-line cardio-minutes" />
+            <i>,</i>
+            <span className="cardio-write-line cardio-distance" />
+            <i>km</i>
+          </div>
         </div>
         <div className="print-session-code" aria-label={`Workout Session ${document.workoutSessionId}`}>
           <QRCodeSVG value={document.workoutSessionId} size={68} level="M" marginSize={0} />

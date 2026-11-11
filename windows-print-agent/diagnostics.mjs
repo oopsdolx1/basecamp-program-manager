@@ -15,7 +15,11 @@ export const diagnosticCodeFor = (reason, nativeCode) => {
   if (reason === "print_timeout") return "SUMATRA_TIMEOUT";
   if (reason === "physical_printer_unavailable") return "PRINTER_NOT_FOUND";
   if (reason === "printer_not_configured") return "PRINTER_NOT_CONFIGURED";
+  if (reason === "config_missing") return "PRINT_AGENT_CONFIG_MISSING";
+  if (reason === "config_invalid") return "PRINT_AGENT_CONFIG_INVALID";
   if (reason === "configured_printer_not_found") return "CONFIGURED_PRINTER_NOT_FOUND";
+  if (reason === "configured_printer_virtual") return "CONFIGURED_PRINTER_VIRTUAL";
+  if (reason === "configured_printer_unavailable") return "CONFIGURED_PRINTER_UNAVAILABLE";
   if (reason === "spooler_stopped") return "SPOOLER_STOPPED";
   if (reason === "printer_queue_recovery_required") return "PRINTER_QUEUE_RECOVERY_REQUIRED";
   if (reason === "printer_queue_access_denied") return "PRINTER_QUEUE_ACCESS_DENIED";

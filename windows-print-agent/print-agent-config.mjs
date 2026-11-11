@@ -12,6 +12,8 @@ export const loadPrintAgentConfig = async ({ configPath = defaultConfigPath, rea
   try {
     const parsed = JSON.parse(await read(configPath, "utf8"));
     const printerName = typeof parsed?.printerName === "string" ? parsed.printerName.trim() : "";
-    return { printerName: printerName || null };
-  } catch { return { printerName: null }; }
+    return printerName ? { status: "ok", printerName } : { status: "config_invalid", printerName: null };
+  } catch (error) {
+    return { status: error?.code === "ENOENT" ? "config_missing" : "config_invalid", printerName: null };
+  }
 };

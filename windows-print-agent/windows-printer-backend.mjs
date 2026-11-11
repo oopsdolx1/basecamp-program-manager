@@ -17,6 +17,7 @@ const failure = (reason, details = {}) => Object.assign(new Error(reason), { det
 const isWithin = (root, target) => { const value = relative(root, target); return value !== "" && !value.startsWith("..") && !isAbsolute(value); };
 const powerShellLiteral = (value) => String(value).replace(/'/gu, "''");
 const isPrinterError = (status, workOffline) => Boolean(workOffline) || /(?:error|offline|not\s*available)/iu.test(String(status ?? ""));
+const isPrinterOffline = (status, workOffline) => Boolean(workOffline) || /(?:offline|not\s*available)/iu.test(String(status ?? ""));
 const jobIsStuck = (job, now = Date.now()) => {
   const status = String(job?.status ?? "");
   if (/error/iu.test(status)) return true;
@@ -102,24 +103,34 @@ export const createWindowsPrintSystem = ({ platform = process.platform, renderer
   },
 });
 
-export const createWindowsPrinterBackend = ({ printSystem = createWindowsPrintSystem(), getConfiguredPrinterName = async () => null, controlledRoot = defaultControlledRoot, logger = createDiagnosticLogger() } = {}) => ({
+export const createWindowsPrinterBackend = ({ printSystem = createWindowsPrintSystem(), getConfiguredPrinterName = async () => null, getConfiguredPrinterConfig, controlledRoot = defaultControlledRoot, logger = createDiagnosticLogger() } = {}) => ({
   async getStatus() {
     try {
-      const startedAt = Date.now(); const configuredPrinter = await getConfiguredPrinterName(); let defaultPrinter = null;
+      const startedAt = Date.now();
+      const config = getConfiguredPrinterConfig ? await getConfiguredPrinterConfig() : { status: "ok", printerName: await getConfiguredPrinterName() };
+      const configuredPrinter = config?.printerName;
+      const configStatus = config?.status ?? "config_invalid";
+      let defaultPrinter = null;
       // Retained as health-only compatibility data. It is never used for printer
       // selection and a failed lookup must not block the configured printer.
       try { defaultPrinter = await printSystem.getDefaultPrinter?.() ?? null; } catch { /* health compatibility is best-effort */ }
       const configured = typeof configuredPrinter === "string" && configuredPrinter.trim() ? configuredPrinter.trim() : null;
       const state = configured ? (printSystem.getPrinterByName ? await printSystem.getPrinterByName(configured) : { exists: true, ...await printSystem.getPrinterMetadata?.(configured) }) : { exists: false };
       const spoolerStatus = await printSystem.getSpoolerStatus?.() ?? null;
-      const status = { printerConfigured: Boolean(configured), configuredPrinter: configured, printerAvailable: Boolean(configured) && state.exists !== false && !isVirtualPrinter(configured), defaultPrinter, ...(spoolerStatus === null ? {} : { spoolerStatus }), ...state };
+      const virtual = Boolean(configured) && isVirtualPrinter(configured);
+      const unavailable = isPrinterError(state.printerStatus, state.workOffline);
+      const status = { configStatus, printerConfigured: Boolean(configured), configuredPrinter: configured, printerAvailable: Boolean(configured) && state.exists !== false && !virtual && !unavailable, defaultPrinter, ...(spoolerStatus === null ? {} : { spoolerStatus }), ...state };
       await logger.info("print", "printer_lookup", { durationMs: Date.now() - startedAt, ...status }); return status;
-    } catch (error) { await logger.error("error", "printer_lookup_failed", { message: error instanceof Error ? error.message : String(error) }); return { printerConfigured: false, configuredPrinter: null, printerAvailable: false, defaultPrinter: null, spoolerStatus: null, driverName: null, portName: null, printerStatus: null }; }
+    } catch (error) { await logger.error("error", "printer_lookup_failed", { message: error instanceof Error ? error.message : String(error) }); return { configStatus: "config_invalid", printerConfigured: false, configuredPrinter: null, printerAvailable: false, defaultPrinter: null, spoolerStatus: null, driverName: null, portName: null, printerStatus: null }; }
   },
   async preparePrinterForSubmission() {
     const status = await this.getStatus();
+    if (status.configStatus === "config_missing") throw failure("config_missing");
+    if (status.configStatus === "config_invalid") throw failure("config_invalid");
     if (!status.printerConfigured) throw failure("printer_not_configured");
-    if (!status.printerAvailable) throw failure("configured_printer_not_found");
+    if (isVirtualPrinter(status.configuredPrinter)) throw failure("configured_printer_virtual");
+    if (status.exists === false) throw failure("configured_printer_not_found");
+    if (isPrinterOffline(status.printerStatus, status.workOffline)) throw failure("configured_printer_unavailable");
     if (String(status.spoolerStatus).toLowerCase() === "stopped") throw failure("spooler_stopped");
     if (!printSystem.getPrintJobs) {
       if (isPrinterError(status.printerStatus, status.workOffline)) throw failure("printer_queue_recovery_required");
@@ -130,7 +141,9 @@ export const createWindowsPrinterBackend = ({ printSystem = createWindowsPrintSy
     if (recoverable.length) await printSystem.removePrintJobs?.(status.configuredPrinter, recoverable);
     const verified = await this.getStatus();
     if (!verified.printerConfigured) throw failure("printer_not_configured");
-    if (!verified.printerAvailable) throw failure("configured_printer_not_found");
+    if (isVirtualPrinter(verified.configuredPrinter)) throw failure("configured_printer_virtual");
+    if (verified.exists === false) throw failure("configured_printer_not_found");
+    if (isPrinterOffline(verified.printerStatus, verified.workOffline)) throw failure("configured_printer_unavailable");
     if (String(verified.spoolerStatus).toLowerCase() === "stopped") throw failure("spooler_stopped");
     const remainingJobs = await printSystem.getPrintJobs(verified.configuredPrinter);
     if (isPrinterError(verified.printerStatus, verified.workOffline) || remainingJobs.some(jobIsStuck)) throw failure("printer_queue_recovery_required");
@@ -139,18 +152,11 @@ export const createWindowsPrinterBackend = ({ printSystem = createWindowsPrintSy
   async submit(job) {
     try {
       if (!job || !Number.isInteger(job.copies) || job.copies < 1 || typeof job.pdfPath !== "string" || !isWithin(controlledRoot, job.pdfPath) || !job.pdfPath.toLowerCase().endsWith(".pdf")) return { status: "failed", reason: "invalid_job" };
-      let prepared = await this.preparePrinterForSubmission();
-      try {
-        await printSystem.submitPdf({ path: job.pdfPath, copies: job.copies, printer: prepared.printer });
-        return { status: "submitted", printer: prepared.printer };
-      } catch (error) {
-        // A timeout is deliberately not retried: Sumatra may already have submitted it.
-        const reason = safeReason(error);
-        if (reason !== "printer_submission_failed" && reason !== "default_printer_unavailable") throw error;
-        prepared = await this.preparePrinterForSubmission();
-        await printSystem.submitPdf({ path: job.pdfPath, copies: job.copies, printer: prepared.printer });
-        return { status: "submitted", printer: prepared.printer };
-      }
+      const prepared = await this.preparePrinterForSubmission();
+      // Once Sumatra is invoked, Windows may have accepted the job even when it
+      // reports failure. Never retry a physical submission automatically.
+      await printSystem.submitPdf({ path: job.pdfPath, copies: job.copies, printer: prepared.printer });
+      return { status: "submitted", printer: prepared.printer };
     } catch (error) { const reason = safeReason(error); return { status: "failed", reason, diagnosticCode: error?.diagnosticCode ?? diagnosticCodeFor(reason, error?.details?.nativeCode) }; }
   },
 });

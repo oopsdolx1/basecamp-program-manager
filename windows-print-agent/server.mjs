@@ -13,7 +13,7 @@ const DEFAULT_PREVIEW_TTL_MS = 5 * 60_000;
 export const createPrintAgent = ({ backend, pdfPipeline, configLoader = loadPrintAgentConfig, logger = createDiagnosticLogger(), port = DEFAULT_PORT, allowedOrigins = DEFAULT_ALLOWED_ORIGINS, previewTtlMs = DEFAULT_PREVIEW_TTL_MS } = {}) => {
   const jobs = new Map();
   const previews = new Map();
-  const printerBackend = backend ?? createWindowsPrinterBackend({ logger, getConfiguredPrinterName: async () => (await configLoader()).printerName });
+  const printerBackend = backend ?? createWindowsPrinterBackend({ logger, getConfiguredPrinterConfig: configLoader });
   const renderer = pdfPipeline ?? createHtmlPdfPipeline();
   const send = (res, code, body, origin) => { const headers = { "content-type": "application/json; charset=utf-8" }; if (origin) headers["access-control-allow-origin"] = origin; res.writeHead(code, headers); res.end(JSON.stringify(body)); };
   const disposePreview = async (artifactId) => { const preview = previews.get(artifactId); if (!preview) return; previews.delete(artifactId); clearTimeout(preview.timer); await preview.cleanup().catch(() => undefined); };

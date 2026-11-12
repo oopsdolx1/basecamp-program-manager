@@ -9,3 +9,5 @@ windows-print-agent/bin/
 windows-print-agent/logs/
 logs/
 .print-history-integration-test.cjs
+
+output/

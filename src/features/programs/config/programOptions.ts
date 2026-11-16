@@ -27,5 +27,38 @@ export const programDifficulties: Array<ProgramOption<ProgramDifficulty>> = [
 export const getCategoryLabel = (category: ProgramCategory): string =>
   programCategories.find((option) => option.value === category)?.label ?? category;
 
+const categoryAliases: Record<string, ProgramCategory> = {
+  full_body: "FULL_BODY",
+  "전신": "FULL_BODY",
+  chest: "CHEST",
+  "가슴": "CHEST",
+  back: "BACK",
+  "등": "BACK",
+  lower_body: "LOWER_BODY",
+  "하체": "LOWER_BODY",
+  shoulder: "SHOULDER",
+  "어깨": "SHOULDER",
+  arms: "ARMS",
+  arm: "ARMS",
+  "팔": "ARMS",
+  recovery: "RECOVERY",
+  "리커버리": "RECOVERY",
+  "회복": "RECOVERY",
+  etc: "ETC",
+  "기타": "ETC",
+  custom: "CUSTOM",
+  "직접작성": "CUSTOM",
+};
+
+/** Converts persisted display labels and legacy values to the program domain key. */
+export const normalizeProgramCategory = (value: unknown): ProgramCategory | null => {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const canonical = trimmed.toUpperCase();
+  if (programCategories.some((option) => option.value === canonical)) return canonical as ProgramCategory;
+  return categoryAliases[trimmed.toLocaleLowerCase("ko-KR")] ?? null;
+};
+
 export const getDifficultyLabel = (difficulty?: ProgramDifficulty): string =>
   difficulty ? programDifficulties.find((option) => option.value === difficulty)?.label ?? difficulty : "공통";

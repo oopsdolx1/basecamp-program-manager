@@ -1,6 +1,6 @@
 import { Timestamp, type DocumentData } from "firebase/firestore";
 import { toProgramId } from "../../../types/brandedIds";
-import { getCategoryLabel, getDifficultyLabel } from "../config/programOptions";
+import { getCategoryLabel, getDifficultyLabel, normalizeProgramCategory } from "../config/programOptions";
 import type {
   Program,
   ProgramCategory,
@@ -40,10 +40,6 @@ const asOptionalDate = (value: unknown): Date | undefined => {
   return asDate(value);
 };
 
-const isProgramCategory = (value: unknown): value is ProgramCategory =>
-  typeof value === "string" &&
-  ["FULL_BODY", "CHEST", "BACK", "LOWER_BODY", "SHOULDER", "ARMS", "RECOVERY", "ETC", "CUSTOM"].includes(value);
-
 const isProgramDifficulty = (value: unknown): value is ProgramDifficulty =>
   typeof value === "string" && ["GENERAL", "BEGINNER", "INTERMEDIATE", "ADVANCED"].includes(value);
 
@@ -69,6 +65,22 @@ const mapExercise = (value: unknown, index: number): ProgramExercise | null => {
   };
 };
 
+const hasRecoveryMarker = (data: DocumentData): boolean =>
+  [data.title, data.memo].some((value) => typeof value === "string" && /(recovery|리커버리|회복)/iu.test(value));
+
+const resolveProgramCategory = (data: DocumentData): ProgramCategory => {
+  const category = normalizeProgramCategory(data.category);
+  const explicitTarget = [data.workoutGoal, data.goal, data.target, data.bodyPart, data.programTarget]
+    .map(normalizeProgramCategory)
+    .find((value): value is ProgramCategory => value !== null);
+
+  if (explicitTarget && explicitTarget !== "CUSTOM") return explicitTarget;
+  if (category && category !== "CUSTOM") return category;
+  // Existing administrator documents stored recovery programs as CUSTOM without a goal field.
+  if (hasRecoveryMarker(data)) return "RECOVERY";
+  return explicitTarget ?? category ?? "ETC";
+};
+
 export const mapProgramDocument = (documentId: string, data: DocumentData): Program => {
   const exercises = Array.isArray(data.exercises)
     ? data.exercises
@@ -81,7 +93,7 @@ export const mapProgramDocument = (documentId: string, data: DocumentData): Prog
     id: toProgramId(documentId),
     schemaVersion: 1,
     title: asText(data.title) ?? "제목 없음",
-    category: isProgramCategory(data.category) ? data.category : "ETC",
+    category: resolveProgramCategory(data),
     difficulty: isProgramDifficulty(data.difficulty) ? data.difficulty : "GENERAL",
     memo: asText(data.memo),
     favorite: asBoolean(data.favorite, false),

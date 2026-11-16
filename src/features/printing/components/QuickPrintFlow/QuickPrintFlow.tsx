@@ -492,6 +492,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
     setCondition((current) => {
       const targets = current.workoutTargets?.length ? current.workoutTargets : current.workoutTarget ? [current.workoutTarget] : [];
       const result = toggleWorkoutTarget(targets, target);
+      if (result.directComposition) { setManualMode(false); setManualPickerOpen(true); }
       if (result.message) { setTargetDialogMessage(result.message); return current; }
       return { ...current, workoutTarget: result.targets[0] ?? null, workoutTargets: result.targets };
     });

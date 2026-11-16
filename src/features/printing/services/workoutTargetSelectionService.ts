@@ -4,8 +4,8 @@ import type { WorkoutTarget } from "../types/condition.types";
 export const MAX_WORKOUT_TARGET_SELECTIONS = 3;
 
 export type WorkoutTargetSelectionResult =
-  | { targets: WorkoutTarget[]; message?: never }
-  | { targets: WorkoutTarget[]; message: string };
+  | { targets: WorkoutTarget[]; directComposition?: boolean; message?: never }
+  | { targets: WorkoutTarget[]; directComposition?: never; message: string };
 
 export const toggleWorkoutTarget = (
   selectedTargets: WorkoutTarget[],
@@ -15,10 +15,14 @@ export const toggleWorkoutTarget = (
     return { targets: selectedTargets.filter((item) => item !== target) };
   }
 
-  if (target === "FULL_BODY" || selectedTargets.includes("FULL_BODY")) {
+  if (target === "FULL_BODY") {
+    return { targets: ["FULL_BODY"], directComposition: true };
+  }
+
+  if (selectedTargets.includes("FULL_BODY")) {
     return {
       targets: selectedTargets,
-      message: "전신 운동은 다른 부위와 함께 선택할 수 없습니다.",
+      message: "전신 운동은 원하는 운동 종목을 직접 선택해 주세요.",
     };
   }
 

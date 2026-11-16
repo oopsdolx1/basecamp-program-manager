@@ -1,4 +1,5 @@
 import {
+  connectAuthEmulator,
   getAuth,
   onAuthStateChanged,
   signInAnonymously,
@@ -6,12 +7,15 @@ import {
   type Auth,
   type User,
 } from "firebase/auth";
-import { getFirebaseApp } from "./firebaseApp";
+import { firebaseEmulator, getFirebaseApp } from "./firebaseApp";
 
 let auth: Auth | null = null;
 
 export const getFirebaseAuth = (): Auth => {
-  auth ??= getAuth(getFirebaseApp());
+  if (!auth) {
+    auth = getAuth(getFirebaseApp());
+    if (firebaseEmulator) connectAuthEmulator(auth, `http://${firebaseEmulator.host}:${firebaseEmulator.authPort}`, { disableWarnings: true });
+  }
   return auth;
 };
 

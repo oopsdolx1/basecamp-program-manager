@@ -40,6 +40,8 @@
     "test:print-adapter": "esbuild scripts/verify-print-adapter.ts --bundle --platform=node --define:import.meta.env={} --format=cjs --outfile=.print-adapter-test.cjs && node .print-adapter-test.cjs && node -e \"require('fs').unlinkSync('.print-adapter-test.cjs')\"",
     "test:android-print-handoff": "esbuild scripts/verify-android-print-handoff.ts --bundle --platform=node --format=cjs --outfile=.android-print-handoff-test.cjs && node .android-print-handoff-test.cjs && node -e \"require('fs').unlinkSync('.android-print-handoff-test.cjs')\"",
     "test:print-runtime-selection": "esbuild scripts/verify-print-runtime-selection.ts --bundle --platform=node --format=cjs --outfile=.print-runtime-selection-test.cjs && node .print-runtime-selection-test.cjs && node -e \"require('fs').unlinkSync('.print-runtime-selection-test.cjs')\"",
+    "test:member-workout-program:emulator": "esbuild scripts/verify-member-workout-program-integration.emulator.ts --bundle --platform=node --format=esm --outfile=.member-workout-program-emulator-test.mjs && node .member-workout-program-emulator-test.mjs && node -e \"require('fs').unlinkSync('.member-workout-program-emulator-test.mjs')\"",
+    "test:kiosk-recommendation:e2e": "node scripts/e2e-kiosk-recommendation.emulator.mjs",
     "test:print-agent": "node scripts/verify-print-agent.mjs",
     "test:windows-printer-backend": "node scripts/verify-windows-printer-backend.mjs",
     "test:print-agent-install": "node scripts/verify-print-agent-install.mjs",

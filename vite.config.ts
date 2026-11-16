@@ -24,8 +24,15 @@ export default defineConfig(({ mode }) => {
     conditionLabAppId: Boolean(env.VITE_CONDITION_LAB_APP_ID),
   });
 
+  // Dev/Emulator only: forward Kiosk API calls to a local Condition Lab API (localhost targets only).
+  const kioskApiProxyTarget = env.VITE_KIOSK_API_PROXY_TARGET;
+  const kioskApiProxy = kioskApiProxyTarget && /^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(kioskApiProxyTarget)
+    ? { "/v1/kiosk": { target: kioskApiProxyTarget, changeOrigin: true } }
+    : undefined;
+
   return {
     plugins: [react()],
+    ...(kioskApiProxy ? { server: { proxy: kioskApiProxy } } : {}),
     define: {
       __PROGRAM_MANAGER_COMMIT__: JSON.stringify(env.VERCEL_GIT_COMMIT_SHA || localCommit()),
       __PROGRAM_MANAGER_BUILT_AT__: JSON.stringify(new Date().toISOString()),

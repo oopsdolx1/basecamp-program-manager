@@ -20,7 +20,7 @@ const membersApi = createConditionLabMemberProvider(appId);
 const periods: Array<{value: WorkoutHistoryPeriod; label: string}> = [{value:"month",label:"최근 1개월"},{value:"quarter",label:"최근 3개월"},{value:"all",label:"전체"}];
 const categoriesFor = (r: WorkoutSessionRecord) => r.prescription?.categories ?? r.programSnapshot.categories ?? (r.prescription?.category ?? r.programSnapshot.category ? [r.prescription?.category ?? r.programSnapshot.category!] : []);
 const categoryLabel = (r: WorkoutSessionRecord) => categoriesFor(r).map(getCategoryLabel).join(" · ") || getCategoryLabel("CUSTOM");
-const sourceLabel = (r: WorkoutSessionRecord) => r.source?.type === "manual" || r.prescription?.source?.type === "manual" ? "직접 구성 운동" : r.programSnapshot.title;
+const sourceLabel = (r: WorkoutSessionRecord) => r.source?.type === "manual" || r.prescription?.source?.type === "manual" ? "직접 구성 운동" : r.source?.type === "recommendation" ? `트레이너 추천 · ${r.programSnapshot.title}` : r.programSnapshot.title;
 const kioskViewportSx = { display: "flex", height: "100%", minHeight: 0, overflow: "hidden" };
 
 export const WorkoutSessionsPage = ({initialSessionId: _initialSessionId=null}:{initialSessionId?:string|null}): JSX.Element => {

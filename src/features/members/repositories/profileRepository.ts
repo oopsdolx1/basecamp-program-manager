@@ -70,7 +70,8 @@ const mapSnapshot = (snapshot: QuerySnapshot): SubscribeMembersResult => {
       diagnostics.legacyNoteFallbacks += 1;
     }
 
-    if (profile.role !== "member") {
+    // Condition Lab treats missing role as a legacy member; explicit non-member roles stay hidden.
+    if (profile.role && profile.role !== "member") {
       diagnostics.excludedByRole += 1;
       return;
     }
@@ -115,7 +116,7 @@ export const getMemberById = async (
   }
 
   const profile = mapProfileDocument(snapshot.id, snapshot.data() as RawProfileDocument);
-  if (profile.role !== "member" || !profile.name) {
+  if ((profile.role && profile.role !== "member") || !profile.name) {
     return null;
   }
 

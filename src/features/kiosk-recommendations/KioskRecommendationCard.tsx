@@ -13,7 +13,10 @@ interface KioskRecommendationCardProps {
 
 /** Trainer recommendations for the selected member. Renders nothing when there is nothing to show. */
 export const KioskRecommendationCard = ({ state, memberId, onUse, onEdit, onManual }: KioskRecommendationCardProps): JSX.Element | null => {
-  const programs = state.status === "ready" && state.memberId === memberId ? state.programs : [];
+  // Shown only for the member bound to this Kiosk's Trainer handoff.
+  const programs = state.status === "ready" && state.memberId === memberId && state.handoff.memberId === memberId ? state.programs : [];
+  const sentProgramId = state.status === "ready" ? state.handoff.memberProgramId : null;
+  const chipLabel = (program: RecommendedProgram) => [program.name, program.isDefault ? "기본" : null, program.id === sentProgramId ? "트레이너 전달" : null].filter(Boolean).join(" · ");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   useEffect(() => { setSelectedId(programs[0]?.id ?? null); }, [programs]);
 
@@ -29,7 +32,7 @@ export const KioskRecommendationCard = ({ state, memberId, onUse, onEdit, onManu
           <Typography sx={{ fontSize: { md: 26, xs: 21 }, fontWeight: 900 }}>트레이너 추천 프로그램</Typography>
           {programs.length > 1 ? (
             <Stack direction="row" flexWrap="wrap" gap={1}>
-              {programs.map((program) => <Chip aria-pressed={program.id === selected.id} clickable color={program.id === selected.id ? "primary" : "default"} key={program.id} label={program.isDefault ? `${program.name} · 기본` : program.name} onClick={() => setSelectedId(program.id)} />)}
+              {programs.map((program) => <Chip aria-pressed={program.id === selected.id} clickable color={program.id === selected.id ? "primary" : "default"} key={program.id} label={chipLabel(program)} onClick={() => setSelectedId(program.id)} />)}
             </Stack>
           ) : null}
           <Box>

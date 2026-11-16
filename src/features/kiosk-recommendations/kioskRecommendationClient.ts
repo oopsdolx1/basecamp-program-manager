@@ -1,21 +1,27 @@
 import type { RecommendedProgram } from "../printing/services/recommendationBuilderService";
 
 /**
- * Kiosk recommendation client (Phase 2-T3, approved device-trust policy).
+ * Kiosk recommendation client (Phase 2-T3, Trainer → Kiosk handoff).
  *
- * - Device identity: a registered Kiosk device-only Firebase identity (`basecampRole: 'kiosk'`,
- *   `deviceId`, no session). Kept in its own Firebase app with local persistence. It is enrolled once
- *   from a server-issued custom token provided as `globalThis.__kiosk_device_token`.
- * - Session identity: the short-lived, member-scoped session token returned by
- *   `POST /v1/kiosk/session/start`, kept in a separate in-memory Firebase app.
+ * The Kiosk authenticates only as its registered device (device-only Firebase identity:
+ * `basecampRole: 'kiosk'`, `deviceId`). It reads the handoff a Trainer issued to this device
+ * (`GET /v1/kiosk/handoff`) and never sends a member or program choice: the server decides scope
+ * from the stored handoff (device + bound member + active status). The member selected on the
+ * Kiosk is only compared with `handoff.memberId` to decide whether to show the card.
  * The Program Manager's own (anonymous) Firebase identity is not touched and gets no Trainer role.
  */
 
-export interface KioskSession {
-  kioskSessionId: string;
+export interface KioskHandoff {
+  handoffId: string;
   memberId: string;
   memberName: string;
+  memberProgramId: string;
   expiresAt: number;
+}
+
+export interface KioskHandoffResult {
+  handoff: KioskHandoff;
+  programs: RecommendedProgram[];
 }
 
 export class KioskApiError extends Error {
@@ -26,12 +32,12 @@ export class KioskApiError extends Error {
 }
 
 export interface KioskDeviceIdentity { getIdToken(): Promise<string | null> }
-export interface KioskSessionIdentity { signIn(customToken: string): Promise<void>; getIdToken(): Promise<string | null>; signOut(): Promise<void> }
 
 export interface KioskRecommendationClient {
-  startSession(memberId: string): Promise<KioskSession>;
-  listPrograms(session: KioskSession): Promise<RecommendedProgram[]>;
-  closeSession(session: KioskSession): Promise<void>;
+  /** This device's active Trainer handoff and the bound member's active recommendations, or null. */
+  fetchHandoff(): Promise<KioskHandoffResult | null>;
+  /** Idempotent: closing an already closed, superseded or expired handoff succeeds. */
+  closeHandoff(handoffId: string): Promise<void>;
 }
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
@@ -57,10 +63,16 @@ const parseProgram = (value: unknown): RecommendedProgram | null => {
     .map((exercise) => ({ exerciseId: exercise.exerciseId, name: exercise.name, order: Number(exercise.order), plannedSets: Number(exercise.plannedSets), ...(isText(exercise.memo) ? { memo: exercise.memo } : {}) }));
   return exercises.length ? { id: item.id, name: item.name, isDefault: item.isDefault === true, exercises } : null;
 };
+const parseHandoff = (value: unknown): KioskHandoff | null => {
+  const item = value as Partial<KioskHandoff> | null;
+  if (!item || !isText(item.handoffId) || !isText(item.memberId) || !isText(item.memberProgramId)) return null;
+  return { handoffId: item.handoffId, memberId: item.memberId, memberName: isText(item.memberName) ? item.memberName : "", memberProgramId: item.memberProgramId, expiresAt: Number(item.expiresAt) || 0 };
+};
 
-export const createKioskRecommendationClient = ({ baseUrl, device, session, fetchImpl = globalThis.fetch.bind(globalThis) }: { baseUrl: string; device: KioskDeviceIdentity; session: KioskSessionIdentity; fetchImpl?: typeof fetch }): KioskRecommendationClient => {
-  const request = async (method: "GET" | "POST", path: string, token: string | null, body?: unknown): Promise<Record<string, unknown>> => {
-    if (!token) throw new KioskApiError("AUTH_REQUIRED", 401);
+export const createKioskRecommendationClient = ({ baseUrl, device, fetchImpl = globalThis.fetch.bind(globalThis) }: { baseUrl: string; device: KioskDeviceIdentity; fetchImpl?: typeof fetch }): KioskRecommendationClient => {
+  const request = async (method: "GET" | "POST", path: string, body?: unknown): Promise<Record<string, unknown>> => {
+    const token = await device.getIdToken();
+    if (!token) throw new KioskApiError("KIOSK_DEVICE_NOT_ENROLLED", 0);
     let response: Response;
     try {
       response = await fetchImpl(`${baseUrl}${path}`, { method, headers: { authorization: `Bearer ${token}`, ...(body ? { "content-type": "application/json" } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
@@ -76,26 +88,16 @@ export const createKioskRecommendationClient = ({ baseUrl, device, session, fetc
   };
 
   return Object.freeze({
-    async startSession(memberId: string) {
-      const deviceToken = await device.getIdToken();
-      if (!deviceToken) throw new KioskApiError("KIOSK_DEVICE_NOT_ENROLLED", 0);
-      const data = await request("POST", "/v1/kiosk/session/start", deviceToken, { memberId });
-      const member = data.member as { id?: unknown; name?: unknown } | undefined;
-      // Defense in depth: the server decides scope; never accept a session for another member.
-      if (!isText(data.kioskSessionId) || !isText(data.customToken) || member?.id !== memberId) throw new KioskApiError("INVALID_API_RESPONSE", 200);
-      await session.signIn(data.customToken);
-      return { kioskSessionId: data.kioskSessionId, memberId, memberName: isText(member.name) ? member.name : "", expiresAt: Number(data.expiresAt) || 0 };
+    async fetchHandoff() {
+      const data = await request("GET", "/v1/kiosk/handoff");
+      if (data.handoff === null) return null;
+      const handoff = parseHandoff(data.handoff);
+      if (!handoff) throw new KioskApiError("INVALID_API_RESPONSE", 200);
+      const programs = (Array.isArray(data.programs) ? data.programs : []).map(parseProgram).filter((program): program is RecommendedProgram => Boolean(program));
+      return { handoff, programs };
     },
-    async listPrograms(active: KioskSession) {
-      const data = await request("GET", `/v1/kiosk/session/workout-programs?kioskSessionId=${encodeURIComponent(active.kioskSessionId)}`, await session.getIdToken());
-      return (Array.isArray(data.programs) ? data.programs : []).map(parseProgram).filter((program): program is RecommendedProgram => Boolean(program));
-    },
-    async closeSession(active: KioskSession) {
-      try {
-        await request("POST", "/v1/kiosk/session/close", await session.getIdToken(), { kioskSessionId: active.kioskSessionId });
-      } finally {
-        await session.signOut().catch(() => undefined);
-      }
+    async closeHandoff(handoffId: string) {
+      await request("POST", "/v1/kiosk/handoff/close", { handoffId });
     },
   });
 };

@@ -9,8 +9,8 @@ export type WorkoutSessionStatus =
   | "ai_completed"
   | "confirmed";
 
-/** `recommendation`: a Trainer recommendation (Condition Lab memberWorkoutPrograms) used as-is or edited on the Kiosk. */
-export type WorkoutSource = { type: "program"; programId: string } | { type: "manual" } | { type: "recommendation"; memberProgramId: string; edited: boolean };
+/** `recommendation`: a Trainer recommendation (Condition Lab memberWorkoutPrograms) used as-is or edited on the Kiosk; `handoffId` is the Trainer → Kiosk handoff it came from. */
+export type WorkoutSource = { type: "program"; programId: string } | { type: "manual" } | { type: "recommendation"; memberProgramId: string; edited: boolean; handoffId?: string };
 
 export interface WorkoutSessionExerciseSnapshot {
   exerciseId: string;

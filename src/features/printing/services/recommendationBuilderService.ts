@@ -1,6 +1,6 @@
 import type { SnapshotBuilderExercise, SnapshotBuilderHistory } from "./snapshotBuilderService";
 
-/** Trainer recommendation as served to the Kiosk (`GET /v1/kiosk/session/workout-programs`). */
+/** Trainer recommendation as served to the Kiosk with its Trainer handoff (`GET /v1/kiosk/handoff`). */
 export interface RecommendedProgramExercise {
   exerciseId: string;
   name: string;

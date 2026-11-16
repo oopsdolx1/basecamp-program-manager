@@ -378,6 +378,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
   const [targetDialogMessage, setTargetDialogMessage] = useState<string | null>(null);
   // Trainer recommendation chosen on the Kiosk; the builder holds a copy, the original is never changed.
   const [recommendationSource, setRecommendationSource] = useState<RecommendedProgram | null>(null);
+  const [recommendationHandoffId, setRecommendationHandoffId] = useState<string | null>(null);
   const kioskRecommendationClient = useMemo(() => getDefaultKioskRecommendationClient(), []);
   const kioskRecommendation = useKioskRecommendation(kioskRecommendationClient, selectedMember?.memberId ?? null);
   const hasSearchQuery = memberQuery.trim().length > 0;
@@ -549,6 +550,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
     setTargetRecommendationGroups([]);
     setBuilderHistory(createRecommendationBuilderHistory(program));
     setRecommendationSource(program);
+    setRecommendationHandoffId(kioskRecommendation.state.status === "ready" ? kioskRecommendation.state.handoff.handoffId : null);
     setOverflowDialogOpen(program.exercises.length > 8);
     setCurrentStep(edit ? 4 : 5);
   };
@@ -608,7 +610,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
         ? new Map((builderState?.exercises ?? []).map((exercise) => [exercise.id, { id: exercise.catalogExerciseId ?? exercise.id, name: exercise.name }]))
         : resolveProgramExerciseKnowledge(historyToProgram(snapshotSourceProgram!, sanitized));
       const source = recommendationSource
-        ? { source: { type: "recommendation" as const, memberProgramId: recommendationSource.id, edited: isRecommendationEdited(recommendationSource, builderState?.exercises ?? []) } }
+        ? { source: { type: "recommendation" as const, memberProgramId: recommendationSource.id, edited: isRecommendationEdited(recommendationSource, builderState?.exercises ?? []), ...(recommendationHandoffId ? { handoffId: recommendationHandoffId } : {}) } }
         : manualMode ? { source: { type: "manual" as const } } : { programId: snapshotSourceProgram!.id };
       const sessionId = await createWorkoutSession({
         appId,
@@ -620,7 +622,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
         ...source,
         exercises: mapSessionPrescriptionExercises(builderState?.exercises ?? [], resolved),
       });
-      // The recommendation is now copied into the workout session snapshot; end the Kiosk session.
+      // The recommendation is now copied into the workout session snapshot; close the Trainer handoff.
       void kioskRecommendation.closeSession();
       if (!builderOnly) savePrintSnapshot({ workoutSessionId: sessionId, sourceProgramId: snapshotSourceProgram!.id, sourceProgramTitle: snapshotSourceProgram!.title, recommendationReasons: recommendationReason ? [recommendationReason] : [], aiRecommendation: null, intelligence, metadata: intelligenceMetadata, periodization, recommendationTrace, condition, recentWorkout, formValues: sanitized });
       navigate(routeBuilder.printPreviewSession(selectedMember.memberId, sessionId, true));

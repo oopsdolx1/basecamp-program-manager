@@ -108,6 +108,12 @@ const main = async () => {
     await check("2. Case 10: no handoff → Kiosk gets nothing (existing manual flow only)", async () => {
       assert.equal(await kioskK1.fetchHandoff(), null);
     });
+    await check("2b. default-workout-program: selected member's active default only, no handoff needed", async () => {
+      const programA = await kioskK1.fetchDefaultProgram(pmMemberA.memberId);
+      assert.equal(programA?.id, created.a_default.id); assert.equal(programA?.isDefault, true);
+      assert.equal((await kioskK2.fetchDefaultProgram(memberB))?.id, created.b_default.id);
+      assert.equal(await kioskK1.fetchHandoff(), null, "reading the default does not create a handoff");
+    });
 
     const issued = await api("POST", "/v1/trainer/kiosk-handoffs", trainerToken, { deviceId: deviceK1, memberId: memberA, programId: created.a_second.id });
     const handoffResult = await kioskK1.fetchHandoff();
@@ -197,7 +203,7 @@ const main = async () => {
   for (const result of results) console.log(`${result.ok ? "PASS" : "FAIL"} ${result.name}${result.error ? ` — ${result.error}` : ""}`);
   const failed = results.filter((result) => !result.ok).length;
   console.log(`\n${results.length - failed}/${results.length} passed`);
-  if (failed || results.length !== 12) process.exit(1);
+  if (failed || results.length !== 13) process.exit(1);
 };
 
 main().catch((error) => { console.error(error); process.exit(1); });

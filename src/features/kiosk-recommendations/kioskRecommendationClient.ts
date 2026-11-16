@@ -1,10 +1,12 @@
 import type { RecommendedProgram } from "../printing/services/recommendationBuilderService";
 
 /**
- * Kiosk recommendation client (Phase 2-T3, Trainer → Kiosk handoff).
+ * Kiosk recommendation client.
  *
  * The Kiosk authenticates only as its registered device (device-only Firebase identity:
- * `basecampRole: 'kiosk'`, `deviceId`). It reads the handoff a Trainer issued to this device
+ * `basecampRole: 'kiosk'`, `deviceId`). The Kiosk UI calls
+ * `GET /v1/kiosk/members/{memberId}/default-workout-program` → `200 { program: Program | null }`
+ * right after member selection. The existing handoff API stays available: it reads the handoff a Trainer issued to this device
  * (`GET /v1/kiosk/handoff`) and never sends a member or program choice: the server decides scope
  * from the stored handoff (device + bound member + active status). The member selected on the
  * Kiosk is only compared with `handoff.memberId` to decide whether to show the card.
@@ -34,9 +36,11 @@ export class KioskApiError extends Error {
 export interface KioskDeviceIdentity { getIdToken(): Promise<string | null> }
 
 export interface KioskRecommendationClient {
-  /** This device's active Trainer handoff and the bound member's active recommendations, or null. */
+  /** The selected member's active default Trainer recommendation, or null. */
+  fetchDefaultProgram(memberId: string): Promise<RecommendedProgram | null>;
+  /** Existing Trainer handoff API (kept): this device's active handoff and the bound member's active recommendations, or null. */
   fetchHandoff(): Promise<KioskHandoffResult | null>;
-  /** Idempotent: closing an already closed, superseded or expired handoff succeeds. */
+  /** Existing Trainer handoff API (kept). Idempotent: closing an already closed, superseded or expired handoff succeeds. */
   closeHandoff(handoffId: string): Promise<void>;
 }
 
@@ -88,6 +92,13 @@ export const createKioskRecommendationClient = ({ baseUrl, device, fetchImpl = g
   };
 
   return Object.freeze({
+    async fetchDefaultProgram(memberId: string) {
+      const data = await request("GET", `/v1/kiosk/members/${encodeURIComponent(memberId)}/default-workout-program`);
+      if (data.program === null) return null;
+      const program = parseProgram(data.program);
+      if (!program || !program.isDefault) throw new KioskApiError("INVALID_API_RESPONSE", 200);
+      return program;
+    },
     async fetchHandoff() {
       const data = await request("GET", "/v1/kiosk/handoff");
       if (data.handoff === null) return null;

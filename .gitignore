@@ -11,3 +11,5 @@ logs/
 .print-history-integration-test.cjs
 
 output/
+windows-print-agent/device-credential.json
+windows-print-agent/device-credential.json.tmp

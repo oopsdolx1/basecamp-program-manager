@@ -5,12 +5,16 @@ import { createHtmlPdfPipeline, validateHtmlArtifact } from "./html-pdf-renderer
 import { createWindowsPrinterBackend } from "./windows-printer-backend.mjs";
 import { createDiagnosticLogger, diagnosticCodeFor } from "./diagnostics.mjs";
 import { loadPrintAgentConfig } from "./print-agent-config.mjs";
+import { createKioskDeviceCredential, loadDeviceAuthConfig, loadDeviceBrowserOrigins } from "./kiosk-device-credential.mjs";
 export const DEFAULT_PORT = 43127;
 export const DEFAULT_ALLOWED_ORIGINS = ["https://basecamp-program-manager.vercel.app", "http://localhost:5173"];
 const MAX_COPIES = 10;
 const MAX_REQUEST_BYTES = 2_200_000;
 const DEFAULT_PREVIEW_TTL_MS = 5 * 60_000;
-export const createPrintAgent = ({ backend, pdfPipeline, configLoader = loadPrintAgentConfig, logger = createDiagnosticLogger(), port = DEFAULT_PORT, allowedOrigins = DEFAULT_ALLOWED_ORIGINS, previewTtlMs = DEFAULT_PREVIEW_TTL_MS } = {}) => {
+// Kiosk device token (Phase 3-A): only https origins by default; the custom token is never logged.
+const defaultDeviceCredential = async () => { const config = await loadDeviceAuthConfig(); return config ? createKioskDeviceCredential({ config }) : null; };
+const DEVICE_TOKEN_STATUS = { device_not_enrolled: 409, enrollment_already_pending: 409, device_auth_not_configured: 503, device_auth_unavailable: 503, credential_protection_unavailable: 500, credential_protection_failed: 500, credential_unreadable: 500 };
+export const createPrintAgent = ({ backend, pdfPipeline, configLoader = loadPrintAgentConfig, logger = createDiagnosticLogger(), port = DEFAULT_PORT, allowedOrigins = DEFAULT_ALLOWED_ORIGINS, previewTtlMs = DEFAULT_PREVIEW_TTL_MS, deviceTokenOrigins = allowedOrigins.filter((item) => item.startsWith("https://")), deviceCredential = defaultDeviceCredential } = {}) => {
   const jobs = new Map();
   const previews = new Map();
   const printerBackend = backend ?? createWindowsPrinterBackend({ logger, getConfiguredPrinterConfig: configLoader });
@@ -22,6 +26,22 @@ export const createPrintAgent = ({ backend, pdfPipeline, configLoader = loadPrin
     if (origin && !allowedOrigins.includes(origin)) return send(res, 403, { status: "failed", reason: "origin_not_allowed" });
     if (req.method === "OPTIONS") { res.writeHead(204, { "access-control-allow-origin": origin ?? "", "access-control-allow-methods": "GET,POST,OPTIONS", "access-control-allow-headers": "content-type" }); return res.end(); }
     if (req.method === "GET" && req.url === "/health") { const printer = await printerBackend.getStatus?.() ?? { printerAvailable: false, defaultPrinter: null }; await logger.info("agent", "health", printer); return send(res, 200, { status: "ok", service: "basecamp-print-agent", ...printer }, origin); }
+    if (req.url === "/kiosk/device-token") {
+      if (req.method !== "POST") return send(res, 405, { status: "failed", reason: "method_not_allowed" }, origin);
+      if (!origin || !deviceTokenOrigins.includes(origin)) return send(res, 403, { status: "failed", reason: "origin_not_allowed" });
+      req.resume();
+      try {
+        const credential = await deviceCredential();
+        if (!credential) return send(res, 503, { status: "failed", reason: "device_auth_not_configured" }, origin);
+        const customToken = await credential.getCustomToken();
+        res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "access-control-allow-origin": origin });
+        return res.end(JSON.stringify({ status: "ok", customToken }));
+      } catch (error) {
+        const reason = typeof error?.reason === "string" ? error.reason : "device_auth_failed";
+        await logger.error("device-auth", "token_failed", { reason });
+        return send(res, DEVICE_TOKEN_STATUS[reason] ?? 403, { status: "failed", reason }, origin);
+      }
+    }
     const previewMatch = req.url?.match(/^\/preview\/([0-9a-f-]{36})$/iu);
     if (req.method === "GET" && previewMatch) { const preview = previews.get(previewMatch[1]); if (!preview || preview.expiresAt <= Date.now()) { if (preview) await disposePreview(previewMatch[1]); return send(res, 404, { status: "failed", reason: "preview_not_found" }, origin); } res.writeHead(200, { "content-type": "application/pdf", "cache-control": "no-store", ...(origin ? { "access-control-allow-origin": origin } : {}) }); return createReadStream(preview.path).pipe(res); }
     if (req.method === "POST" && req.url === "/preview") {
@@ -64,4 +84,8 @@ export const createPrintAgent = ({ backend, pdfPipeline, configLoader = loadPrin
   });
   return { server, port, listen: () => new Promise((resolve) => server.listen(port, "127.0.0.1", resolve)), close: async () => { await Promise.all([...previews.keys()].map(disposePreview)); return new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve())); } };
 };
-if (process.argv[1]?.endsWith("server.mjs")) createPrintAgent().listen().then(() => console.log(`BaseCamp Print Agent listening on 127.0.0.1:${DEFAULT_PORT}`));
+if (process.argv[1]?.endsWith("server.mjs")) {
+  // config.json deviceAuth.browserOrigins adds https pages (e.g. the Condition Lab kiosk) that may use the agent.
+  const browserOrigins = await loadDeviceBrowserOrigins();
+  createPrintAgent({ allowedOrigins: [...new Set([...DEFAULT_ALLOWED_ORIGINS, ...browserOrigins])] }).listen().then(() => console.log(`BaseCamp Print Agent listening on 127.0.0.1:${DEFAULT_PORT}`));
+}

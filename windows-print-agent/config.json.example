@@ -1,3 +1,9 @@
 {
-  "printerName": ""
+  "printerName": "",
+  "deviceAuth": {
+    "apiBaseUrl": "",
+    "projectId": "",
+    "appId": "",
+    "browserOrigins": []
+  }
 }

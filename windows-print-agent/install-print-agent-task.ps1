@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
 $sourceRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $runtimeRoot = 'C:\ProgramData\BaseCamp\PrintAgent'
-$runtimeFiles = @('server.mjs', 'windows-printer-backend.mjs', 'html-pdf-renderer.mjs', 'diagnostics.mjs', 'print-agent-config.mjs', 'start-print-agent.ps1')
+$runtimeFiles = @('server.mjs', 'windows-printer-backend.mjs', 'html-pdf-renderer.mjs', 'diagnostics.mjs', 'print-agent-config.mjs', 'start-print-agent.ps1', 'kiosk-device-credential.mjs', 'enroll-kiosk-device.mjs')
 $sourceBin = Join-Path $sourceRoot 'bin'
 $sourceRenderer = Join-Path $sourceBin 'SumatraPDF.exe'
 if (-not (Test-Path -LiteralPath $sourceRenderer -PathType Leaf)) { throw "Missing required runtime renderer: $sourceRenderer" }
@@ -10,6 +10,8 @@ foreach ($file in $runtimeFiles) { Copy-Item -LiteralPath (Join-Path $sourceRoot
 Copy-Item -LiteralPath $sourceBin -Destination (Join-Path $runtimeRoot 'bin') -Recurse -Force
 $config = Join-Path $runtimeRoot 'config.json'
 if (-not (Test-Path -LiteralPath $config -PathType Leaf)) { Copy-Item -LiteralPath (Join-Path $sourceRoot 'config.json.example') -Destination $config }
+# device-credential.json (Phase 3-A) is created by enroll-kiosk-device.mjs, holds only a DPAPI-protected key and
+# is never copied or overwritten by an update.
 $currentUser = "$env:USERDOMAIN\$env:USERNAME"
 # Keep the inherited SYSTEM/Administrators ACLs and grant only the interactive
 # operator write access needed for logs and idempotent reinstalls.

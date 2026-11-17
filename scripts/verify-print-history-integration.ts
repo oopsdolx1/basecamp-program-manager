@@ -7,10 +7,13 @@ const firebase = JSON.parse(readFileSync("firebase.json", "utf8"));
 assert.equal(firebase.firestore.indexes, "firestore.indexes.json");
 assert.deepEqual(index.indexes, [{ collectionGroup: "printHistory", queryScope: "COLLECTION", fields: [{ fieldPath: "isArchived", order: "ASCENDING" }, { fieldPath: "requestedAt", order: "DESCENDING" }] }]);
 
-const page = readFileSync("src/features/workout-sessions/pages/WorkoutSessionsPage.tsx", "utf8");
-assert.ok(page.includes('useState<"loading" | "ready" | "error">'));
-assert.ok(page.includes("출력 이력을 불러오지 못했습니다."));
-assert.ok(page.includes('historyState === "ready" && history.length === 0'));
+// Since bd6984b ("replace print history with workout history") this page lists workout sessions instead of
+// print history; it must still expose explicit loading/ready/error states, an error notice and an empty state.
+// Whitespace-insensitive so formatting changes do not fail the check.
+const page = readFileSync("src/features/workout-sessions/pages/WorkoutSessionsPage.tsx", "utf8").replace(/\s+/g, "");
+assert.ok(page.includes('useState<"loading"|"ready"|"error">'), "loading/ready/error state");
+assert.ok(/status==="error"\?<Alert[^>]*>운동기록을불러오지못했습니다\.<\/Alert>/.test(page), "load failure is shown, not an empty list");
+assert.ok(/status==="ready"&&!filtered\.length\?.{0,80}저장된운동기록이없습니다/.test(page), "empty state only after a successful load");
 
 const main = async (): Promise<void> => {
 const events: string[] = [];

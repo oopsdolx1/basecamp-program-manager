@@ -30,6 +30,16 @@ for (const reused of ["WorkoutPrintTemplateV1", "createRenderedPrintArtifactFact
   assert.ok(blankPage.includes(reused), `blank print reuses the existing pipeline: ${reused}`);
 }
 assert.doesNotMatch(blankPage, /fetch\(|child_process|Sumatra|window\.print/, "no separate printing path");
+// Kiosk print-ready layout: title, preview, one status line, then back (secondary) + print (primary) and PDF save (tertiary).
+assert.doesNotMatch(blankPage, /BLANK WORKOUT LOG|<Card\b|<Alert\b|EmptyState/, "no English eyebrow, floating action card or large error box");
+assert.match(blankPage, /variant="secondary">운동기록으로 돌아가기<\/Button>/);
+assert.match(blankPage, /disabled=\{!ready\} onClick=\{\(\) => void requestPrint\(\)\}/, "only the physical print waits for the Print Agent");
+assert.match(blankPage, /"빈 운동일지 출력"/);
+assert.match(blankPage, /disabled=\{!printArtifactId \|\| pdfSaveInProgress\}[^\n]*?variant="tertiary">PDF 저장/, "PDF save needs the agent-made PDF artifact");
+assert.match(blankPage, /title="프린터 연결을 확인해 주세요\." tone="warning"/);
+assert.match(blankPage, /variant="tertiary">다시 시도<\/Button>/);
+assert.match(blankPage, /: <A5DocumentPreview document=\{document\} \/>/, "the A5 document stays visible until (or without) the agent PDF");
+assert.doesNotMatch(blankPage, /caught\.message|error\.message\}|\{printArtifactError\}|\{visualPdfPreviewError\}/, "no raw error text is rendered");
 
 const blank = createBlankWorkoutPrintDocument(new Date("2026-11-17T09:00:00.000Z"));
 assert.equal(blank.kind, "blank-workout-log");

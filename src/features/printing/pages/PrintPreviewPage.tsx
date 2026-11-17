@@ -85,10 +85,12 @@ export const PdfCanvasPreview = ({ pdfBytes, expectedPages, onPageCount }: { pdf
         const page = await pdf.getPage(Math.min(currentPage, pdf.numPages));
         const canvas = canvasRef.current;
         if (!canvas) return;
-        const viewport = page.getViewport({ scale: 1 });
+        const pageSize = page.getViewport({ scale: 1 });
         const maxWidth = Math.min(canvas.parentElement?.clientWidth ?? 980, 980);
         const cssWidth = Math.max(1, maxWidth);
-        const cssHeight = cssWidth * (viewport.height / viewport.width);
+        // Scale the PDF page to the canvas width; at scale 1 it only filled the top-left 595pt of the canvas.
+        const viewport = page.getViewport({ scale: cssWidth / pageSize.width });
+        const cssHeight = viewport.height;
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
         canvas.width = Math.round(cssWidth * dpr);
         canvas.height = Math.round(cssHeight * dpr);
@@ -109,7 +111,7 @@ export const PdfCanvasPreview = ({ pdfBytes, expectedPages, onPageCount }: { pdf
     return () => { active = false; renderTask?.cancel(); void loadingTask?.destroy(); };
   }, [currentPage, onPageCount, pdfBytes, retryKey]);
 
-  return <Stack alignItems="center" spacing={`${spacing[2]}px`} sx={{ minHeight: "min(70vh, 760px)", position: "relative", width: "100%" }}>
+  return <Stack alignItems="center" spacing={`${spacing[2]}px`} sx={{ minHeight: status === "ready" ? 0 : "min(70vh, 760px)", position: "relative", width: "100%" }}>
     <canvas aria-label={`운동일지 ${currentPage}페이지 미리보기`} ref={canvasRef} style={{ background: "white", display: status === "ready" ? "block" : "none", maxWidth: "100%" }} />
     {status !== "ready" ? <Stack alignItems="center" justifyContent="center" spacing={`${spacing[2]}px`} sx={{ bgcolor: "white", minHeight: "min(70vh, 760px)", position: "absolute", width: "100%" }}><Typography color="text.primary">{status === "fetch-error" ? "운동일지를 불러오지 못했습니다." : status === "render-error" ? "운동일지 미리보기를 표시하지 못했습니다." : "운동일지를 준비하고 있습니다."}</Typography>{status !== "loading" ? <Button variant="secondary" onClick={() => setRetryKey((current) => current + 1)}>다시 시도</Button> : null}</Stack> : null}
     {pageCount > 1 ? <Stack alignItems="center" direction="row" spacing={`${spacing[2]}px`}><Button disabled={currentPage === 1} variant="secondary" onClick={() => setCurrentPage((current) => current - 1)}>이전</Button><Typography color={colors.neutral.gray400}>{currentPage} / {pageCount}</Typography><Button disabled={currentPage === pageCount} variant="secondary" onClick={() => setCurrentPage((current) => current + 1)}>다음</Button></Stack> : null}

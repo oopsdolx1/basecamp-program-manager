@@ -13,3 +13,7 @@ logs/
 output/
 windows-print-agent/device-credential.json
 windows-print-agent/device-credential.json.tmp
+
+outputs/
+.firestore-workout-session-mapping-test.cjs
+.kiosk-member-session-test.cjs

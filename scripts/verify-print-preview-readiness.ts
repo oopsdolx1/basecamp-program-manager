@@ -18,7 +18,8 @@ const main = async (): Promise<void> => {
   const factory = readFileSync("src/features/printing/gateways/printArtifactFactory.ts", "utf8");
   const css = readFileSync("src/features/printing/styles/print.css", "utf8");
   assert.equal(page.includes("const PrintSourceDocument"), true);
-  assert.equal(page.match(/<PrintSourceDocument document=\{state\.document\} \/>/g)?.length, 7, "auto-print failures and reprint success retain the canonical source document");
+  // 8 views since Phase 3-B added the Kiosk member-session error view (no selection / other member / revoked device).
+  assert.equal(page.match(/<PrintSourceDocument document=\{state\.document\} \/>/g)?.length, 8, "auto-print failures, the kiosk session error view and reprint success retain the canonical source document");
   assert.equal(page.includes("재출력을 요청했습니다."), true);
   assert.equal(page.includes("isRenderedPrintDocumentReady(artifactRequest)"), true);
   assert.equal(factory.includes("element.isConnected"), true);
@@ -28,7 +29,7 @@ const main = async (): Promise<void> => {
   assert.equal(css.includes(".print-source-root {\n  display: none"), false);
   assert.equal(pageContainer.includes('marginInline: "auto"'), true);
   assert.equal(pageContainer.includes('width: "100%"'), true);
-  assert.equal(page.includes('"인쇄 서비스를 연결하지 못했습니다."'), true);
+  assert.equal(page.includes('"인쇄 서비스에 연결하지 못했습니다. Print Agent가 실행 중인지 확인한 뒤 다시 시도해 주세요."'), true);
   assert.equal(page.includes("const retryPreview = () =>"), true);
   assert.equal(page.includes("visualPdfPreviewError) return"), true);
   assert.equal(page.includes("<Button onClick={retryPreview}>다시 시도</Button>"), true);

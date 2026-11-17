@@ -14,6 +14,38 @@ import { getWorkoutSession } from "../../workout-sessions/services/workoutSessio
 import type { WorkoutSessionRecord } from "../../workout-sessions/domain/workoutSession.types";
 import { assertPrintPreviewSessionContext, resolvePrintPreviewSource } from "../services/printPreviewAuthorityResolver";
 import { normalizeWorkoutSource } from "../../workout-sessions/services/workoutSessionSourceResolver";
+import { KioskApiError } from "../../kiosk-recommendations/kioskRecommendationClient";
+import { kioskErrorMessage } from "../../print-history/services/kioskPrintRecordService";
+import { logKioskError } from "../../kiosk-diagnostics/kioskErrorLog";
+
+// Kiosk API errors while loading the preview get the product's Korean guidance instead of a raw code.
+// Only the message changes: the load still fails, so nothing is shown or printed.
+const PREVIEW_SESSION_EXPIRED_MESSAGE = "회원 선택 시간이 만료되었거나 종료되었습니다. 처음 화면에서 회원을 다시 선택해 주세요.";
+const PREVIEW_SESSION_UNVERIFIABLE_MESSAGE = "회원 선택 정보를 확인할 수 없습니다. 처음 화면에서 회원을 다시 선택해 주세요.";
+const PREVIEW_SERVER_ERROR_MESSAGE = "서버 오류로 미리보기를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.";
+const MEMBER_SELECTION_CODES = new Set(["KIOSK_SESSION_MEMBER_CHANGED", "KIOSK_SESSION_STALE", "KIOSK_SESSION_MEMBER_MISMATCH"]);
+const SESSION_EXPIRED_CODES = new Set(["KIOSK_SESSION_EXPIRED", "KIOSK_SESSION_ENDED"]);
+const SESSION_UNVERIFIABLE_CODES = new Set(["KIOSK_SESSION_INVALID", "KIOSK_SESSION_NOT_FOUND", "KIOSK_SESSION_REQUIRED"]);
+const DEVICE_AUTH_CODES = new Set(["KIOSK_DEVICE_NOT_ENROLLED", "KIOSK_DEVICE_IDENTITY_REQUIRED", "KIOSK_DEVICE_AUTH_FAILED"]);
+
+const PREVIEW_GENERAL_MESSAGE = "미리보기를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.";
+const PREVIEW_SHARED_CODES = new Set(["KIOSK_DEVICE_NOT_REGISTERED", "NETWORK_ERROR", "WORKOUT_SESSION_NOT_FOUND", "PRINT_SCOPE_DENIED", "KIOSK_SESSION_RATE_LIMITED"]);
+
+export const previewErrorMessage = (caught: unknown): string => {
+  if (caught instanceof KioskApiError) {
+    logKioskError("print preview", caught);
+    if (MEMBER_SELECTION_CODES.has(caught.code)) return kioskErrorMessage("KIOSK_SESSION_MEMBER_CHANGED")!;
+    if (SESSION_EXPIRED_CODES.has(caught.code)) return PREVIEW_SESSION_EXPIRED_MESSAGE;
+    if (SESSION_UNVERIFIABLE_CODES.has(caught.code)) return PREVIEW_SESSION_UNVERIFIABLE_MESSAGE;
+    if (DEVICE_AUTH_CODES.has(caught.code)) return kioskErrorMessage("KIOSK_DEVICE_NOT_ENROLLED")!;
+    if (PREVIEW_SHARED_CODES.has(caught.code)) return kioskErrorMessage(caught.code)!;
+    if (caught.status >= 500 || caught.code === "INTERNAL_ERROR" || caught.code === "INVALID_API_RESPONSE") return PREVIEW_SERVER_ERROR_MESSAGE;
+    // Phase 3-E: an unknown API code gets safe general guidance; the code is only in the diagnostic log.
+    return PREVIEW_GENERAL_MESSAGE;
+  }
+  // Non-API errors (e.g. PrintMapperError) already carry product Korean messages.
+  return caught instanceof PrintMapperError || caught instanceof Error ? caught.message : "출력 문서를 만들지 못했습니다.";
+};
 
 type PreviewState =
   | { status: "loading" }
@@ -51,7 +83,7 @@ export const usePrintPreview = ({ appId, memberId, programId, workoutSessionId }
 
       try {
         await ensureFirebaseAuth();
-        const [member, workoutSession] = await Promise.all([getMemberById(appId, memberId), getWorkoutSession(appId, workoutSessionId)]);
+        const [member, workoutSession] = await Promise.all([getMemberById(appId, memberId), getWorkoutSession(appId, memberId, workoutSessionId)]);
 
         if (!active) return;
 
@@ -68,11 +100,7 @@ export const usePrintPreview = ({ appId, memberId, programId, workoutSessionId }
         setState({ status: "ready", document, member: member as MemberSelectionItem, program: authoritativeProgram, workoutSession });
       } catch (caught) {
         if (!active) return;
-        const message =
-          caught instanceof PrintMapperError || caught instanceof Error
-            ? caught.message
-            : "출력 문서를 만들지 못했습니다.";
-        setState({ status: "error", message });
+        setState({ status: "error", message: previewErrorMessage(caught) });
       }
     };
 

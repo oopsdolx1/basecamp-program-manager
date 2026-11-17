@@ -1,6 +1,8 @@
 import { collection, doc, getDoc, onSnapshot, type FirestoreError, type QuerySnapshot } from "firebase/firestore";
 import { profilesCollectionPath } from "../../../firebase/firestorePaths";
 import { getFirestoreClient } from "../../../firebase/firestoreClient";
+import { getDefaultKioskMemberSessionRuntime } from "../../kiosk-session/defaultKioskMemberSession";
+import { withKioskMemberSession } from "../../kiosk-session/kioskSessionRenewal";
 import type { AppId, ProfileId } from "../../../types/brandedIds";
 import type { RepositoryError } from "../../../types/common.types";
 import { mapProfileDocument, toMemberSelectionItem } from "../mappers/profileMapper";
@@ -108,14 +110,20 @@ export const getMemberById = async (
   appId: AppId,
   memberId: ProfileId,
 ): Promise<MemberSelectionItem | null> => {
-  const firestore = getFirestoreClient();
-  const snapshot = await getDoc(doc(firestore, profilesCollectionPath(appId), memberId));
-
-  if (!snapshot.exists()) {
-    return null;
-  }
-
-  const profile = mapProfileDocument(snapshot.id, snapshot.data() as RawProfileDocument);
+  // Kiosk print preview is reached after member selection, so it must keep
+  // using that member's server-scoped session instead of reading raw profile
+  // data through the Firestore Client SDK.
+  void appId;
+  const runtime = getDefaultKioskMemberSessionRuntime();
+  if (!runtime) throw new Error("키오스크 API가 설정되지 않았습니다.");
+  const raw = await withKioskMemberSession(runtime.sessions, String(memberId), (token) => runtime.client.readProfile(token));
+  // The session profile intentionally omits the display name. Resolve that
+  // already-selected member from the device-only directory rather than
+  // broadening the sensitive profile projection.
+  const directory = await runtime.client.listMembers();
+  const selected = directory.find((item) => item.memberId === String(memberId));
+  if (!selected) return null;
+  const profile = mapProfileDocument(String(memberId), { ...raw, name: selected.name } as RawProfileDocument);
   if ((profile.role && profile.role !== "member") || !profile.name) {
     return null;
   }

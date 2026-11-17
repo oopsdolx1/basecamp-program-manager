@@ -49,6 +49,9 @@ import { savePrintSnapshot } from "../../services/printSnapshotSession";
 import { createRecommendationBuilderHistory, isRecommendationEdited, type RecommendedProgram } from "../../services/recommendationBuilderService";
 import { getDefaultKioskRecommendationClient } from "../../../kiosk-recommendations/kioskFirebaseIdentity";
 import { useKioskRecommendation } from "../../../kiosk-recommendations/useKioskRecommendation";
+import { getDefaultKioskMemberSessionRuntime } from "../../../kiosk-session/defaultKioskMemberSession";
+import { useKioskSessionScope } from "../../../kiosk-session/kioskSessionScope";
+import { kioskMemberListErrorMessage } from "../../../kiosk-session/kioskErrorMessages";
 import { KioskRecommendationCard } from "../../../kiosk-recommendations/KioskRecommendationCard";
 import { createMergedSnapshotBuilderHistory, createSnapshotBuilderHistory, snapshotBuilderService, type SnapshotBuilderExercise, type SnapshotBuilderHistory } from "../../services/snapshotBuilderService";
 import { createManualWorkoutBuilderHistory } from "../../services/manualWorkoutBuilderService";
@@ -380,6 +383,17 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
   const [recommendationSource, setRecommendationSource] = useState<RecommendedProgram | null>(null);
   const kioskRecommendationClient = useMemo(() => getDefaultKioskRecommendationClient(), []);
   const kioskRecommendation = useKioskRecommendation(kioskRecommendationClient, selectedMember?.memberId ?? null);
+  // Kiosk member session (memory only): follows the selected member; leaving the flow ends it.
+  const kioskSessionRuntime = useMemo(() => getDefaultKioskMemberSessionRuntime(), []);
+  const selectedMemberIdRef = useRef<string | null>(null);
+  selectedMemberIdRef.current = selectedMember?.memberId ?? null;
+  useEffect(() => {
+    if (!kioskSessionRuntime) return;
+    if (selectedMember) kioskSessionRuntime.sessions.select(selectedMember.memberId);
+    else kioskSessionRuntime.sessions.clear();
+  }, [kioskSessionRuntime, selectedMember]);
+  // Leaving the flow ends the session, except when handing the member over to the print preview.
+  const handoffKioskSession = useKioskSessionScope(kioskSessionRuntime);
   const hasSearchQuery = memberQuery.trim().length > 0;
   const filteredMembers = useMemo(() => filterQuickPrintMembers(members, memberQuery, memberInitial), [memberInitial, memberQuery, members]);
   const rankedPrograms = useMemo(() => (recommendationTrace?.candidatePrograms ?? [])
@@ -421,7 +435,8 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
       if (!active) return;
       setMembers([]);
       setMemberStatus("error");
-      setMemberError(error instanceof Error ? error.message : "회원 목록을 불러오지 못했습니다.");
+      // Never render the internal code (KIOSK_*, NETWORK_ERROR …): map it to Korean guidance.
+      setMemberError(kioskMemberListErrorMessage(error));
     });
     return () => {
       active = false;
@@ -611,9 +626,10 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
       const source = recommendationSource
         ? { source: { type: "recommendation" as const, memberProgramId: recommendationSource.id, edited: isRecommendationEdited(recommendationSource, builderState?.exercises ?? []) } }
         : manualMode ? { source: { type: "manual" as const } } : { programId: snapshotSourceProgram!.id };
+      const savingMemberId = selectedMember.memberId;
       const sessionId = await createWorkoutSession({
         appId,
-        memberId: selectedMember.memberId,
+        memberId: savingMemberId,
         memberName: selectedMember.displayName,
         programTitle: sanitized.title,
         category: builderOnly ? selectedTargets[0] ?? sanitized.category : sanitized.category,
@@ -621,7 +637,10 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
         ...source,
         exercises: mapSessionPrescriptionExercises(builderState?.exercises ?? [], resolved),
       });
+      // The selection changed or the flow was reset while saving: do not continue with the old member.
+      if (selectedMemberIdRef.current !== savingMemberId) return;
       if (!builderOnly) savePrintSnapshot({ workoutSessionId: sessionId, sourceProgramId: snapshotSourceProgram!.id, sourceProgramTitle: snapshotSourceProgram!.title, recommendationReasons: recommendationReason ? [recommendationReason] : [], aiRecommendation: null, intelligence, metadata: intelligenceMetadata, periodization, recommendationTrace, condition, recentWorkout, formValues: sanitized });
+      handoffKioskSession();
       navigate(routeBuilder.printPreviewSession(selectedMember.memberId, sessionId, true));
     } catch (caught) {
       setSessionError(caught instanceof Error ? caught.message : "운동 세션을 생성하지 못했습니다.");

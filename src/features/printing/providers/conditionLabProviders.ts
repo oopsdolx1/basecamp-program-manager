@@ -1,11 +1,8 @@
-import { collection, doc, getDoc, getDocs, limit, query, where, type DocumentData } from "firebase/firestore";
-import { getFirestoreClient } from "../../../firebase/firestoreClient";
-import { profilesCollectionPath, workoutLogsCollectionPath } from "../../../firebase/firestorePaths";
 import type { AppId, ProfileId } from "../../../types/brandedIds";
-import { mapProfileDocument, toMemberSelectionItem } from "../../members/mappers/profileMapper";
+import { toProfileId } from "../../../types/brandedIds";
+import { toMemberSelectionItem } from "../../members/mappers/profileMapper";
 import { sortMembersByName } from "../../members/services/memberService";
 import type { MemberSelectionItem } from "../../members/types/memberViewModel.types";
-import type { RawProfileDocument } from "../../members/types/profile.types";
 import { programCategories } from "../../programs/config/programOptions";
 import type { ProgramCategory } from "../../programs/types/program.types";
 import { analyzeMemberIntelligence } from "../services/memberIntelligenceService";
@@ -14,11 +11,18 @@ import type { MemberProfile, MemberProvider } from "./memberProvider";
 import type { RecommendationContext, RecommendationProvider } from "./recommendationProvider";
 import type { WorkoutHistoryProvider, WorkoutHistoryRecord } from "./workoutHistoryProvider";
 import { parseWorkoutDate, validateWorkoutDate } from "./workoutDateIntegrity";
+import { getDefaultKioskMemberSessionRuntime } from "../../kiosk-session/defaultKioskMemberSession";
+import { withKioskMemberSession } from "../../kiosk-session/kioskSessionRenewal";
+import { logKioskError } from "../../kiosk-diagnostics/kioskErrorLog";
 
 const now = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
-const debugLog = (label: string, startedAt: number, detail: Record<string, unknown>) => {
+// Phase 3-E minimal diagnostics: a fixed operation label, timing and aggregate counts only. The detail type
+// deliberately allows no identifiers — never a member id, name, token, request/response body or record content.
+type DebugDetail = { count?: number; found?: boolean; requestedLimit?: number };
+const debugLog = (label: string, startedAt: number, detail: DebugDetail) => {
   const elapsedMs = Math.round((typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt);
-  console.debug(`[ConditionLabProvider] ${label}`, { elapsedMs, ...detail });
+  const { count, found, requestedLimit } = detail;
+  console.debug(`[ConditionLabProvider] ${label}`, { elapsedMs, ...(count !== undefined ? { count } : {}), ...(found !== undefined ? { found } : {}), ...(requestedLimit !== undefined ? { requestedLimit } : {}) });
 };
 const asText = (value: unknown): string | undefined => (typeof value === "string" && value.trim() ? value.trim() : undefined);
 const asNumber = (value: unknown): number | undefined => {
@@ -54,23 +58,8 @@ const asProgramCategories = (value: unknown): ProgramCategory[] => {
   if (!text) return [];
   const candidates = text.split(/[,/·+]/).map((part) => part.trim()).filter(Boolean);
   return [...new Set(candidates.map(asProgramCategory).filter((item): item is ProgramCategory => Boolean(item)))];
-};const buildProfile = (memberId: ProfileId, raw: RawProfileDocument & Record<string, unknown>): MemberProfile | null => {
-  const mapped = mapProfileDocument(String(memberId), raw);
-  if (mapped.role !== "member" || !mapped.name) return null;
-  return {
-    id: mapped.profileId,
-    name: mapped.name,
-    gender: asText(raw.gender) ?? asText(raw.sex),
-    age: computeAge(raw.age ?? raw.birthday ?? raw.birthDate),
-    height: asNumber(raw.height),
-    weight: asNumber(raw.weight),
-    goal: asText(raw.goal),
-    memo: mapped.memo,
-    phone: mapped.phone,
-    status: mapped.status,
-  };
 };
-export const mapWorkoutHistoryRecord = (memberId: ProfileId, data: DocumentData, id: string, nowAt = new Date()): WorkoutHistoryRecord | null => {
+export const mapWorkoutHistoryRecord = (memberId: ProfileId, data: Record<string, unknown>, id: string, nowAt = new Date()): WorkoutHistoryRecord | null => {
   const categories = asProgramCategories(data.category ?? data.target);
   const exercises = Array.isArray(data.exercises) ? data.exercises : [];
   // Workout occurrence is explicit only. Metadata is an integrity signal, never a fallback.
@@ -103,23 +92,17 @@ export const createConditionLabMemberProvider = (appId: AppId): MemberProvider =
     if (memberListCache) return memberListCache;
     if (memberListPromise) return memberListPromise;
     const startedAt = now();
-    memberListPromise = getDocs(collection(getFirestoreClient(), profilesCollectionPath(appId)))
-      .then((snapshot) => {
-        const members: MemberSelectionItem[] = [];
-        snapshot.forEach((documentSnapshot) => {
-          const raw = documentSnapshot.data() as RawProfileDocument & Record<string, unknown>;
-          const mapped = mapProfileDocument(documentSnapshot.id, raw);
-          if (mapped.role !== "member" || !mapped.name) return;
-          const profile = buildProfile(mapped.profileId, raw);
-          profileCache.set(mapped.profileId, profile);
-          members.push(toMemberSelectionItem(mapped));
-        });
+    const runtime = getDefaultKioskMemberSessionRuntime();
+    if (!runtime) return Promise.reject(new Error("키오스크 API가 설정되지 않았습니다."));
+    memberListPromise = runtime.client.listMembers()
+      .then((items) => {
+        const members: MemberSelectionItem[] = items.map(({ memberId, name }) => toMemberSelectionItem({ profileId: toProfileId(memberId), name, role: "member", warnings: [], legacyAliases: [] }));
         memberListCache = sortMembersByName(members);
-        debugLog("listMembers success", startedAt, { count: memberListCache.length, appId });
+        debugLog("listMembers success", startedAt, { count: memberListCache.length });
         return memberListCache;
       })
       .catch((error) => {
-        console.debug("[ConditionLabProvider] listMembers failure", { appId, error });
+        logKioskError("member list (provider)", error);
         throw error;
       })
       .finally(() => {
@@ -131,15 +114,14 @@ export const createConditionLabMemberProvider = (appId: AppId): MemberProvider =
   const getMemberProfile = async (memberId: ProfileId): Promise<MemberProfile | null> => {
     if (profileCache.has(memberId)) return profileCache.get(memberId) ?? null;
     const startedAt = now();
-    const snapshot = await getDoc(doc(getFirestoreClient(), profilesCollectionPath(appId), memberId));
-    if (!snapshot.exists()) {
-      profileCache.set(memberId, null);
-      debugLog("getMemberProfile missing", startedAt, { memberId });
-      return null;
-    }
-    const profile = buildProfile(memberId, snapshot.data() as RawProfileDocument & Record<string, unknown>);
+    const runtime = getDefaultKioskMemberSessionRuntime();
+    if (!runtime) throw new Error("키오스크 API가 설정되지 않았습니다.");
+    // Member-session read: the shared Phase 3-E renewal rule (EXPIRED only, once; never ENDED/device/member change).
+    const raw = await withKioskMemberSession(runtime.sessions, String(memberId), (token) => runtime.client.readProfile(token));
+    const selected = memberListCache?.find((item) => item.memberId === memberId);
+    const profile = selected ? { id: memberId, name: selected.displayName, gender: asText(raw.gender) ?? asText(raw.sex), age: computeAge(raw.age ?? raw.birthday ?? raw.birthDate), height: asNumber(raw.height), weight: asNumber(raw.weight), goal: asText(raw.goal), status: selected.status } : null;
     profileCache.set(memberId, profile);
-    debugLog("getMemberProfile success", startedAt, { memberId, found: Boolean(profile) });
+    debugLog("getMemberProfile success", startedAt, { found: Boolean(profile) });
     return profile;
   };
 
@@ -154,18 +136,17 @@ export const createConditionLabWorkoutHistoryProvider = (appId: AppId): WorkoutH
       const cacheKey = `${memberId}:${requestedLimit}`;
       if (historyCache.has(cacheKey)) return historyCache.get(cacheKey) ?? [];
       const startedAt = now();
-      const snapshot = await getDocs(query(
-        collection(getFirestoreClient(), workoutLogsCollectionPath(appId)),
-        where("memberId", "==", memberId),
-        limit(Math.min(100, Math.max(requestedLimit, requestedLimit * 4))),
-      ));
-      const records = snapshot.docs
-        .map((item) => mapWorkoutHistoryRecord(memberId, item.data(), item.id))
+      const runtime = getDefaultKioskMemberSessionRuntime();
+      if (!runtime) throw new Error("키오스크 API가 설정되지 않았습니다.");
+      const limit = Math.min(100, Math.max(requestedLimit, requestedLimit * 4));
+      const logs = await withKioskMemberSession(runtime.sessions, String(memberId), (token) => runtime.client.readLogs(token, limit));
+      const records = logs
+        .map((item) => mapWorkoutHistoryRecord(memberId, item, String(item.id ?? "")))
         .filter((item): item is WorkoutHistoryRecord => Boolean(item))
         .sort((left, right) => right.workoutDate.getTime() - left.workoutDate.getTime())
         .slice(0, requestedLimit);
       historyCache.set(cacheKey, records);
-      debugLog("getRecentWorkoutHistory success", startedAt, { memberId, requestedLimit, count: records.length, source: "logs" });
+      debugLog("getRecentWorkoutHistory success", startedAt, { requestedLimit, count: records.length });
       return records;
     },
   };
@@ -195,10 +176,10 @@ export const createConditionLabRecommendationProvider = (
           metadata: intelligenceResult.metadata,
         };
         contextCache.set(cacheKey, context);
-        debugLog("getRecommendationContext success", startedAt, { memberId, historyCount: workoutHistory.length });
+        debugLog("getRecommendationContext success", startedAt, { count: workoutHistory.length });
         return context;
       } catch (error) {
-        console.debug("[ConditionLabProvider] getRecommendationContext failure", { memberId, error });
+        logKioskError("recommendation context", error);
         throw error;
       }
     },

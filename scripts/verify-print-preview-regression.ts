@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { KioskApiError } from "../src/features/kiosk-recommendations/kioskRecommendationClient";
+import { previewErrorMessage } from "../src/features/printing/hooks/usePrintPreview";
 import { toAppId } from "../src/types/brandedIds";
 import type { MemberSelectionItem } from "../src/features/members/types/memberViewModel.types";
 import { createWorkoutPrintDocument } from "../src/features/printing/mappers/workoutPrintMapper";
@@ -113,6 +115,28 @@ const run = async (): Promise<void> => {
 
   const legacySession = { ...session, prescription: undefined };
   assert.throws(() => assertPrintPreviewSessionContext(legacySession, "member-1", snapshotRouteProgramId), /프로그램/);
+  // Preview load errors: Kiosk API codes become the product's Korean guidance, never a raw code.
+  const memberGuidance = "선택된 회원 정보가 없습니다. 처음 화면에서 회원을 다시 선택해 주세요.";
+  for (const code of ["KIOSK_SESSION_MEMBER_CHANGED", "KIOSK_SESSION_STALE", "KIOSK_SESSION_MEMBER_MISMATCH"]) assert.equal(previewErrorMessage(new KioskApiError(code, 0)), memberGuidance, code);
+  for (const code of ["KIOSK_SESSION_EXPIRED", "KIOSK_SESSION_ENDED"]) assert.equal(previewErrorMessage(new KioskApiError(code, 401)), "회원 선택 시간이 만료되었거나 종료되었습니다. 처음 화면에서 회원을 다시 선택해 주세요.", code);
+  for (const code of ["KIOSK_SESSION_INVALID", "KIOSK_SESSION_NOT_FOUND", "KIOSK_SESSION_REQUIRED"]) {
+    const message = previewErrorMessage(new KioskApiError(code, 401));
+    assert.equal(message, "회원 선택 정보를 확인할 수 없습니다. 처음 화면에서 회원을 다시 선택해 주세요.", code);
+    assert.doesNotMatch(message, /만료|종료/, `${code} is not described as an expiry`);
+  }
+  for (const code of ["KIOSK_DEVICE_NOT_ENROLLED", "KIOSK_DEVICE_IDENTITY_REQUIRED", "KIOSK_DEVICE_AUTH_FAILED"]) assert.equal(previewErrorMessage(new KioskApiError(code, 401)), "키오스크 기기 인증이 되어 있지 않아 출력할 수 없습니다.", code);
+  assert.equal(previewErrorMessage(new KioskApiError("KIOSK_DEVICE_NOT_REGISTERED", 403)), "등록되지 않았거나 사용이 중지된 키오스크입니다.");
+  assert.equal(previewErrorMessage(new KioskApiError("NETWORK_ERROR", 0)), "서버에 연결하지 못했습니다.");
+  assert.equal(previewErrorMessage(new KioskApiError("WORKOUT_SESSION_NOT_FOUND", 404)), "운동 세션을 찾지 못했습니다.");
+  assert.match(previewErrorMessage(new KioskApiError("INTERNAL", 500)), /서버 오류로 미리보기를 불러오지 못했습니다/);
+  for (const code of ["KIOSK_SESSION_MEMBER_CHANGED", "KIOSK_SESSION_EXPIRED", "KIOSK_DEVICE_NOT_ENROLLED", "INTERNAL"]) assert.doesNotMatch(previewErrorMessage(new KioskApiError(code, 500)), /KIOSK_|INTERNAL/, `${code} is not shown raw`);
+  // Phase 3-E: an unknown API code gets safe general guidance (the code is only in the diagnostic log).
+  assert.equal(previewErrorMessage(new KioskApiError("SOMETHING_NEW", 409)), "미리보기를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
+  assert.equal(previewErrorMessage(new KioskApiError("INVALID_API_RESPONSE", 200)), "서버 오류로 미리보기를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
+  assert.doesNotMatch(previewErrorMessage(new KioskApiError("PRINT_REQUEST_CONFLICT", 409)), /PRINT_|기록하지 못했습니다/, "print-record wording is not reused for the preview");
+  // Non-API errors keep their product (Korean) messages.
+  assert.equal(previewErrorMessage(new Error("plain error")), "plain error");
+  assert.equal(previewErrorMessage("not an error"), "출력 문서를 만들지 못했습니다.");
   console.log("Print preview regression checks: PASS");
 };
 

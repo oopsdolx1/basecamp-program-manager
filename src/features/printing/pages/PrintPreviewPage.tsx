@@ -4,16 +4,18 @@ import PrintIcon from "@mui/icons-material/Print";
 import DownloadIcon from "@mui/icons-material/Download";
 import QrCode2Icon from "@mui/icons-material/QrCode2";
 import { Alert, Box, Stack, Typography } from "@mui/material";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { GlobalWorkerOptions, getDocument } from "pdfjs-dist/build/pdf.mjs";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { routeBuilder } from "../../../app/routeBuilder";
 import { Button, Card, EmptyState, Loading, colors, kiosk, motion, radius, shadows, spacing } from "../../../design-system";
 import { toAppId, toProfileId, toProgramId } from "../../../types/brandedIds";
-import { useCreatePrintRequest, type PrintRequestRecord } from "../../print-history";
+import type { PrintRequestRecord } from "../../print-history";
 import { getPrintRequestsByIds } from "../../print-history/services/printRequestService";
-import { markWorkoutSessionPrinted } from "../../workout-sessions/services/workoutSessionService";
+import { createPrintRequestId, ensureKioskPrintSession, recordKioskPrint, type PendingPrintRecord } from "../../print-history/services/kioskPrintRecordService";
+import { getDefaultKioskMemberSessionRuntime } from "../../kiosk-session/defaultKioskMemberSession";
+import { useKioskSessionScope } from "../../kiosk-session/kioskSessionScope";
 import { WorkoutPrintTemplateV1 } from "../components/WorkoutPrintTemplateV1/WorkoutPrintTemplateV1";
 import { configuredPrintAdapter, configuredPrintAgentEndpoint, configuredPrintRuntime, createArtifactPrintAdapter } from "../gateways/configuredPrintAdapter";
 import { createRenderedPrintArtifactFactory, isRenderedPrintDocumentReady } from "../gateways/printArtifactFactory";
@@ -28,7 +30,13 @@ import "../styles/print.css";
 const conditionLabAppId = toAppId(import.meta.env.VITE_CONDITION_LAB_APP_ID ?? "");
 const formatDateTime = (date: Date): string => new Intl.DateTimeFormat("ko-KR", { dateStyle: "short", timeStyle: "short" }).format(date);
 export const userFacingPrintError = (reason: string): string => {
-  if (reason === "print_agent_unavailable" || reason === "preview_artifact_requires_windows_agent") return "인쇄 서비스를 연결하지 못했습니다.";
+  if (reason === "print_agent_unavailable" || reason === "preview_artifact_requires_windows_agent") return "인쇄 서비스에 연결하지 못했습니다. Print Agent가 실행 중인지 확인한 뒤 다시 시도해 주세요.";
+  if (reason === "agent_http_401" || reason === "agent_http_403") return "인쇄 서비스 인증이 만료되었거나 권한이 없습니다. 관리자에게 문의해 주세요.";
+  if (reason === "agent_http_404") return "인쇄 문서를 찾을 수 없습니다. 새로고침 후 다시 준비해 주세요.";
+  if (reason.startsWith("agent_http_")) return "인쇄 서비스가 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+  if (reason === "preview_unavailable" || reason === "pdf_get_failed") return "인쇄 문서를 불러오지 못했습니다. 인쇄하지 않았으므로 다시 준비해 주세요.";
+  if (reason === "print_status_unknown" || reason === "print_status_timeout") return "출력 요청 결과를 확인하지 못했습니다. 프린터 대기열을 확인한 뒤 필요할 때만 다시 출력해 주세요.";
+  if (reason === "print_request_conflict" || reason === "REQUEST_PAYLOAD_CONFLICT") return "같은 출력 요청이 이미 처리 중이거나 기록되어 있습니다. 출력 기록을 먼저 확인해 주세요.";
   if (reason === "default_printer_unavailable" || reason === "physical_printer_unavailable") return "연결된 프린터를 찾을 수 없습니다. PDF 저장은 사용할 수 있습니다.";
   if (reason === "printer_not_configured") return "출력 프린터가 설정되지 않았습니다. 관리자에게 문의해 주세요.";
   if (reason === "config_missing" || reason === "config_invalid") return "출력 프린터 설정을 확인해 주세요. 관리자에게 문의해 주세요.";
@@ -36,8 +44,8 @@ export const userFacingPrintError = (reason: string): string => {
   if (reason === "configured_printer_virtual" || reason === "configured_printer_unavailable") return "설정된 프린터를 사용할 수 없습니다. 프린터 연결을 확인해 주세요.";
   if (reason === "printer_queue_access_denied") return "프린터 오류 작업을 자동으로 정리할 수 없습니다. 관리자 점검이 필요합니다.";
   if (reason === "printer_queue_recovery_required" || reason === "printer_spooler_error" || reason === "spooler_stopped") return "프린터 대기열에 오류가 있습니다. 프린터 상태를 확인해 주세요.";
-  if (reason === "printer_submission_failed" || reason === "print_timeout" || reason === "print_engine_failed") return "출력하지 못했습니다. 프린터 연결을 확인해 주세요.";
-  return "인쇄 artifact를 준비하지 못했습니다.";
+  if (reason === "printer_submission_failed" || reason === "print_timeout" || reason === "print_engine_failed") return "출력 요청을 보내지 못했습니다. 프린터 연결을 확인한 뒤 다시 시도해 주세요.";
+  return "인쇄 처리 중 문제가 발생했습니다. 출력 성공 여부를 확인한 뒤 필요할 때만 다시 시도해 주세요.";
 };
 
 GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
@@ -148,7 +156,14 @@ export const PrintPreviewPage = (): JSX.Element => {
     programId: programId ? toProgramId(programId) : null,
     workoutSessionId,
   });
-  const printRequest = useCreatePrintRequest(conditionLabAppId);
+  // Phase 3-B: the print record is saved by the Condition Lab API with the Kiosk member session handed over
+  // from the selection flow / workout history. No Client SDK write, no fallback.
+  const kioskSessionRuntime = useMemo(() => getDefaultKioskMemberSessionRuntime(), []);
+  useKioskSessionScope(kioskSessionRuntime, { receivesHandoff: true });
+  const [recordSaving, setRecordSaving] = useState(false);
+  const [pendingPrintRecord, setPendingPrintRecord] = useState<PendingPrintRecord | null>(null);
+  const [kioskSessionError, setKioskSessionError] = useState<string | null>(null);
+  const printRequest = { saving: recordSaving, error: null as string | null };
   const documentWorkoutSessionId = state.status === "ready" ? state.document.workoutSessionId : null;
   const pdfDownloadName = state.status === "ready" ? state.document.member.name || state.document.workoutSessionId : null;
   const printArtifactId = printArtifact?.artifactId ?? null;
@@ -253,6 +268,16 @@ export const PrintPreviewPage = (): JSX.Element => {
     physicalPrintInFlight.current = true;
     setSessionError(null);
     setHistoryWarning(null);
+    setKioskSessionError(null);
+    // Confirm the selected member's session before anything is printed: a print that cannot be recorded
+    // (no selection, other member, revoked device, API down) is not started.
+    try {
+      await ensureKioskPrintSession(state.workoutSession.memberId, kioskSessionRuntime);
+    } catch (error) {
+      setKioskSessionError(error instanceof Error ? error.message : "출력 준비를 완료하지 못했습니다.");
+      physicalPrintInFlight.current = false;
+      return;
+    }
     const userGestureAdapter = isUserGesturePdfPrintAdapter(configuredPrintAdapter) ? configuredPrintAdapter : null;
     if (userGestureAdapter) {
       if (!visualPdfPreview) { setSessionError("인쇄용 문서를 준비하지 못했습니다."); physicalPrintInFlight.current = false; return; }
@@ -261,12 +286,24 @@ export const PrintPreviewPage = (): JSX.Element => {
     }
     const nextCopy = Math.max(state.workoutSession.print.copyCount, ...history.map((item) => item.copy), 0) + 1;
     const printAdapter = createArtifactPrintAdapter(configuredPrintRuntime, Boolean(printArtifact?.artifactId));
+    // One idempotency key per physical print: retries of the record (network, lost response) reuse it.
+    const printRequestId = createPrintRequestId();
     let outcome;
     try {
       outcome = await submitPhysicalPrintAndPersist({
         submit: () => userGestureAdapter ? Promise.resolve({ status: "submitted" as const }) : printAdapter.print({ jobId: crypto.randomUUID(), document: state.document, copies: 1, artifactId: completedPrints === 0 ? printArtifact?.artifactId : undefined }),
-        saveHistory: (printer) => printRequest.create(state.document, nextCopy, printer),
-        markSessionPrinted: (printHistoryId) => markWorkoutSessionPrinted(conditionLabAppId, workoutSessionId, printHistoryId),
+        saveHistory: async (printer) => {
+          const pending: PendingPrintRecord = { printRequestId, workoutSessionId, memberId: state.workoutSession.memberId, printer, copy: nextCopy };
+          setPendingPrintRecord(pending);
+          setRecordSaving(true);
+          try {
+            const record = await recordKioskPrint(pending, kioskSessionRuntime);
+            setPendingPrintRecord(null);
+            return record;
+          } finally {
+            setRecordSaving(false);
+          }
+        },
         onPhysicalSubmitted: () => { setCompletedPrints((current) => current + 1); setMarkingPrinted(true); },
       });
     } catch {
@@ -286,6 +323,21 @@ export const PrintPreviewPage = (): JSX.Element => {
     }
     setHistory((current) => [outcome.record, ...current]);
     setMarkingPrinted(false);
+  };
+  // The physical print already happened: only the record is retried, with the same idempotency key.
+  const retryPrintRecord = async () => {
+    if (!pendingPrintRecord || recordSaving) return;
+    setRecordSaving(true);
+    setHistoryWarning(null);
+    try {
+      const record = await recordKioskPrint(pendingPrintRecord, kioskSessionRuntime);
+      setPendingPrintRecord(null);
+      setHistory((current) => [record, ...current]);
+    } catch (error) {
+      setHistoryWarning(error instanceof Error ? error.message : "출력 기록 저장에 실패했습니다.");
+    } finally {
+      setRecordSaving(false);
+    }
   };
 
   useEffect(() => {
@@ -308,8 +360,9 @@ export const PrintPreviewPage = (): JSX.Element => {
   if (state.status === "error") return <Box sx={{ ...printStateSx, p: `${spacing[6]}px` }}><Card><Stack spacing={`${spacing[4]}px`}><EmptyState title="미리보기를 만들 수 없습니다." description={state.message} /><Button variant="secondary" startIcon={<ArrowBackIcon />} onClick={goWorkspace}>프로그램으로 돌아가기</Button></Stack></Card></Box>;
 
   if (completedPrints > 0 && reprint) return <><PrintSourceDocument document={state.document} /><Box sx={{ ...printStateSx, alignItems: "center", display: "flex", justifyContent: "center", p: { md: `${spacing[8]}px`, xs: `${spacing[4]}px` } }}><Stack alignItems="center" spacing={`${spacing[3]}px`} sx={{ maxWidth: 560, width: "100%" }} textAlign="center"><CheckCircleIcon sx={{ color: colors.semantic.success, fontSize: 64 }} /><Typography fontSize={{ md: 42, xs: 30 }} fontWeight={900}>재출력을 요청했습니다.</Typography><Typography color={colors.neutral.gray400}>{state.document.member.name} · {state.document.program.title}</Typography><Typography color={colors.neutral.gray400} variant="body2">{secondsRemaining}초 후 처음 화면으로 돌아갑니다.</Typography><Button fullWidth onClick={goWorkspace} sx={{ fontSize: { md: 28, xs: 23 }, minHeight: 92 }}>처음으로</Button></Stack></Box></>;
-  if (completedPrints > 0) return <><PrintSourceDocument document={state.document} /><Box sx={{ ...printStateSx, alignItems: "center", display: "flex", justifyContent: "center", p: { md: `${spacing[8]}px`, xs: `${spacing[4]}px` } }}><Stack alignItems="center" spacing={`${spacing[3]}px`} sx={{ maxWidth: 560, width: "100%" }} textAlign="center"><CheckCircleIcon sx={{ color: colors.semantic.success, fontSize: 64 }} /><Box><Typography fontSize={{ md: 42, xs: 30 }} fontWeight={900}>출력이 완료되었습니다.</Typography><Typography color={colors.neutral.gray400} sx={{ fontSize: { md: 22, xs: 17 }, mt: `${spacing[1]}px` }}>{state.document.member.name} · {state.document.program.title}</Typography></Box>{markingPrinted || printRequest.saving ? <Typography color={colors.neutral.gray400}>출력 기록을 저장하고 있습니다.</Typography> : historyWarning ? <Alert severity="warning">출력 기록 저장 상태를 확인해 주세요.</Alert> : <Typography color={colors.neutral.gray400} variant="body2">{secondsRemaining}초 후 처음 화면으로 돌아갑니다.</Typography>}<Stack spacing={`${spacing[2]}px`} sx={{ mt: `${spacing[2]}px`, width: "100%" }}><Button fullWidth onClick={goWorkspace} sx={{ fontSize: { md: 28, xs: 23 }, minHeight: 92 }}>처음으로</Button><Button fullWidth disabled={markingPrinted || printRequest.saving} loading={markingPrinted || printRequest.saving} variant="secondary" onClick={() => { setSecondsRemaining(30); void requestPrint(); }} sx={{ fontSize: { md: 22, xs: 18 }, minHeight: 72 }}>다시 출력</Button><Button fullWidth variant="tertiary" startIcon={<DownloadIcon />} disabled={!printArtifactId || pdfSaveInProgress} onClick={() => void savePdf()}>PDF 저장</Button></Stack></Stack></Box></>;
+  if (completedPrints > 0) return <><PrintSourceDocument document={state.document} /><Box sx={{ ...printStateSx, alignItems: "center", display: "flex", justifyContent: "center", p: { md: `${spacing[8]}px`, xs: `${spacing[4]}px` } }}><Stack alignItems="center" spacing={`${spacing[3]}px`} sx={{ maxWidth: 560, width: "100%" }} textAlign="center"><CheckCircleIcon sx={{ color: colors.semantic.success, fontSize: 64 }} /><Box><Typography fontSize={{ md: 42, xs: 30 }} fontWeight={900}>출력이 완료되었습니다.</Typography><Typography color={colors.neutral.gray400} sx={{ fontSize: { md: 22, xs: 17 }, mt: `${spacing[1]}px` }}>{state.document.member.name} · {state.document.program.title}</Typography></Box>{markingPrinted || printRequest.saving ? <Typography color={colors.neutral.gray400}>출력 기록을 저장하고 있습니다.</Typography> : historyWarning ? <Stack spacing={`${spacing[2]}px`} sx={{ width: "100%" }}><Alert severity="warning">출력 기록 저장 상태를 확인해 주세요.</Alert>{pendingPrintRecord ? <Button fullWidth variant="secondary" onClick={() => void retryPrintRecord()}>출력 기록 다시 저장</Button> : null}</Stack> : <Typography color={colors.neutral.gray400} variant="body2">{secondsRemaining}초 후 처음 화면으로 돌아갑니다.</Typography>}<Stack spacing={`${spacing[2]}px`} sx={{ mt: `${spacing[2]}px`, width: "100%" }}><Button fullWidth onClick={goWorkspace} sx={{ fontSize: { md: 28, xs: 23 }, minHeight: 92 }}>처음으로</Button><Button fullWidth disabled={markingPrinted || printRequest.saving} loading={markingPrinted || printRequest.saving} variant="secondary" onClick={() => { setSecondsRemaining(30); void requestPrint(); }} sx={{ fontSize: { md: 22, xs: 18 }, minHeight: 72 }}>다시 출력</Button><Button fullWidth variant="tertiary" startIcon={<DownloadIcon />} disabled={!printArtifactId || pdfSaveInProgress} onClick={() => void savePdf()}>PDF 저장</Button></Stack></Stack></Box></>;
 
+  if (kioskSessionError && completedPrints === 0) return <><PrintSourceDocument document={state.document} /><Box sx={{ ...printStateSx, p: `${spacing[6]}px` }}><Card sx={{ margin: "0 auto", maxWidth: 760 }}><Stack spacing={`${spacing[3]}px`}><EmptyState title={kioskSessionError} description="출력하지 않았습니다. 처음 화면에서 회원을 선택한 뒤 다시 진행해 주세요." /><Button onClick={goWorkspace}>처음으로</Button></Stack></Card></Box></>;
   if (autoPrint && !isUserGesturePdfPrintAdapter(configuredPrintAdapter) && printArtifactError) return <><PrintSourceDocument document={state.document} /><Box sx={{ ...printStateSx, p: `${spacing[6]}px` }}><Card sx={{ margin: "0 auto", maxWidth: 760 }}><Stack spacing={`${spacing[3]}px`}><EmptyState title={userFacingPrintError(printArtifactError)} description="인쇄 서비스를 확인한 뒤 다시 시도해 주세요." /><Button onClick={() => setPreviewRetryKey((current) => current + 1)}>다시 시도</Button><Button variant="secondary" onClick={goWorkspace}>프로그램으로 돌아가기</Button></Stack></Card></Box></>;
   if (autoPrint && !isUserGesturePdfPrintAdapter(configuredPrintAdapter) && visualPdfPreviewError) return <><PrintSourceDocument document={state.document} /><Box sx={{ ...printStateSx, p: `${spacing[6]}px` }}><Card sx={{ margin: "0 auto", maxWidth: 760 }}><Stack spacing={`${spacing[3]}px`}><EmptyState title="인쇄 미리보기를 준비하지 못했습니다." description="인쇄 서비스를 확인한 뒤 다시 시도해 주세요." /><Button onClick={retryPreview}>다시 시도</Button><Button variant="secondary" onClick={goWorkspace}>프로그램으로 돌아가기</Button></Stack></Card></Box></>;
   if (autoPrint && !isUserGesturePdfPrintAdapter(configuredPrintAdapter) && (printRequest.error || sessionError)) return <><PrintSourceDocument document={state.document} /><Box sx={{ ...printStateSx, p: `${spacing[6]}px` }}><Card sx={{ margin: "0 auto", maxWidth: 760 }}><Stack spacing={`${spacing[3]}px`}><EmptyState title="출력하지 못했습니다. 프린터 연결을 확인해 주세요." description="잠시 후 다시 시도해 주세요." /><Button onClick={retryAutoPrint}>다시 시도</Button><Button variant="secondary" onClick={goWorkspace}>프로그램으로 돌아가기</Button></Stack></Card></Box></>;

@@ -3,7 +3,7 @@ import GroupsIcon from "@mui/icons-material/Groups";
 import PrintIcon from "@mui/icons-material/Print";
 import QrCode2Icon from "@mui/icons-material/QrCode2";
 import { Box, Grid, Stack, Typography } from "@mui/material";
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import { useNavigate } from "react-router-dom";
 import { routeBuilder } from "../../../app/routeBuilder";
 import { PageContainer } from "../../../components/layout/PageContainer";
@@ -15,7 +15,6 @@ import { usePrintRequests } from "../../print-history/hooks/usePrintRequests";
 import { usePrograms } from "../../programs/hooks/usePrograms";
 import type { WorkoutSessionRecord } from "../../workout-sessions/domain/workoutSession.types";
 import { workoutSessionStatusPresentation } from "../../workout-sessions/presentation/workoutSessionPresentation";
-import { subscribeWorkoutSessions } from "../../workout-sessions/services/workoutSessionService";
 
 const appId = toAppId(import.meta.env.VITE_CONDITION_LAB_APP_ID ?? "");
 const printFilters = { search: "", category: "ALL" as const };
@@ -28,10 +27,10 @@ export const DashboardPage = (): JSX.Element => {
   const { programState, listItems } = usePrograms(appId);
   const { state: printState, records: printRecords } = usePrintRequests(appId, printFilters);
   const [sessions, setSessions] = useState<WorkoutSessionRecord[]>([]);
-  const [sessionStatus, setSessionStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [sessionStatus] = useState<"loading" | "ready" | "error">("ready");
   const runtimeRevision = useSyncExternalStore(programManagerRuntime.subscribe, programManagerRuntime.getRevision, programManagerRuntime.getRevision);
 
-  useEffect(() => subscribeWorkoutSessions(appId, (records) => { setSessions(records); setSessionStatus("ready"); }, () => setSessionStatus("error")), []);
+  // This direct URL is not a member-scoped Kiosk screen. Raw session data is intentionally not loaded here.
 
   const todaySessions = useMemo(() => sessions.filter((session) => isToday(session.createdAt)), [sessions]);
   const summaries = [

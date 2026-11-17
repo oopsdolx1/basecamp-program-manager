@@ -6,7 +6,9 @@ export type PhysicalPrintPersistenceResult<TRecord> =
   | { physical: "submitted"; history: "failed" };
 
 // The physical action always happens first. Persistence failures are reported
-// separately and never cause a second submission.
+// separately and never cause a second submission. Since Phase 3-B the kiosk passes one
+// `saveHistory` (server API: print history + session print status in one transaction) and no
+// `markSessionPrinted`.
 export const submitPhysicalPrintAndPersist = async <TRecord extends { id: string }>({
   submit,
   saveHistory,
@@ -15,7 +17,7 @@ export const submitPhysicalPrintAndPersist = async <TRecord extends { id: string
 }: {
   submit: () => Promise<PrintSubmissionResult>;
   saveHistory: (printer: string) => Promise<TRecord | null>;
-  markSessionPrinted: (printHistoryId: string) => Promise<void>;
+  markSessionPrinted?: (printHistoryId: string) => Promise<void>;
   onPhysicalSubmitted?: () => void;
 }): Promise<PhysicalPrintPersistenceResult<TRecord>> => {
   const physical = await submit();
@@ -24,7 +26,7 @@ export const submitPhysicalPrintAndPersist = async <TRecord extends { id: string
   try {
     const record = await saveHistory(physical.printer ?? "unknown");
     if (!record) throw new Error("print_history_write_failed");
-    await markSessionPrinted(record.id);
+    await markSessionPrinted?.(record.id);
     return { physical: "submitted", history: "saved", record };
   } catch {
     return { physical: "submitted", history: "failed" };

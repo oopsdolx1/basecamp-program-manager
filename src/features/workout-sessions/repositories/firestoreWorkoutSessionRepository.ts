@@ -1,11 +1,17 @@
-import { collection, doc, getDoc, onSnapshot, orderBy, query, runTransaction, serverTimestamp, setDoc, type DocumentData, Timestamp, type Unsubscribe } from "firebase/firestore";
-import { getFirestoreClient } from "../../../firebase/firestoreClient";
-import { workoutSessionsCollectionPath } from "../../../firebase/firestorePaths";
+import { Timestamp, type DocumentData, type Unsubscribe } from "firebase/firestore";
 import type { AppId } from "../../../types/brandedIds";
 import type { WorkoutSessionRecord } from "../domain/workoutSession.types";
 import type { ProgramCategory } from "../../programs/types/program.types";
+import { getDefaultKioskMemberSessionRuntime } from "../../kiosk-session/defaultKioskMemberSession";
+import { withKioskMemberSession } from "../../kiosk-session/kioskSessionRenewal";
 
-const asDate = (value: unknown): Date => value instanceof Timestamp ? value.toDate() : new Date(0);
+// Firestore Timestamp (direct SDK reads) or epoch milliseconds (the Kiosk read API serializes Timestamps that way).
+// Anything else keeps the existing epoch-0 fallback.
+const asDate = (value: unknown): Date => {
+  if (value instanceof Timestamp) return value.toDate();
+  if (typeof value === "number" && Number.isFinite(value)) return new Date(value);
+  return new Date(0);
+};
 const statuses = new Set(["created", "printed", "ocr_pending", "ocr_completed", "ai_completed", "confirmed"]);
 const categories = new Set<ProgramCategory>(["FULL_BODY", "CHEST", "BACK", "LOWER_BODY", "SHOULDER", "ARMS", "RECOVERY", "ETC", "CUSTOM"]);
 const categoryOf = (value: unknown): ProgramCategory | undefined => typeof value === "string" && categories.has(value as ProgramCategory) ? value as ProgramCategory : undefined;
@@ -50,45 +56,24 @@ export const mapWorkoutSessionRecord = (id: string, data: DocumentData): Workout
   };
 };
 
+// Creation is server-only (Condition Lab `POST /v1/kiosk/workout-sessions`, see workoutSessionService.createWorkoutSession).
+// Print status is recorded server-side too (POST /v1/kiosk/workout-sessions/{id}/prints, Phase 3-B).
+// This repository only reads; there is intentionally no browser write here.
 export const firestoreWorkoutSessionRepository = {
-  async create(appId: AppId, record: Omit<WorkoutSessionRecord, "createdAt" | "updatedAt" | "printedAt" | "lastPrintedAt">): Promise<void> {
-    const ref = doc(getFirestoreClient(), workoutSessionsCollectionPath(appId), record.sessionId);
-    const timestamp = serverTimestamp();
-    await setDoc(ref, { ...record, createdAt: timestamp, updatedAt: timestamp, printedAt: null, lastPrintedAt: null });
+  async get(_appId: AppId, memberId: string, sessionId: string): Promise<WorkoutSessionRecord | null> {
+    const runtime = getDefaultKioskMemberSessionRuntime();
+    if (!runtime) throw new Error("키오스크 API가 설정되지 않았습니다.");
+    const record = await withKioskMemberSession(runtime.sessions, memberId, (token) => runtime.client.readWorkoutSession(token, sessionId));
+    return record ? mapWorkoutSessionRecord(sessionId, record) : null;
   },
 
-  async get(appId: AppId, sessionId: string): Promise<WorkoutSessionRecord | null> {
-    const snapshot = await getDoc(doc(getFirestoreClient(), workoutSessionsCollectionPath(appId), sessionId));
-    return snapshot.exists() ? mapWorkoutSessionRecord(snapshot.id, snapshot.data()) : null;
-  },
-
-  subscribe(appId: AppId, callback: (records: WorkoutSessionRecord[]) => void, onError: (message: string) => void): Unsubscribe {
-    return onSnapshot(
-      query(collection(getFirestoreClient(), workoutSessionsCollectionPath(appId)), orderBy("createdAt", "desc")),
-      (snapshot) => callback(snapshot.docs.map((item) => mapWorkoutSessionRecord(item.id, item.data()))),
-      (error) => onError(`${error.code}: ${error.message}`),
-    );
-  },
-
-  async markPrinted(appId: AppId, sessionId: string, printHistoryId: string): Promise<number> {
-    const db = getFirestoreClient();
-    const ref = doc(db, workoutSessionsCollectionPath(appId), sessionId);
-    return runTransaction(db, async (transaction) => {
-      const snapshot = await transaction.get(ref);
-      if (!snapshot.exists()) throw new Error("Workout Session을 찾지 못했습니다.");
-      const current = mapWorkoutSessionRecord(snapshot.id, snapshot.data());
-      const copyCount = current.print.copyCount + 1;
-      const timestamp = serverTimestamp();
-      transaction.update(ref, {
-        status: "printed",
-        "print.printHistoryId": printHistoryId,
-        "print.historyIds": [...current.print.historyIds, printHistoryId],
-        "print.copyCount": copyCount,
-        printedAt: current.printedAt ? snapshot.data().printedAt : timestamp,
-        lastPrintedAt: timestamp,
-        updatedAt: timestamp,
-      });
-      return copyCount;
-    });
+  subscribe(_appId: AppId, memberId: string, callback: (records: WorkoutSessionRecord[]) => void, onError: (message: string) => void): Unsubscribe {
+    let cancelled = false;
+    const runtime = getDefaultKioskMemberSessionRuntime();
+    if (!runtime) { onError("키오스크 API가 설정되지 않았습니다."); return () => undefined; }
+    void withKioskMemberSession(runtime.sessions, memberId, (token) => runtime.client.readWorkoutSessions(token))
+      .then((records) => { if (!cancelled) callback(records.map((record) => mapWorkoutSessionRecord(String(record.sessionId ?? ""), record))); })
+      .catch((error: unknown) => { if (!cancelled) onError(error instanceof Error ? error.message : "read_failed"); });
+    return () => { cancelled = true; };
   },
 };

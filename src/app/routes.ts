@@ -10,6 +10,7 @@ export const routes = {
   editProgram: "/program-manager/programs/:id/edit",
   printPreview: "/program-manager/print/:programId",
   printPreviewSession: "/program-manager/print/session/:workoutSessionId",
+  blankWorkoutLogPrint: "/program-manager/print/blank-workout-log",
   printHistory: "/program-manager/print-history",
   workoutSessions: "/program-manager/workout-sessions",
   workoutSessionDetail: "/program-manager/workout-sessions/:sessionId",

@@ -21,6 +21,7 @@ export const routeBuilder = {
     if (reprint) params.set("reprint", "1");
     return `/program-manager/print/session/${workoutSessionId}?${params.toString()}`;
   },
+  blankWorkoutLogPrint: (): AppRoute => routes.blankWorkoutLogPrint,
   printHistory: (filters?: { memberId?: string; programId?: string; category?: string; search?: string }): string => {
     const params = new URLSearchParams();
     params.set("tab", "history");

@@ -6,3 +6,4 @@ export type {
 } from "./types/print.types";
 export { QuickPrintPage } from "./pages/QuickPrintPage";
 export { PrintPreviewPage } from "./pages/PrintPreviewPage";
+export { BlankWorkoutLogPrintPage } from "./pages/BlankWorkoutLogPrintPage";

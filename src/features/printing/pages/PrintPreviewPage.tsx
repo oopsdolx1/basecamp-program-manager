@@ -27,7 +27,7 @@ import "../styles/print.css";
 
 const conditionLabAppId = toAppId(import.meta.env.VITE_CONDITION_LAB_APP_ID ?? "");
 const formatDateTime = (date: Date): string => new Intl.DateTimeFormat("ko-KR", { dateStyle: "short", timeStyle: "short" }).format(date);
-const userFacingPrintError = (reason: string): string => {
+export const userFacingPrintError = (reason: string): string => {
   if (reason === "print_agent_unavailable" || reason === "preview_artifact_requires_windows_agent") return "인쇄 서비스를 연결하지 못했습니다.";
   if (reason === "default_printer_unavailable" || reason === "physical_printer_unavailable") return "연결된 프린터를 찾을 수 없습니다. PDF 저장은 사용할 수 있습니다.";
   if (reason === "printer_not_configured") return "출력 프린터가 설정되지 않았습니다. 관리자에게 문의해 주세요.";
@@ -62,7 +62,7 @@ const printStateSx = {
   overflow: "hidden",
 };
 
-const PdfCanvasPreview = ({ pdfBytes, expectedPages, onPageCount }: { pdfBytes: Uint8Array; expectedPages: number; onPageCount: (pages: number) => void }): JSX.Element => {
+export const PdfCanvasPreview = ({ pdfBytes, expectedPages, onPageCount }: { pdfBytes: Uint8Array; expectedPages: number; onPageCount: (pages: number) => void }): JSX.Element => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageCount, setPageCount] = useState(expectedPages);

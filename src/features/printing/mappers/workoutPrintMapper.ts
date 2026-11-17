@@ -2,13 +2,15 @@ import type { MemberSelectionItem } from "../../members/types/memberViewModel.ty
 import { getCategoryLabel, getDifficultyLabel } from "../../programs/config/programOptions";
 import type { Program } from "../../programs/types/program.types";
 import {
+  PRINT_EXERCISE_ROW_COUNT,
   PRINT_FORMAT,
   PRINT_TEMPLATE_KEY,
   PRINT_TEMPLATE_VERSION,
 } from "../constants/print.constants";
+import type { ProfileId, ProgramId } from "../../../types/brandedIds";
 import type { PrintExerciseRow, WorkoutPrintDocument } from "../types/print.types";
 import { resolveProgramExerciseKnowledge } from "../../../shared-knowledge/resolveProgramExercises";
-import { resolveA5WorkoutLayout } from "../services/a5WorkoutLayoutService";
+import { A5_WORKOUT_TOP_BINDING_SAFE_AREA_MM, resolveA5WorkoutLayout } from "../services/a5WorkoutLayoutService";
 
 export class PrintMapperError extends Error {
   constructor(message: string) {
@@ -125,3 +127,45 @@ export const createWorkoutPrintDocument = ({
     rows,
   };
 };
+
+/**
+ * A blank A5 workout log for handwriting: same template, eight empty exercise
+ * rows with SET 1-5 columns, and no member, program, exercise or workout
+ * session data. It is a template print only and is never saved anywhere.
+ */
+export const createBlankWorkoutPrintDocument = (printDate: Date = new Date()): WorkoutPrintDocument => ({
+  kind: "blank-workout-log",
+  templateKey: PRINT_TEMPLATE_KEY,
+  templateVersion: PRINT_TEMPLATE_VERSION,
+  format: PRINT_FORMAT,
+  workoutSessionId: "",
+  bodyParts: [],
+  member: { memberId: "" as ProfileId, name: "" },
+  program: {
+    programId: "" as ProgramId,
+    title: "",
+    category: "CUSTOM",
+    categoryLabel: "",
+    difficulty: "GENERAL",
+    difficultyLabel: "",
+    memo: "",
+    exercises: [],
+  },
+  printDate,
+  layout: {
+    density: "standard",
+    exerciseCount: 0,
+    minimumRowCount: PRINT_EXERCISE_ROW_COUNT,
+    topBindingSafeAreaMm: A5_WORKOUT_TOP_BINDING_SAFE_AREA_MM,
+    showExerciseMemo: false,
+    setLayout: "five-set",
+  },
+  rows: Array.from({ length: PRINT_EXERCISE_ROW_COUNT }, (_, index) => ({
+    order: index + 1,
+    exerciseName: "",
+    exerciseMemo: "",
+    memberWhy: "",
+    configuredSets: null,
+    isBlank: true,
+  })),
+});

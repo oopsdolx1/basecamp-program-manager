@@ -8,17 +8,19 @@ interface WorkoutPrintTemplateV1Props {
 }
 
 export const WorkoutPrintTemplateV1 = ({ document }: WorkoutPrintTemplateV1Props): JSX.Element => {
+  // A blank workout log keeps every label and line of the template but prints no session data or QR.
+  const isBlankLog = document.kind === "blank-workout-log";
   const runtimeBodyParts = document.bodyParts.map((value) => value.trim().replace(/[_\s]*\([^)]*\)$/u, "")).filter(Boolean);
   const bodyPartText = runtimeBodyParts.length > 0 ? runtimeBodyParts.join(" · ") : document.program.categoryLabel;
   const hasPointColumn = document.layout.setLayout === "four-set-with-note";
   const setLabels = Array.from({ length: document.layout.setLayout === "five-set" ? 5 : 4 }, (_, index) => index + 1);
   return (
-    <article className="a5-workout-document" aria-label="A5 가로 운동 일지" data-layout-density={document.layout.density} data-top-binding-safe-mm={document.layout.topBindingSafeAreaMm} style={{ "--a5-binding-safe-area": `${document.layout.topBindingSafeAreaMm}mm`, "--a5-exercise-row-count": document.rows.length } as CSSProperties}>
+    <article className="a5-workout-document" aria-label="A5 가로 운동 일지" data-document-kind={document.kind ?? "workout-session"} data-layout-density={document.layout.density} data-top-binding-safe-mm={document.layout.topBindingSafeAreaMm} style={{ "--a5-binding-safe-area": `${document.layout.topBindingSafeAreaMm}mm`, "--a5-exercise-row-count": document.rows.length } as CSSProperties}>
       <header className="print-header">
         <div className="print-brand-block">
           <div className="print-logo">BASECAMP</div>
           <div className="print-member-name"><strong>회원명 :</strong><span>{document.member.name}</span></div>
-          <div className="print-workout-date"><strong>운동일 :</strong><span>{formatPrintDate(document.printDate)}.</span></div>
+          <div className="print-workout-date"><strong>운동일 :</strong><span>{isBlankLog ? "" : `${formatPrintDate(document.printDate)}.`}</span></div>
           <div className="print-program-name"><strong>프로그램 :</strong><span>{document.program.title}</span></div>
         </div>
         <div className="print-meta-grid" aria-label="운동 정보">
@@ -37,10 +39,14 @@ export const WorkoutPrintTemplateV1 = ({ document }: WorkoutPrintTemplateV1Props
             <i>km</i>
           </div>
         </div>
-        <div className="print-session-code" aria-label={`Workout Session ${document.workoutSessionId}`}>
-          <QRCodeSVG value={document.workoutSessionId} size={68} level="M" marginSize={0} />
-          <span>{document.workoutSessionId}</span>
-        </div>
+        {isBlankLog ? (
+          <div className="print-session-code print-session-code-empty" aria-hidden="true" />
+        ) : (
+          <div className="print-session-code" aria-label={`Workout Session ${document.workoutSessionId}`}>
+            <QRCodeSVG value={document.workoutSessionId} size={68} level="M" marginSize={0} />
+            <span>{document.workoutSessionId}</span>
+          </div>
+        )}
       </header>
 
       <section className="exercise-print-table" aria-label="운동 기록표" role="table">
@@ -54,7 +60,7 @@ export const WorkoutPrintTemplateV1 = ({ document }: WorkoutPrintTemplateV1Props
             return (
               <div className={`exercise-row ${hasPointColumn ? "four-set-row" : "five-set-row"}`} key={row.order} role="row">
                 <div className="exercise-name-cell" role="cell">
-                  <div className="exercise-title" title={row.isBlank ? undefined : row.exerciseName}>{row.isBlank ? "" : `${row.order}. ${row.exerciseName}`}</div>
+                  <div className="exercise-title" title={row.isBlank ? undefined : row.exerciseName}>{row.isBlank ? (isBlankLog ? `${row.order}.` : "") : `${row.order}. ${row.exerciseName}`}</div>
                 </div>
                 {hasPointColumn ? <div className="exercise-point-cell" role="cell"><span className="exercise-point-text">{row.isBlank ? "" : row.exerciseMemo.trim() || "—"}</span></div> : null}
                 {setLabels.map((setNumber) => <div className="set-cell" key={setNumber} role="cell"><span className="set-writing-fields"><span /><span /><span /></span></div>)}

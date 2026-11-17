@@ -1,7 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { PageContainer } from "../components/layout/PageContainer";
 import { MasterPage } from "../features/master";
-import { PrintPreviewPage, QuickPrintPage } from "../features/printing";
+import { BlankWorkoutLogPrintPage, PrintPreviewPage, QuickPrintPage } from "../features/printing";
 import { WorkoutSessionDetailPage, WorkoutSessionsPage } from "../features/workout-sessions";
 import { routeBuilder } from "./routeBuilder";
 import { routes } from "./routes";
@@ -29,6 +29,7 @@ export const AppRouter = (): JSX.Element => (
     <Route path={routes.editProgram} element={<Navigate replace to={routeBuilder.print()} />} />
     <Route path={routes.printPreview} element={<PrintPreviewPage />} />
     <Route path={routes.printPreviewSession} element={<PrintPreviewPage />} />
+    <Route path={routes.blankWorkoutLogPrint} element={<BlankWorkoutLogPrintPage />} />
     <Route path={routes.printHistory} element={<LegacyPrintHistoryRedirect />} />
     <Route path={routes.workoutSessions} element={<WorkoutSessionsPage />} />
     <Route path={routes.workoutSessionDetail} element={<WorkoutSessionDetailPage />} />

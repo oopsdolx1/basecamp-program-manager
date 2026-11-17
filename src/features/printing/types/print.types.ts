@@ -37,7 +37,15 @@ export interface PrintExerciseRow {
   isBlank: boolean;
 }
 
+/**
+ * `blank-workout-log` is a handwriting template: the A5 layout with no member,
+ * program, exercise or workout session data and no QR. It is never persisted.
+ * Omitted means a regular workout-session document.
+ */
+export type WorkoutPrintDocumentKind = "workout-session" | "blank-workout-log";
+
 export interface WorkoutPrintDocument {
+  kind?: WorkoutPrintDocumentKind;
   templateKey: "basecamp-workout-log-v1";
   templateVersion: 1;
   format: "A5-landscape";

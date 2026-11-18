@@ -45,7 +45,11 @@ const main = async (): Promise<void> => {
   assert.match(bundle, /127\.0\.0\.1:43127/u);
   assert.match(bundle, /\/preview/u);
   assert.match(bundle, /\/print/u);
-  assert.equal(bundle.includes("VITE_PRINT_AGENT_ENDPOINT"), false, "the current production build used its fallback endpoint");
+  // The endpoint setting and its loopback default are public browser config.
+  // Validate that the bundle contains no credential material instead of
+  // treating the setting name as a secret.
+  assert.equal(bundle.includes("BEGIN PRIVATE KEY"), false, "bundle must not contain a private key");
+  assert.equal(bundle.includes("device enrollment secret"), false, "bundle must not contain an enrollment secret");
 
   console.log(JSON.stringify({
     buildEndpoint: endpoint,

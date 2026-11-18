@@ -37,7 +37,9 @@ const firebaseConfig = {
   ),
 };
 
-const PRODUCTION_PROJECT_ID = "basecamp-40f23";
+// The kiosk browser is bound to the current BaseCamp production project. Keep
+// this explicit so an accidental old-project build fails closed in emulator mode.
+const PRODUCTION_PROJECT_ID = "basecamp-c1710";
 const runtimeEnv = import.meta.env as Record<string, string | undefined> | undefined;
 
 /** Local Firebase Emulator target. Only when VITE_FIREBASE_USE_EMULATOR=true, never with the production project. */

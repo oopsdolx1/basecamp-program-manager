@@ -1,144 +1,56 @@
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  onSnapshot,
-  serverTimestamp,
-  setDoc,
-  updateDoc,
-  type DocumentData,
-} from "firebase/firestore";
-import { getFirebaseAuth } from "../../../firebase/firebaseAuth";
-import { getFirestoreClient } from "../../../firebase/firestoreClient";
-import { programsCollectionPath } from "../../../firebase/firestorePaths";
 import type { AppId, ProgramId } from "../../../types/brandedIds";
-import { toProgramId } from "../../../types/brandedIds";
-import { formExerciseToPayload, mapProgramDocument } from "../mappers/programMapper";
+import { mapProgramDocument } from "../mappers/programMapper";
+import { createFirebaseKioskDeviceIdentity } from "../../kiosk-recommendations/kioskFirebaseIdentity";
+import { KioskApiError, resolveKioskApiBaseUrl } from "../../kiosk-recommendations/kioskRecommendationClient";
 import type { Program, ProgramFormValues } from "../types/program.types";
 import type { ProgramRepository } from "./programRepository.types";
 
-const programCollection = (appId: AppId) =>
-  collection(getFirestoreClient(), programsCollectionPath(appId));
+const kioskPrograms = async (): Promise<Program[]> => {
+  const env = import.meta.env as Record<string, string | undefined>;
+  const baseUrl = resolveKioskApiBaseUrl(env.VITE_BASECAMP_API_BASE_URL, typeof window === "undefined" ? undefined : window.location.origin);
+  if (!baseUrl) throw new KioskApiError("KIOSK_API_NOT_CONFIGURED", 0);
+  const token = await createFirebaseKioskDeviceIdentity().getIdToken();
+  if (!token) throw new KioskApiError("KIOSK_DEVICE_NOT_ENROLLED", 0);
+  const response = await fetch(`${baseUrl}/v1/kiosk/programs`, { headers: { authorization: `Bearer ${token}` } });
+  const body = await response.json().catch(() => null) as { programs?: Array<Record<string, unknown>>; error?: { code?: string } } | null;
+  if (!response.ok || !Array.isArray(body?.programs)) throw new KioskApiError(body?.error?.code ?? "INVALID_API_RESPONSE", response.status);
+  return body.programs.map((program) => mapProgramDocument(String(program.id ?? ""), { ...program, createdAt: new Date(Number(program.createdAt) || 0), updatedAt: new Date(Number(program.updatedAt) || 0), ...(program.lastUsedAt ? { lastUsedAt: new Date(Number(program.lastUsedAt)) } : {}) } as never));
+};
 
-const programDocument = (appId: AppId, programId: ProgramId) =>
-  doc(getFirestoreClient(), programsCollectionPath(appId), programId);
-
-const currentUserId = (): string | null => getFirebaseAuth().currentUser?.uid ?? null;
-
-const toCreatePayload = (programId: ProgramId, values: ProgramFormValues): Record<string, unknown> => ({
-  id: programId,
-  schemaVersion: 1,
-  title: values.title.trim(),
-  category: values.category,
-  difficulty: values.difficulty,
-  memo: values.memo.trim(),
-  favorite: values.favorite,
-  usageCount: 0,
-  lastUsedAt: null,
-  createdBy: currentUserId(),
-  updatedBy: currentUserId(),
-  isArchived: false,
-  exercises: values.exercises.map(formExerciseToPayload),
-  createdAt: serverTimestamp(),
-  updatedAt: serverTimestamp(),
-});
-
-const toUpdatePayload = (values: ProgramFormValues): Record<string, unknown> => ({
-  title: values.title.trim(),
-  category: values.category,
-  difficulty: values.difficulty,
-  memo: values.memo.trim(),
-  favorite: values.favorite,
-  exercises: values.exercises.map(formExerciseToPayload),
-  updatedBy: currentUserId(),
-  updatedAt: serverTimestamp(),
-});
+const unavailable = async (): Promise<never> => { throw new Error("Kiosk program mutation is unavailable."); };
 
 export const programRepository: ProgramRepository = {
-  async getPrograms(appId) {
-    const snapshot = await getDocs(programCollection(appId));
-    return snapshot.docs.map((documentSnapshot) =>
-      mapProgramDocument(documentSnapshot.id, documentSnapshot.data()),
-    );
-  },
+  async getPrograms(_appId) { return kioskPrograms(); },
 
   subscribePrograms(appId, callback, onError) {
-    return onSnapshot(
-      programCollection(appId),
-      (snapshot) => {
-        const programs = snapshot.docs.map((documentSnapshot) =>
-          mapProgramDocument(documentSnapshot.id, documentSnapshot.data()),
-        );
-        callback(programs);
-      },
-      (error) => onError(`${error.code}: ${error.message}`),
-    );
+    void appId;
+    let active = true;
+    void kioskPrograms().then((programs) => { if (active) callback(programs); }).catch((error: unknown) => { if (active) onError(error instanceof Error ? error.message : "PROGRAM_READ_FAILED"); });
+    return () => { active = false; };
   },
 
   async getProgram(appId, programId) {
-    const snapshot = await getDoc(programDocument(appId, programId));
-    if (!snapshot.exists()) {
-      return null;
-    }
-
-    return mapProgramDocument(snapshot.id, snapshot.data() as DocumentData);
+    void appId;
+    return (await kioskPrograms()).find((program) => program.id === programId) ?? null;
   },
 
   async createProgram(appId, values) {
-    const documentRef = doc(programCollection(appId));
-    const programId = toProgramId(documentRef.id);
-    await setDoc(documentRef, toCreatePayload(programId, values));
-    return programId;
+    void appId; void values; return unavailable();
   },
 
   async updateProgram(appId, programId, values) {
-    await updateDoc(programDocument(appId, programId), toUpdatePayload(values));
+    void appId; void programId; void values; return unavailable();
   },
 
   async archiveProgram(appId, programId) {
-    await updateDoc(programDocument(appId, programId), {
-      isArchived: true,
-      updatedBy: currentUserId(),
-      updatedAt: serverTimestamp(),
-    });
+    void appId; void programId; return unavailable();
   },
 
   async duplicateProgram(appId, source, title) {
-    const documentRef = doc(programCollection(appId));
-    const programId = toProgramId(documentRef.id);
-    await setDoc(documentRef, {
-      id: programId,
-      schemaVersion: 1,
-      title,
-      category: source.category,
-      difficulty: source.difficulty ?? "GENERAL",
-      memo: source.memo ?? "",
-      favorite: false,
-      usageCount: 0,
-      lastUsedAt: null,
-      createdBy: currentUserId(),
-      updatedBy: currentUserId(),
-      isArchived: false,
-      exercises: source.exercises.map((exercise) => ({
-        id: crypto.randomUUID(),
-        name: exercise.name,
-        sets: exercise.sets,
-        memo: exercise.memo ?? "",
-        order: exercise.order,
-        ...(exercise.catalogExerciseId ? { catalogExerciseId: exercise.catalogExerciseId } : {}),
-      })),
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-    return programId;
+    void appId; void source; void title; return unavailable();
   },
 
   async restoreProgram(appId, programId) {
-    await updateDoc(programDocument(appId, programId), {
-      isArchived: false,
-      updatedBy: currentUserId(),
-      updatedAt: serverTimestamp(),
-    });
+    void appId; void programId; return unavailable();
   },
 };

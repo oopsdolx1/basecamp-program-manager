@@ -1,6 +1,5 @@
-import { doc, onSnapshot } from "firebase/firestore";
-import { ensureFirebaseAuth } from "../firebase/firebaseAuth";
-import { getFirestoreClient } from "../firebase/firestoreClient";
+import { createFirebaseKioskDeviceIdentity } from "../features/kiosk-recommendations/kioskFirebaseIdentity";
+import { KioskApiError, resolveKioskApiBaseUrl } from "../features/kiosk-recommendations/kioskRecommendationClient";
 import {
   countRawSnapshotItems,
   createSharedRuntimeSnapshotStore,
@@ -39,15 +38,12 @@ export interface SharedExerciseKnowledge {
 type RuntimeSnapshot = SharedRuntimeSnapshot<SharedExerciseKnowledge>;
 
 const appId = (import.meta.env.VITE_CONDITION_LAB_APP_ID ?? "").trim();
-const projectId = (import.meta.env.VITE_FIREBASE_PROJECT_ID ?? "").trim();
-const runtimePath = `artifacts/${appId}/public/data/sharedKnowledgeRuntime/current`;
 const listeners = new Set<() => void>();
 let exercises: SharedExerciseKnowledge[] = [];
 let byId = new Map<string, SharedExerciseKnowledge>();
 let revision = 0;
 let connectionStatus: "loading" | "ready" | "error" = "loading";
 let connectionError = "";
-let unsubscribeRemote: (() => void) | null = null;
 let startPromise: Promise<void> | null = null;
 
 const normalize = (value: unknown): string => String(value ?? "")
@@ -73,18 +69,7 @@ const replaceSnapshot = (snapshot: RuntimeSnapshot) => {
   revision = snapshot.revision;
   connectionStatus = "ready";
   connectionError = "";
-  console.info(`[ProgramManager Hydration] Runtime count=${exercises.length}`, {
-    documentExists: true,
-    projectId,
-    appId,
-    documentPath: runtimePath,
-    revision,
-    firestoreCount: snapshot.exerciseCount,
-    receivedCount: snapshot.items.length,
-    catalogCount: exercises.length,
-    runtimeCount: exercises.length,
-    exerciseIds: exercises.map(({ id }) => id),
-  });
+  console.info(`[ProgramManager Hydration] Runtime count=${exercises.length}`, { revision });
   notify();
 };
 
@@ -92,53 +77,15 @@ const start = (): Promise<void> => {
   if (startPromise) return startPromise;
   startPromise = (async () => {
     if (!appId) throw new Error("VITE_CONDITION_LAB_APP_ID is required for Shared Runtime.");
-    await ensureFirebaseAuth();
-    unsubscribeRemote = onSnapshot(doc(getFirestoreClient(), runtimePath), (snapshot) => {
-      if (!snapshot.exists()) {
-        if ((snapshotStore.getCurrent()?.items.length ?? 0) > 0) {
-          connectionStatus = "error";
-          connectionError = "Shared Runtime document is missing; retaining the last successful snapshot.";
-          notify();
-          console.error("[ProgramManager Runtime] Shared Runtime document is missing; retaining the last successful snapshot.");
-          return;
-        }
-        exercises = []; byId = new Map(); revision = 0; connectionStatus = "ready"; connectionError = ""; notify();
-        console.info("[SharedRuntime Receive]", {
-          documentExists: false, projectId, appId, documentPath: runtimePath, revision: 0, receivedCount: 0, exerciseIds: [],
-        });
-        return;
-      }
-      const raw = snapshot.data();
-      console.info(`[ProgramManager Hydration] Raw Firestore count=${countRawSnapshotItems(raw) ?? "invalid"}`, {
-        count: countRawSnapshotItems(raw),
-        keys: Object.keys(raw),
-      });
-      let value: RuntimeSnapshot;
-      try {
-        value = snapshotStore.apply(raw);
-      } catch (caught) {
-        connectionStatus = "error";
-        connectionError = caught instanceof Error ? caught.message : String(caught);
-        console.error("[ProgramManager Runtime] Invalid Shared Runtime document; retaining the last successful snapshot.", caught);
-        notify();
-        return;
-      }
-      console.info(`[ProgramManager Hydration] Snapshot Store count=${snapshotStore.getCurrent()?.items.length ?? 0}`, {
-        count: snapshotStore.getCurrent()?.items.length ?? 0,
-        revision: value.revision,
-      });
-      console.info(`[ProgramManager Hydration] Normalized count=${value.items.length}`, {
-        count: value.items.length,
-        exerciseCount: value.exerciseCount,
-        exerciseIds: value.items.map(({ id }) => id),
-      });
-      replaceSnapshot(value);
-    }, (error) => {
-      connectionStatus = "error";
-      connectionError = error.message;
-      console.error("[ProgramManager Runtime] Subscription failed; retaining the last successful snapshot.", error);
-      notify();
-    });
+    const env = import.meta.env as Record<string, string | undefined>;
+    const baseUrl = resolveKioskApiBaseUrl(env.VITE_BASECAMP_API_BASE_URL, typeof window === "undefined" ? undefined : window.location.origin);
+    if (!appId || !baseUrl) throw new Error("Kiosk API is required for Shared Runtime.");
+    const token = await createFirebaseKioskDeviceIdentity().getIdToken();
+    if (!token) throw new KioskApiError("KIOSK_DEVICE_NOT_ENROLLED", 0);
+    const response = await fetch(`${baseUrl}/v1/kiosk/shared-knowledge-runtime`, { headers: { authorization: `Bearer ${token}` } });
+    const body = await response.json().catch(() => null) as { runtime?: unknown; error?: { code?: string } } | null;
+    if (!response.ok || !body?.runtime) throw new KioskApiError(body?.error?.code ?? "INVALID_API_RESPONSE", response.status);
+    replaceSnapshot(snapshotStore.apply(body.runtime));
   })().catch((error) => {
     startPromise = null;
     connectionStatus = "error";
@@ -160,7 +107,7 @@ const select = (ids: string[]) => ids.map((id) => byId.get(id)).filter((item): i
 
 export const programManagerRuntime = Object.freeze({
   start,
-  stop: () => { unsubscribeRemote?.(); unsubscribeRemote = null; startPromise = null; },
+  stop: () => { startPromise = null; },
   subscribe(listener: () => void) { listeners.add(listener); void start(); return () => { listeners.delete(listener); }; },
   getRevision: () => revision,
   getStatus: () => connectionStatus,

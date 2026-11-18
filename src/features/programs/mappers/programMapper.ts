@@ -1,4 +1,3 @@
-import { Timestamp, type DocumentData } from "firebase/firestore";
 import { toProgramId } from "../../../types/brandedIds";
 import { getCategoryLabel, getDifficultyLabel, normalizeProgramCategory } from "../config/programOptions";
 import type {
@@ -21,8 +20,8 @@ const asBoolean = (value: unknown, fallback: boolean): boolean =>
   typeof value === "boolean" ? value : fallback;
 
 const asDate = (value: unknown): Date => {
-  if (value instanceof Timestamp) {
-    return value.toDate();
+  if (value && typeof value === "object" && "toDate" in value && typeof (value as { toDate?: unknown }).toDate === "function") {
+    return (value as { toDate: () => Date }).toDate();
   }
 
   if (value instanceof Date) {
@@ -65,10 +64,10 @@ const mapExercise = (value: unknown, index: number): ProgramExercise | null => {
   };
 };
 
-const hasRecoveryMarker = (data: DocumentData): boolean =>
+const hasRecoveryMarker = (data: Record<string, unknown>): boolean =>
   [data.title, data.memo].some((value) => typeof value === "string" && /(recovery|리커버리|회복)/iu.test(value));
 
-const resolveProgramCategory = (data: DocumentData): ProgramCategory => {
+const resolveProgramCategory = (data: Record<string, unknown>): ProgramCategory => {
   const category = normalizeProgramCategory(data.category);
   const explicitTarget = [data.workoutGoal, data.goal, data.target, data.bodyPart, data.programTarget]
     .map(normalizeProgramCategory)
@@ -81,7 +80,7 @@ const resolveProgramCategory = (data: DocumentData): ProgramCategory => {
   return explicitTarget ?? category ?? "ETC";
 };
 
-export const mapProgramDocument = (documentId: string, data: DocumentData): Program => {
+export const mapProgramDocument = (documentId: string, data: Record<string, unknown>): Program => {
   const exercises = Array.isArray(data.exercises)
     ? data.exercises
         .map((exercise, index) => mapExercise(exercise, index))

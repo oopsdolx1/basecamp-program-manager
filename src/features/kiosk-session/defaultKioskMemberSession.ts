@@ -8,13 +8,13 @@ export interface KioskMemberSessionRuntime { client: KioskMemberSessionClient; s
 let runtime: KioskMemberSessionRuntime | null | undefined;
 /**
  * The browser's single Kiosk member-session runtime (one manager per page, memory only).
- * Null when `VITE_CONDITION_LAB_API_BASE_URL` is unset/invalid: then no session can be issued and
+ * Null when `VITE_BASECAMP_API_BASE_URL` is unset/invalid: then no session can be issued and
  * workout sessions cannot be saved (there is deliberately no Client SDK fallback).
  */
 export const getDefaultKioskMemberSessionRuntime = (): KioskMemberSessionRuntime | null => {
   if (runtime !== undefined) return runtime;
   const env = import.meta.env as Record<string, string | undefined> | undefined;
-  const baseUrl = resolveKioskApiBaseUrl(env?.VITE_CONDITION_LAB_API_BASE_URL, typeof window === "undefined" ? undefined : window.location.origin);
+  const baseUrl = resolveKioskApiBaseUrl(env?.VITE_BASECAMP_API_BASE_URL, typeof window === "undefined" ? undefined : window.location.origin);
   if (!baseUrl) { runtime = null; return runtime; }
   const client = createKioskMemberSessionClient({ baseUrl, device: createFirebaseKioskDeviceIdentity() });
   runtime = { client, sessions: createKioskMemberSessionManager({ client }) };

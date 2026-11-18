@@ -1,9 +1,6 @@
-import { collection, doc, getDoc, onSnapshot, type FirestoreError, type QuerySnapshot } from "firebase/firestore";
-import { profilesCollectionPath } from "../../../firebase/firestorePaths";
-import { getFirestoreClient } from "../../../firebase/firestoreClient";
 import { getDefaultKioskMemberSessionRuntime } from "../../kiosk-session/defaultKioskMemberSession";
 import { withKioskMemberSession } from "../../kiosk-session/kioskSessionRenewal";
-import type { AppId, ProfileId } from "../../../types/brandedIds";
+import { toProfileId, type AppId, type ProfileId } from "../../../types/brandedIds";
 import type { RepositoryError } from "../../../types/common.types";
 import { mapProfileDocument, toMemberSelectionItem } from "../mappers/profileMapper";
 import { sortMembersByName } from "../services/memberService";
@@ -35,55 +32,16 @@ const emptyDiagnostics = (): MemberReadDiagnostics => ({
   legacyNoteFallbacks: 0,
 });
 
-const toRepositoryError = (error: FirestoreError): RepositoryError => ({
-  userMessage: "회원 목록을 읽지 못했습니다. Firebase 연결과 권한을 확인해 주세요.",
-  developerMessage: `${error.code}: ${error.message}`,
-});
-
-const mapSnapshot = (snapshot: QuerySnapshot): SubscribeMembersResult => {
+const mapDirectory = (directory: Array<{ memberId: string; name: string }>): SubscribeMembersResult => {
   const diagnostics = emptyDiagnostics();
-  const members: MemberSelectionItem[] = [];
-
-  snapshot.forEach((documentSnapshot) => {
+  const members = directory.map(({ memberId, name }) => {
     diagnostics.totalDocuments += 1;
-
-    const profile = mapProfileDocument(
-      documentSnapshot.id,
-      documentSnapshot.data() as RawProfileDocument,
-    );
-
-    if (!profile.role) {
-      diagnostics.missingRole += 1;
-    }
-
-    if (!profile.name) {
-      diagnostics.missingName += 1;
-    }
-
-    if (profile.warnings.some((warning) => warning.code === "id-mismatch")) {
-      diagnostics.idMismatches += 1;
-    }
-
-    if (profile.legacyAliases.includes("contact")) {
-      diagnostics.legacyContactFallbacks += 1;
-    }
-
-    if (profile.legacyAliases.includes("note")) {
-      diagnostics.legacyNoteFallbacks += 1;
-    }
-
-    // Condition Lab treats missing role as a legacy member; explicit non-member roles stay hidden.
-    if (profile.role && profile.role !== "member") {
-      diagnostics.excludedByRole += 1;
-      return;
-    }
-
-    if (!profile.name) {
-      return;
-    }
-
     diagnostics.memberDocuments += 1;
-    members.push(toMemberSelectionItem(profile));
+    return {
+      memberId: toProfileId(memberId),
+      displayName: name,
+      searchText: name.normalize("NFKC").toLocaleLowerCase("ko-KR"),
+    } satisfies MemberSelectionItem;
   });
 
   return {
@@ -96,14 +54,22 @@ export const subscribeMembers = (
   params: SubscribeMembersParams,
   callbacks: SubscribeMembersCallbacks,
 ): (() => void) => {
-  const firestore = getFirestoreClient();
-  const collectionRef = collection(firestore, profilesCollectionPath(params.appId));
-
-  return onSnapshot(
-    collectionRef,
-    (snapshot) => callbacks.next(mapSnapshot(snapshot)),
-    (error) => callbacks.error(toRepositoryError(error)),
-  );
+  // The API intentionally returns only the device-scoped member directory; raw
+  // profile documents remain server-side. This read has no Client SDK fallback.
+  void params;
+  let active = true;
+  const runtime = getDefaultKioskMemberSessionRuntime();
+  if (!runtime) {
+    callbacks.error({ userMessage: "회원 목록을 읽지 못했습니다. 키오스크 API 설정을 확인해 주세요.", developerMessage: "KIOSK_API_NOT_CONFIGURED" });
+    return () => undefined;
+  }
+  void runtime.client.listMembers()
+    .then((directory) => { if (active) callbacks.next(mapDirectory(directory)); })
+    .catch((error: unknown) => {
+      if (!active) return;
+      callbacks.error({ userMessage: "회원 목록을 읽지 못했습니다. 키오스크 연결과 기기 등록을 확인해 주세요.", developerMessage: error instanceof Error ? error.message : "KIOSK_MEMBER_DIRECTORY_FAILED" });
+    });
+  return () => { active = false; };
 };
 
 export const getMemberById = async (

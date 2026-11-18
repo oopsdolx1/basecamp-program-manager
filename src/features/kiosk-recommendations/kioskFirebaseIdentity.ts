@@ -43,11 +43,11 @@ export const createFirebaseKioskDeviceIdentity = (): KioskDeviceIdentity => {
 };
 
 let defaultClient: KioskRecommendationClient | null | undefined;
-/** Null when `VITE_CONDITION_LAB_API_BASE_URL` is unset or invalid: the Kiosk keeps its existing flow. */
+/** Null when `VITE_BASECAMP_API_BASE_URL` is unset or invalid: the Kiosk fails closed. */
 export const getDefaultKioskRecommendationClient = (): KioskRecommendationClient | null => {
   if (defaultClient !== undefined) return defaultClient;
   const env = import.meta.env as Record<string, string | undefined> | undefined;
-  const baseUrl = resolveKioskApiBaseUrl(env?.VITE_CONDITION_LAB_API_BASE_URL, typeof window === "undefined" ? undefined : window.location.origin);
+  const baseUrl = resolveKioskApiBaseUrl(env?.VITE_BASECAMP_API_BASE_URL, typeof window === "undefined" ? undefined : window.location.origin);
   defaultClient = baseUrl ? createKioskRecommendationClient({ baseUrl, device: createFirebaseKioskDeviceIdentity() }) : null;
   return defaultClient;
 };

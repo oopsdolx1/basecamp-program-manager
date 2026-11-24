@@ -4,8 +4,9 @@
  * Starts the Condition Lab Kiosk API on localhost, runs the Program Manager Vite dev server against
  * the Firebase Emulator, and drives the real Kiosk UI in Chrome. Selecting a member calls
  * GET /v1/kiosk/members/{memberId}/default-workout-program (device-only identity) and shows that
- * member's active default; 추천대로 운동하기 / 수정해서 사용 / 직접 구성하기 reach the existing workout-session +
- * print preview flow. The Trainer handoff API stays available and is not consumed by this flow.
+ * member's active default. The lookup starts on member selection and is offered once per flow as a popup on the
+ * condition step (step 2): 추천 프로그램 사용 reaches the existing workout-session + print preview flow, 다른 운동 선택
+ * keeps the existing condition step. Step 2 -> 3 waits for a slow lookup; a late response for a previous member is dropped. The Trainer handoff API stays available and is not consumed by this flow.
  * Phase 2: selecting a member opens a Kiosk member session (POST /v1/kiosk/sessions) and the workout
  * session is saved only through POST /v1/kiosk/workout-sessions with that session (no Client SDK write).
  * Phase 3-B: the preview prints through a test Windows agent and records the print only through
@@ -45,7 +46,7 @@ const [{ createEmulatorAdminTokenVerifier }, { createEmulatorFirestoreContext },
 const [{ createKioskDeviceEnrollment }, deviceHttp, { createKioskPrintRecorder }] = await Promise.all([load('server/kiosk/kioskDeviceEnrollment.js'), load('server/http/kioskDeviceAuthHttpAdapter.js'), load('server/kiosk/kioskPrintRecordHandler.js')]);
 const AGENT_PORT = 43192;
 const requestedScenario = process.argv.find((argument) => argument.startsWith('--scenario='))?.slice('--scenario='.length)?.toUpperCase() ?? null;
-if (requestedScenario && !/^[A-M]$/.test(requestedScenario)) throw new Error(`Unknown scenario selector: ${requestedScenario}`);
+if (requestedScenario && !/^[A-P]$/.test(requestedScenario)) throw new Error(`Unknown scenario selector: ${requestedScenario}`);
 
 const prefix = `pm_e2e_${Date.now()}`;
 const resultsFile = path.join(PM_ROOT, 'outputs', 'e2e-results', `${prefix}.json`);
@@ -54,8 +55,8 @@ const adminUid = `${prefix}_admin`; const trainerUid = `${prefix}_trainer`; cons
 const gDeviceId = `${prefix}_kiosk_g`;
 // Phase 3-E: I revokes its own dedicated device, so the shared device is never left revoked for later scenarios.
 const iDeviceId = `${prefix}_kiosk_i`;
-const memberA = `${prefix}_a`; const memberB = `${prefix}_b`; const memberC = `${prefix}_c`;
-const programIds = { aDefault: `${prefix}_pa`, aSecond: `${prefix}_pa2`, aArchived: `${prefix}_parch`, b: `${prefix}_pb` };
+const memberA = `${prefix}_a`; const memberB = `${prefix}_b`; const memberC = `${prefix}_c`; const memberD = `${prefix}_d`;
+const programIds = { d: `${prefix}_pd`, aDefault: `${prefix}_pa`, aSecond: `${prefix}_pa2`, aArchived: `${prefix}_parch`, b: `${prefix}_pb` };
 const verifier = createEmulatorAdminTokenVerifier({ projectId: PROJECT_ID, authEmulatorHost: AUTH_HOST, appName: `${prefix}_auth` });
 const { db } = createEmulatorFirestoreContext({ projectId: PROJECT_ID, firestoreEmulatorHost: FIRESTORE_HOST, appName: `${prefix}_fs` });
 const issuance = createTrustedIssuance({ auth: verifier.auth, db, trustedIssuerUids: [adminUid], approvedTrainerUids: [trainerUid] });
@@ -75,11 +76,11 @@ process.on('uncaughtException', (error) => console.error('[e2e] uncaughtExceptio
 process.on('beforeExit', (code) => console.log(`[e2e] beforeExit code=${code}`));
 process.on('exit', (code) => console.log(`[e2e] exit code=${code}`));
 const step = async (name, fn) => {
-  const scenario = name.match(/^([A-M])\./)?.[1];
+  const scenario = name.match(/^([A-P])\./)?.[1];
   if (requestedScenario && scenario !== requestedScenario) { console.log(`SKIP ${name} (--scenario=${requestedScenario})`); return; }
   const started = Date.now(); console.log(`START ${name}`); try { await fn(); results.push({ name, ok: true, durationMs: Date.now() - started }); await persistResults(); console.log(`PASS ${name} (${Date.now() - started}ms)`); } catch (error) { results.push({ name, ok: false, durationMs: Date.now() - started, error: error?.stack ?? error?.message ?? String(error) }); await persistResults(); console.log(`FAIL ${name} — ${String(error?.message ?? error).split(String.fromCharCode(10))[0]}`); throw error; }
 };
-const EXPECTED_STEPS = requestedScenario ? 1 : 13;
+const EXPECTED_STEPS = requestedScenario ? 1 : 16;
 const kioskSessionsOf = async () => (await db.collection(`artifacts/${APP_ID}/private/data/kioskSessions`).where('deviceId', '==', deviceId).get()).docs.map((doc) => doc.data());
 const until = async (label, predicate, timeout = 15_000) => { const end = Date.now() + timeout; for (;;) { const value = await predicate(); if (value) return value; if (Date.now() > end) throw new Error(`timed out: ${label}`); await new Promise((resolve) => setTimeout(resolve, 250)); } };
 
@@ -98,20 +99,20 @@ const cleanup = async () => {
   const privateData = `artifacts/${APP_ID}/private/data`;
   const [handoffs, workoutSessions, prints, ...kioskSessionDocs] = await Promise.all([
     db.collection('authKioskHandoffs').where('deviceId', '==', deviceId).get(),
-    db.collection(`artifacts/${APP_ID}/public/data/workoutSessions`).where('memberId', 'in', [memberA, memberB]).get(),
-    db.collection(`artifacts/${APP_ID}/public/data/printHistory`).where('memberId', 'in', [memberA, memberB]).get().catch(() => ({ docs: [] })),
+    db.collection(`artifacts/${APP_ID}/public/data/workoutSessions`).where('memberId', 'in', [memberA, memberB, memberD]).get(),
+    db.collection(`artifacts/${APP_ID}/public/data/printHistory`).where('memberId', 'in', [memberA, memberB, memberD]).get().catch(() => ({ docs: [] })),
     ...['kioskSessions', 'kioskSessionAudit', 'kioskSessionDevices'].flatMap((name) => [deviceId, gDeviceId, iDeviceId].map((id) => db.collection(`${privateData}/${name}`).where('deviceId', '==', id).get())),
   ]);
   await Promise.all([
     ...handoffs.docs.map((doc) => doc.ref.delete()), ...workoutSessions.docs.map((doc) => doc.ref.delete()), ...prints.docs.map((doc) => doc.ref.delete()), ...kioskSessionDocs.flatMap((snapshot) => snapshot.docs).map((doc) => doc.ref.delete()),
-    ...Object.values(programIds).map((id) => program(id).delete()), profile(memberA).delete(), profile(memberB).delete(), profile(memberC).delete(),
+    ...Object.values(programIds).map((id) => program(id).delete()), profile(memberA).delete(), profile(memberB).delete(), profile(memberC).delete(), profile(memberD).delete(),
     issuance.paths.device(deviceId).delete().catch(() => {}), issuance.paths.device(gDeviceId).delete().catch(() => {}), issuance.paths.device(iDeviceId).delete().catch(() => {}),
     ...[adminUid, trainerUid, `kiosk:${deviceId}`, `kiosk:${gDeviceId}`, `kiosk:${iDeviceId}`].map((uid) => verifier.auth.deleteUser(uid).catch(() => {})),
     previousKnowledge ? knowledge.set(previousKnowledge) : knowledge.delete(),
   ]);
 };
 // Watchdog: always clean up (Vite child, API server, Emulator fixtures) even if a step hangs.
-const watchdog = setTimeout(async () => { console.error('E2E watchdog: exceeded 420s'); await cleanup().catch(() => {}); process.exit(1); }, 420_000);
+const watchdog = setTimeout(async () => { console.error('E2E watchdog: exceeded 720s'); await cleanup().catch(() => {}); process.exit(1); }, 720_000);
 
 try {
   // Remove fixtures left by an interrupted earlier run (ids prefixed pm_e2e_).
@@ -124,9 +125,11 @@ try {
   const items = [knowledgeItem('squat', '스쿼트', 'legs'), knowledgeItem('lunge', '런지', 'legs'), knowledgeItem('row', '바벨 로우', 'back'), knowledgeItem('bench_press', '벤치 프레스', 'chest')];
   await knowledge.set({ revision: Number(previousKnowledge?.revision || 0) + 1, schemaVersion: FIRESTORE_SNAPSHOT_SCHEMA_VERSION, knowledgeVersion: '3.0.0', updatedAt: new Date().toISOString(), updatedBy: `${prefix}:e2e-seed`, exerciseCount: items.length, checksum: await checksumKnowledgeItems(items), items });
   await Promise.all([adminUid, trainerUid].map((uid) => verifier.auth.createUser({ uid })));
-  await Promise.all([profile(memberA).set({ id: memberA, name: '추천회원', role: 'member' }), profile(memberB).set({ id: memberB, name: '추가회원', role: 'member' }), profile(memberC).set({ id: memberC, name: '초보회원', role: 'member' })]);
+  await Promise.all([profile(memberA).set({ id: memberA, name: '추천회원', role: 'member' }), profile(memberB).set({ id: memberB, name: '추가회원', role: 'member' }), profile(memberC).set({ id: memberC, name: '초보회원', role: 'member' }), profile(memberD).set({ id: memberD, name: '추천장문회원', role: 'member' })]);
   const now = new Date();
   await Promise.all([
+    // Longest allowed program (8 exercises) with long memos: the popup layout check needs the list to overflow.
+    program(programIds.d).set({ id: programIds.d, memberId: memberD, name: '트레이너 8종목 장문 루틴', isDefault: true, status: 'active', revision: 1, exercises: Array.from({ length: 8 }, (_, index) => ({ exerciseId: ['squat', 'lunge', 'row', 'bench_press'][index % 4], name: ['스쿼트', '런지', '바벨 로우', '벤치 프레스'][index % 4], order: index + 1, plannedSets: (index % 4) + 2, memo: `${index + 1}번 운동은 템포를 천천히 유지하고 마지막 세트에서 자세가 무너지지 않도록 호흡과 코어 긴장을 끝까지 유지합니다.` })), updatedAt: now, createdAt: now }),
     program(programIds.aDefault).set({ id: programIds.aDefault, memberId: memberA, name: '트레이너 하체 루틴', description: '내부 메모', isDefault: true, status: 'active', revision: 1, exercises: [{ exerciseId: 'lunge', name: '런지', order: 2, plannedSets: 3 }, { exerciseId: 'squat', name: '스쿼트', order: 1, plannedSets: 4, memo: '무릎 정렬' }], updatedAt: now, createdAt: now }),
     program(programIds.aSecond).set({ id: programIds.aSecond, memberId: memberA, name: '트레이너 상체 루틴', isDefault: false, status: 'active', revision: 1, exercises: [{ exerciseId: 'row', name: '바벨 로우', order: 1, plannedSets: 5 }, { exerciseId: 'bench_press', name: '벤치 프레스', order: 2, plannedSets: 3 }], updatedAt: now, createdAt: now }),
     program(programIds.aArchived).set({ id: programIds.aArchived, memberId: memberA, name: '보관된 루틴', isDefault: false, status: 'archived', revision: 1, exercises: [{ exerciseId: 'row', name: '바벨 로우', order: 1, plannedSets: 1 }], updatedAt: now, createdAt: now }),
@@ -196,7 +199,7 @@ try {
     ...process.env,
     VITE_FIREBASE_USE_EMULATOR: 'true', VITE_FIREBASE_EMULATOR_HOST: '127.0.0.1', VITE_FIRESTORE_EMULATOR_PORT: '18080', VITE_FIREBASE_AUTH_EMULATOR_PORT: '19099',
     VITE_FIREBASE_API_KEY: 'emulator-test-key', VITE_FIREBASE_AUTH_DOMAIN: 'localhost', VITE_FIREBASE_PROJECT_ID: PROJECT_ID, VITE_FIREBASE_STORAGE_BUCKET: `${PROJECT_ID}.appspot.com`, VITE_FIREBASE_MESSAGING_SENDER_ID: '000000000000', VITE_FIREBASE_APP_ID: '1:000000000000:web:e2etest',
-    VITE_CONDITION_LAB_APP_ID: APP_ID, VITE_CONDITION_LAB_API_BASE_URL: origin, VITE_KIOSK_API_PROXY_TARGET: `http://127.0.0.1:${API_PORT}`, VITE_KIOSK_DEVICE_AGENT_ENDPOINT: `http://127.0.0.1:${AGENT_PORT}`,
+    VITE_CONDITION_LAB_APP_ID: APP_ID, VITE_BASECAMP_API_BASE_URL: origin, VITE_KIOSK_API_PROXY_TARGET: `http://127.0.0.1:${API_PORT}`, VITE_KIOSK_DEVICE_AGENT_ENDPOINT: `http://127.0.0.1:${AGENT_PORT}`,
     VITE_PRINT_RUNTIME: 'windows-agent', VITE_PRINT_AGENT_ENDPOINT: `http://127.0.0.1:${AGENT_PORT}`, VITE_GEMINI_API_KEY: '',
   } });
   let viteLog = ''; vite.stdout.on('data', (chunk) => { viteLog += chunk; }); vite.stderr.on('data', (chunk) => { viteLog += chunk; });
@@ -253,7 +256,21 @@ try {
     if (await initialButton.getAttribute('aria-pressed') !== 'true') await initialButton.click();
     await target.getByRole('button', { name: `${name} 회원 선택` }).click();
   };
-  const card = page.getByRole('region', { name: '트레이너 추천 프로그램' });
+  // Step 2 popup (replaces the former step-1 card). Its accessible name is the popup title.
+  const popupOf = (target = page) => target.getByRole('dialog', { name: '트레이너 추천 프로그램이 있습니다' });
+  const card = popupOf();
+  const continueWith = async (name, target = page) => {
+    await target.getByRole('button', { name: `${name} 회원으로 계속하기` }).click();
+    await target.getByText('회원의 오늘 상태를 알려주세요.', { exact: false }).waitFor({ timeout: 15_000 });
+  };
+  const recommendButton = (target = page) => target.getByRole('button', { name: /프로그램 추천 받기|트레이너 추천 확인 중/ });
+  // Holds the default-program response of `memberId` for `ms` on `target` (the request itself is real).
+  const delayDefaultProgram = async (target, memberId, ms) => target.route(`**${defaultRequest(memberId)}`, async (route) => { await new Promise((resolve) => setTimeout(resolve, ms)); await route.continue().catch(() => {}); });
+  const goHome = async (target = page) => { await target.getByRole('link', { name: '처음으로' }).click(); await target.waitForLoadState('load'); };
+  // Scenarios that stop mid-flow leave through "처음으로" (a reload: the member session stays until the next selection
+  // supersedes it, as before) and let that page's in-flight session requests settle, so the next scenario's session on
+  // the same device is never superseded or closed by the previous page.
+  const leaveFlow = async () => { await goHome(); await page.waitForTimeout(2500); };
   const sessionRecord = async () => {
     await page.waitForURL(/\/program-manager\/print\/session\/ws_\d{8}_[a-z0-9]+/, { timeout: 20_000 }); const sessionId = new URL(page.url()).pathname.split('/').pop();
     const record = (await db.doc(`artifacts/${APP_ID}/public/data/workoutSessions/${sessionId}`).get()).data();
@@ -287,84 +304,160 @@ try {
     return record;
   };
   const printHistoryOf = async (workoutSessionId, expected) => until(`printHistory x${expected} for ${workoutSessionId}`, async () => { const docs = (await db.collection(`artifacts/${APP_ID}/public/data/printHistory`).where('workoutSessionId', '==', workoutSessionId).get()).docs.map((doc) => doc.data()); return docs.length === expected ? docs.sort((left, right) => left.copy - right.copy) : null; }, 20_000);
-  const saveWithRecommendation = async () => { await begin(); await openMember('추천회원'); await card.waitFor({ timeout: 20_000 }); await card.getByRole('button', { name: '추천대로 운동하기' }).click(); await page.getByRole('button', { name: '이 프로그램으로 진행하기' }).click(); await page.waitForURL(/\/program-manager\/print\/session\/ws_\d{8}_[a-z0-9]+/, { timeout: 20_000 }); return new URL(page.url()).pathname.split('/').pop(); };
+  const saveWithRecommendation = async () => { await begin(); await openMember('추천회원'); await continueWith('추천회원'); await card.waitFor({ timeout: 20_000 }); await card.getByRole('button', { name: '추천 프로그램 사용' }).click(); await page.getByRole('button', { name: '이 프로그램으로 진행하기' }).click(); await page.waitForURL(/\/program-manager\/print\/session\/ws_\d{8}_[a-z0-9]+/, { timeout: 20_000 }); return new URL(page.url()).pathname.split('/').pop(); };
 
   const defaultRequest = (memberId) => `/v1/kiosk/members/${encodeURIComponent(memberId)}/default-workout-program`;
   // The existing Trainer → Kiosk handoff API stays available; the default-program flow must not consume it.
   const preservedHandoff = await issueHandoff(memberA, programIds.aSecond);
 
-  await step('A. Selecting A auto-loads only A\'s active default recommendation via the new API', async () => {
+  await step('A. Selecting A starts the lookup; step 2 shows only A\'s active default as a popup', async () => {
     await begin(); await openMember('추천회원');
+    await until('default program requested for A on selection', async () => kioskRequests.some((url) => url.endsWith(defaultRequest(memberA))));
+    await page.waitForTimeout(1000);
+    assert.equal(await page.getByRole('region', { name: '트레이너 추천 프로그램' }).count(), 0, 'no step-1 card any more');
+    assert.equal(await card.count(), 0, 'no popup on step 1');
+    await continueWith('추천회원');
     await card.waitFor({ timeout: 20_000 });
+    assert.ok(await card.getByText('트레이너가 회원님을 위해 준비한 운동 프로그램입니다. 이 프로그램으로 진행하시겠습니까?').isVisible());
     assert.ok(await card.getByText('트레이너 하체 루틴').isVisible(), 'default program name shown');
-    assert.ok(await card.getByText('스쿼트 · 4세트 · 무릎 정렬').isVisible(), 'ordered exercises with memo');
-    for (const hidden of ['트레이너 상체 루틴', '보관된 루틴', '다른 회원 루틴']) assert.equal(await card.getByText(hidden).count(), 0, `${hidden} hidden`);
-    assert.ok(kioskRequests.some((url) => url.endsWith(defaultRequest(memberA))), `default program requested for A: ${kioskRequests}`);
+    const rows = (await card.locator('li').allInnerTexts()).map((text) => text.replace(/\s+/g, ' ').trim());
+    assert.deepEqual(rows, ['01 스쿼트 무릎 정렬 4세트', '02 런지 3세트'], `ordered exercises with sets and memo: ${JSON.stringify(rows)}`);
+    for (const hidden of ['트레이너 상체 루틴', '보관된 루틴', '다른 회원 루틴']) assert.equal(await page.getByText(hidden).count(), 0, `${hidden} hidden`);
     assert.equal(kioskRequests.some((url) => url.includes('/v1/kiosk/handoff')), false, 'no handoff read or close from the Kiosk');
     await until('a Kiosk member session for A', async () => (await kioskSessionsOf()).filter((item) => item.status === 'ACTIVE' && item.memberId === memberA).length === 1);
-    for (const name of ['추천대로 운동하기', '수정해서 사용', '직접 구성하기']) {
+    for (const name of ['다른 운동 선택', '추천 프로그램 사용']) {
       const box = await card.getByRole('button', { name }).boundingBox();
       assert.ok(box && box.height >= 64 && box.width >= 200, `${name} is a kiosk-sized touch target: ${JSON.stringify(box)}`);
     }
   });
 
-  await step('B. Switching to B shows B\'s default only; A\'s card is gone', async () => {
-    // Phase 3-E: B sets up its own starting state (A selected, A's card shown) instead of inheriting A's screen.
+  await step('B. Switching to B before step 2 shows B\'s default only', async () => {
     await begin(); await openMember('추천회원');
-    await card.getByText('트레이너 하체 루틴').waitFor({ timeout: 20_000 });
     await until('a Kiosk member session for A before switching', async () => (await kioskSessionsOf()).some((item) => item.status === 'ACTIVE' && item.memberId === memberA));
     await openMember('추가회원');
+    await continueWith('추가회원');
     await card.getByText('다른 회원 루틴').waitFor({ timeout: 20_000 });
-    assert.equal(await card.getByText('트레이너 하체 루틴').count(), 0);
+    assert.equal(await page.getByText('트레이너 하체 루틴').count(), 0);
     assert.ok(kioskRequests.some((url) => url.endsWith(defaultRequest(memberB))));
     // Switching members leaves exactly one ACTIVE session, for B; A's session is no longer usable.
     await until('only B active', async () => { const active = (await kioskSessionsOf()).filter((item) => item.status === 'ACTIVE'); return active.length === 1 && active[0].memberId === memberB; });
     assert.ok((await kioskSessionsOf()).filter((item) => item.memberId === memberA).every((item) => item.status !== 'ACTIVE'));
   });
 
-  await step('C. Member without a default → no card; existing flow continues', async () => {
-    await begin(); await openMember('초보회원');
-    await page.getByRole('button', { name: '초보회원 회원으로 계속하기' }).waitFor();
+  await step('C. Member without a default → no popup; existing flow continues', async () => {
+    await begin(); await openMember('초보회원'); await continueWith('초보회원');
+    await until('default program requested for C', async () => kioskRequests.some((url) => url.endsWith(defaultRequest(memberC))));
     await page.waitForTimeout(1500);
-    assert.equal(await card.count(), 0, 'program: null → no card');
+    assert.equal(await card.count(), 0, 'program: null → no popup');
     assert.equal(await page.getByText(/트레이너 추천/).count(), 0, 'no recommendation notice for a member without one');
-    assert.equal(await page.getByRole('progressbar', { name: '트레이너 추천 확인 중' }).count(), 0, 'loading indicator gone');
+    assert.equal(await recommendButton().innerText(), '프로그램 추천 받기', 'not held in the checking state');
   });
 
-  await step('D. 수정해서 사용 opens the existing editor → snapshot source=recommendation edited=true', async () => {
-    await begin(); await openMember('추천회원');
+  await step('D. 다른 운동 선택 closes the popup, keeps step 2 usable and never repeats it in the same flow', async () => {
+    await begin(); await openMember('추천회원'); await continueWith('추천회원');
     await card.waitFor({ timeout: 20_000 });
-    await card.getByRole('button', { name: '수정해서 사용' }).click();
-    await page.getByRole('button', { name: '2번 운동 세트 줄이기' }).click();
-    await page.getByRole('button', { name: '출력 준비하기' }).click();
-    await page.getByRole('button', { name: '이 프로그램으로 진행하기' }).click();
-    const record = await sessionRecord();
-    assert.equal(record.memberId, memberA);
-    assert.deepEqual(record.source, { type: 'recommendation', memberProgramId: programIds.aDefault, edited: true });
-    assert.equal(record.programId, undefined);
-    assert.deepEqual(record.exercises.map((item) => [item.exerciseId, item.order, item.plannedSets]), [['squat', 1, 4], ['lunge', 2, 2]]);
+    await card.getByRole('button', { name: '다른 운동 선택' }).click();
+    await card.waitFor({ state: 'detached', timeout: 10_000 });
+    const chest = page.getByRole('button', { name: '가슴', exact: true }).first();
+    await chest.click();
+    assert.equal(await chest.getAttribute('aria-pressed'), 'true', 'workout target selectable after declining');
+    // Back to member selection and forward again (same member): no repeat.
+    await page.getByRole('button', { name: '회원 다시 선택' }).click();
+    await continueWith('추천회원');
+    await page.waitForTimeout(1500);
+    assert.equal(await card.count(), 0, 'no repeat after going back');
+    // Another member, then A again within the same flow: B is offered once, A is not repeated.
+    await page.getByRole('button', { name: '회원 다시 선택' }).click();
+    await openMember('추가회원'); await continueWith('추가회원');
+    await card.getByText('다른 회원 루틴').waitFor({ timeout: 20_000 });
+    await card.getByRole('button', { name: '다른 운동 선택' }).click();
+    await page.getByRole('button', { name: '회원 다시 선택' }).click();
+    await openMember('추천회원'); await continueWith('추천회원');
+    await page.waitForTimeout(1500);
+    assert.equal(await card.count(), 0, 'A not repeated after switching members within the flow');
+    // "처음으로" (document reload) starts a new flow: offered again.
+    await goHome();
+    await page.getByRole('button', { name: '프로그램 시작', exact: true }).click();
+    await openMember('추천회원'); await continueWith('추천회원');
+    await card.waitFor({ timeout: 20_000 });
+    await card.getByRole('button', { name: '다른 운동 선택' }).click();
+    await leaveFlow();
   });
 
-  await step('E. 추천대로 운동하기 (accept): default program as-is → edited=false, order/sets/memo preserved', async () => {
-    await begin(); await openMember('추천회원');
+  await step('E. 추천 프로그램 사용: default program as-is → edited=false, order/sets/memo preserved, printed', async () => {
+    await begin(); await openMember('추천회원'); await continueWith('추천회원');
     await card.waitFor({ timeout: 20_000 });
-    await card.getByRole('button', { name: '추천대로 운동하기' }).click();
+    await card.getByRole('button', { name: '추천 프로그램 사용' }).click();
     await page.getByRole('button', { name: '이 프로그램으로 진행하기' }).click();
     const record = await sessionRecord();
     assert.deepEqual(record.source, { type: 'recommendation', memberProgramId: programIds.aDefault, edited: false });
     assert.deepEqual(record.exercises.map((item) => [item.exerciseId, item.order, item.plannedSets, item.memo ?? '']), [['squat', 1, 4, '무릎 정렬'], ['lunge', 2, 3, '']]);
   });
 
-  await step('F. 직접 구성하기 (decline) uses the existing manual builder (source=manual)', async () => {
-    await begin(); await openMember('추천회원');
+  await step('F. Slow lookup: step 2 waits in a visible checking state and the popup still appears', async () => {
+    await delayDefaultProgram(page, memberB, 4000);
+    try {
+      await begin(); await openMember('추가회원'); await continueWith('추가회원');
+      const button = recommendButton();
+      await page.getByRole('status').filter({ hasText: '트레이너 추천 프로그램을 확인하고 있습니다' }).waitFor({ timeout: 3000 });
+      assert.equal(await button.innerText(), '트레이너 추천 확인 중');
+      assert.equal(await button.isDisabled(), true, 'cannot move past step 2 before the lookup settles');
+      await card.getByText('다른 회원 루틴').waitFor({ timeout: 20_000 });
+      await card.getByRole('button', { name: '다른 운동 선택' }).click();
+      assert.equal(await button.innerText(), '프로그램 추천 받기', 'released after the lookup');
+    } finally { await page.unroute(`**${defaultRequest(memberB)}`); }
+    await leaveFlow();
+  });
+
+  await step('N. A late response for the previous member is never shown for the new member', async () => {
+    await delayDefaultProgram(page, memberA, 4000);
+    try {
+      await begin(); await openMember('추천회원');
+      await openMember('초보회원'); await continueWith('초보회원');
+      await page.waitForTimeout(5500);
+      assert.equal(await card.count(), 0, 'C has no default; A\'s late answer is dropped');
+      assert.equal(await page.getByText('트레이너 하체 루틴').count(), 0);
+      assert.equal(await recommendButton().innerText(), '프로그램 추천 받기');
+    } finally { await page.unroute(`**${defaultRequest(memberA)}`); }
+    await leaveFlow();
+  });
+
+  await step('O. Popup layout: whole popup and both buttons on screen at 1366x768, 1920x1080, 1080x1920; only the list scrolls', async () => {
+    const captures = [];
+    for (const [width, height, name] of [[1366, 768, '추천장문회원'], [1920, 1080, '추천장문회원'], [1080, 1920, '추천장문회원'], [1366, 768, '추천회원'], [1920, 1080, '추천회원'], [1080, 1920, '추천회원']]) {
+      await page.setViewportSize({ width, height });
+      await begin(); await openMember(name); await continueWith(name);
+      await card.waitFor({ timeout: 20_000 });
+      await page.waitForTimeout(500);
+      const geometry = await page.evaluate(() => {
+        const dialog = document.querySelector('[role="dialog"]'); const paper = dialog.getBoundingClientRect();
+        const list = dialog.querySelector('.MuiDialogContent-root');
+        const buttons = [...dialog.querySelectorAll('button')].map((button) => { const box = button.getBoundingClientRect(); return { text: button.innerText, top: box.top, bottom: box.bottom, left: box.left, right: box.right, height: box.height }; });
+        return { paper: { top: paper.top, bottom: paper.bottom, left: paper.left, right: paper.right }, listScrolls: list.scrollHeight > list.clientHeight, buttons };
+      });
+      assert.ok(geometry.paper.top >= 0 && geometry.paper.bottom <= height && geometry.paper.left >= 0 && geometry.paper.right <= width, `popup within ${width}x${height}: ${JSON.stringify(geometry.paper)}`);
+      assert.equal(geometry.buttons.length, 2);
+      for (const button of geometry.buttons) assert.ok(button.top >= geometry.paper.top && button.bottom <= geometry.paper.bottom && button.bottom <= height && button.height >= 64, `${button.text} fully visible at ${width}x${height}: ${JSON.stringify(button)}`);
+      if (name === '추천장문회원' && height < 1000) assert.ok(geometry.listScrolls, 'long program: the list scrolls, not the buttons');
+      const file = path.join(PM_ROOT, 'outputs', 'e2e-results', `${prefix}-popup-${width}x${height}${name === '추천회원' ? '-short' : '-long'}.png`);
+      await mkdir(path.dirname(file), { recursive: true }); await page.screenshot({ path: file });
+      captures.push(`${file} listScrolls=${geometry.listScrolls}`);
+      await card.getByRole('button', { name: '다른 운동 선택' }).click();
+      await leaveFlow();
+    }
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    console.log(`[e2e][O] popup captures:\n${captures.join('\n')}`);
+  });
+
+  await step('P. Declining changes nothing stored; the rule-based condition step stays as it was', async () => {
+    await begin(); await openMember('추천회원'); await continueWith('추천회원');
     await card.waitFor({ timeout: 20_000 });
-    await card.getByRole('button', { name: '직접 구성하기' }).click();
-    await page.getByRole('dialog').getByText('벤치 프레스', { exact: true }).first().click();
-    await page.getByRole('button', { name: '출력 준비하기' }).click();
-    await page.getByRole('button', { name: '이 구성으로 진행하기' }).click();
-    const record = await sessionRecord();
-    assert.deepEqual(record.source, { type: 'manual' });
-    assert.equal(record.exercises[0].exerciseId, 'bench_press');
+    await card.getByRole('button', { name: '다른 운동 선택' }).click();
+    await card.waitFor({ state: 'detached', timeout: 10_000 });
+    assert.equal(await page.getByText('트레이너 하체 루틴').count(), 0, 'declined program is not shown on the condition step');
+    assert.equal((await program(programIds.aDefault).get()).data().isDefault, true, 'declining never changes the Trainer program');
+    assert.equal(await recommendButton().innerText(), '프로그램 추천 받기');
+    await leaveFlow();
   });
 
   await step('K. Reprint from the workout history uses the member chosen there; a preview opened without a selection prints nothing', async () => {
@@ -448,11 +541,12 @@ try {
     await agentPage.goto(`${origin}/program-manager/print`); await agentPage.getByRole('button', { name: '프로그램 시작' }).click();
     const initialButton = agentPage.getByRole('button', { name: 'ㅊ', exact: true }); if (await initialButton.getAttribute('aria-pressed') !== 'true') await initialButton.click();
     try { await agentPage.getByRole('button', { name: '추천회원 회원 선택' }).click(); } catch (error) { const screenshot = path.join(PM_ROOT, 'outputs', 'e2e-results', `${prefix}-J-failure.png`); await mkdir(path.dirname(screenshot), { recursive: true }); await agentPage.screenshot({ path: screenshot, fullPage: true }).catch(() => {}); console.error(`[e2e][J] failure url=${new URL(agentPage.url()).pathname} tokenRequests=${agentTokenRequests} screenshot=${screenshot} flow=${JSON.stringify(agentFlow)}`); throw error; }
-    const agentCard = agentPage.getByRole('region', { name: '트레이너 추천 프로그램' });
+    await continueWith('추천회원', agentPage);
+    const agentCard = popupOf(agentPage);
     await agentCard.waitFor({ timeout: 20_000 });
     assert.ok(agentTokenRequests >= 1, 'the browser obtained its device identity from the agent');
     await until('agent device session for A', async () => (await db.collection(`artifacts/${APP_ID}/private/data/kioskSessions`).where('deviceId', '==', agentDeviceId).get()).docs.some((doc) => doc.data().status === 'ACTIVE' && doc.data().memberId === memberA));
-    await agentCard.getByRole('button', { name: '추천대로 운동하기' }).click();
+    await agentCard.getByRole('button', { name: '추천 프로그램 사용' }).click();
     await agentPage.getByRole('button', { name: '이 프로그램으로 진행하기' }).click();
     await agentPage.waitForURL(/\/program-manager\/print\/session\/ws_\d{8}_[a-z0-9]+/, { timeout: 20_000 });
     const record = (await db.doc(`artifacts/${APP_ID}/public/data/workoutSessions/${new URL(agentPage.url()).pathname.split('/').pop()}`).get()).data();
@@ -507,13 +601,13 @@ try {
     // H's checks (page errors, production Firebase hosts) cover I's page too.
     iPage.on('pageerror', (error) => { console.error('[e2e][I] pageerror', error?.stack || error); consoleErrors.push(error.message); });
     iPage.on('request', (request) => { const host = new URL(request.url()).host; if (/googleapis\.com|firebaseio\.com|firebaseapp\.com/.test(host)) firebaseHosts.add(host); });
-    const iCard = iPage.getByRole('region', { name: '트레이너 추천 프로그램' });
+    const iCard = popupOf(iPage);
     const iSessionsOf = async () => (await db.collection(`artifacts/${APP_ID}/private/data/kioskSessions`).where('deviceId', '==', iDeviceId).get()).docs.map((doc) => doc.data());
     try {
-      await begin(iPage); await openMember('추천회원', 'ㅊ', iPage);
+      await begin(iPage); await openMember('추천회원', 'ㅊ', iPage); await continueWith('추천회원', iPage);
       await iCard.waitFor({ timeout: 20_000 });
       await until('session for A', async () => (await iSessionsOf()).some((item) => item.status === 'ACTIVE' && item.memberId === memberA));
-      await iCard.getByRole('button', { name: '추천대로 운동하기' }).click();
+      await iCard.getByRole('button', { name: '추천 프로그램 사용' }).click();
       const before = (await db.collection(`artifacts/${APP_ID}/public/data/workoutSessions`).where('memberId', '==', memberA).get()).size;
       await issuance.revokeKioskDevice({ issuerUid: adminUid, deviceId: iDeviceId });
       const saveResponse = iPage.waitForResponse((response) => response.url().endsWith('/v1/kiosk/workout-sessions'));
@@ -543,9 +637,13 @@ try {
     // recommendation API outage for the selected member.
     await begin(gPage);
     await new Promise((resolve) => gateway.close(resolve));
-    await openMember('추천회원', 'ㅊ', gPage);
-    await gPage.getByText('트레이너 추천 프로그램을 불러오지 못했습니다.', { exact: false }).waitFor({ timeout: 20_000 });
-    assert.ok(await gPage.getByRole('button', { name: '추천회원 회원으로 계속하기' }).isVisible());
+    await openMember('추천회원', 'ㅊ', gPage); await continueWith('추천회원', gPage);
+    await gPage.getByRole('alert').filter({ hasText: '트레이너 추천 프로그램을 확인하지 못했습니다.' }).waitFor({ timeout: 20_000 });
+    assert.equal(await popupOf(gPage).count(), 0, 'an error is not shown as a recommendation');
+    assert.ok(await gPage.getByRole('button', { name: '다시 확인' }).isVisible(), 'retry offered');
+    assert.equal(await recommendButton(gPage).innerText(), '프로그램 추천 받기', 'an error never holds step 2');
+    const gChest = gPage.getByRole('button', { name: '가슴', exact: true }).first(); await gChest.click();
+    assert.equal(await gChest.getAttribute('aria-pressed'), 'true', 'workout target still selectable');
     assert.equal(await gPage.getByText(/NETWORK_ERROR|Failed to fetch|ECONNREFUSED/).count(), 0, 'no raw network error shown');
     await gContext.close();
   });

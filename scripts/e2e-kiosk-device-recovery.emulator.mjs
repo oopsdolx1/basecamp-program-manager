@@ -109,7 +109,7 @@ const startAgent = async (credential) => {
 const stopAgent = async () => { if (!agent) return; await agent.close(); agent = null; };
 
 /** Opens Program Manager's member selection. Marks the window so a reload/navigation is detected. */
-const openKiosk = async ({ start = true, clock = false } = {}) => {
+const openKiosk = async ({ clock = false, scenario = "entry" } = {}) => {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
   // Fake clock that keeps flowing in real time; fastForward() lets the device ID token expire on demand (scenario D).
   if (clock) await context.clock.install();
@@ -122,18 +122,43 @@ const openKiosk = async ({ start = true, clock = false } = {}) => {
   page.on('pageerror', (error) => tracker.pageErrors.push(error.message));
   page.on('console', (message) => { if (message.type() === 'error' && !/Kiosk|device-token|Failed to load resource|ERR_CONNECTION_REFUSED/.test(message.text())) console.error(`[e2e][browser] ${message.text()}`); });
   await page.goto(`${origin}/program-manager/print`);
-  if (start) await page.getByRole('button', { name: '프로그램 시작' }).click();
+  // Production can either show the welcome screen first or restore directly to member selection.
+  // Treat both as the real kiosk entry flow; do not add a test-only navigation shortcut.
+  const startButton = page.getByRole('button', { name: '프로그램 시작' });
+  // The production title is MUI Typography rather than a semantic heading. The search field's
+  // accessible label is the stable control that proves the member-selection screen is ready.
+  const memberSelection = page.getByLabel('회원 이름 또는 전화번호 검색');
+  try {
+    await until('welcome screen or member selection shown', async () => {
+      if (await memberSelection.isVisible().catch(() => false)) return 'member-selection';
+      if (await startButton.isVisible().catch(() => false)) return 'welcome';
+      return null;
+    });
+    if (await startButton.isVisible().catch(() => false)) await startButton.click();
+    await until('member selection shown', () => memberSelection.isVisible().catch(() => false));
+  } catch (error) {
+    await dump(page, `${scenario}-entry`);
+    throw error;
+  }
   await page.evaluate(() => { window.__e2eSamePage = true; });
   return { context, page, tracker };
 };
 let dumpSerial = 0;
-/** On a scenario failure: full-page screenshot and the visible text, for diagnosis. */
+/** On a scenario failure: local-fixture page diagnostics, visible text and screenshot. */
 const dump = async (page, label) => {
   const base = path.join(PM_ROOT, 'outputs', 'e2e-results', `${prefix}-${label}-${++dumpSerial}`);
   await mkdir(path.dirname(base), { recursive: true });
+  const diagnostics = await page.evaluate(() => ({
+    url: window.location.href,
+    title: document.title,
+    headings: [...document.querySelectorAll('h1,h2,h3,[role="heading"]')].map((element) => element.textContent?.trim()).filter(Boolean).slice(0, 12),
+    buttons: [...document.querySelectorAll('button,[role="button"]')].map((element) => (element.getAttribute('aria-label') || element.textContent || '').trim()).filter(Boolean).slice(0, 24),
+    bodyText: document.body.innerText.slice(0, 4000),
+  })).catch(() => ({ url: page.url(), title: '', headings: [], buttons: [], bodyText: '' }));
   await page.screenshot({ path: `${base}.png`, fullPage: true }).catch(() => {});
-  await writeFile(`${base}.txt`, `url=${page.url()}\n${await page.locator('body').innerText().catch(() => '')}`).catch(() => {});
-  console.log(`[e2e] failure dump ${base}.png / .txt`);
+  await writeFile(`${base}.json`, JSON.stringify(diagnostics, null, 2)).catch(() => {});
+  await writeFile(`${base}.txt`, `url=${diagnostics.url}\ntitle=${diagnostics.title}\nheadings=${diagnostics.headings.join(' | ')}\nbuttons=${diagnostics.buttons.join(' | ')}\n\n${diagnostics.bodyText}`).catch(() => {});
+  console.log(`[e2e] failure dump ${base}.png / .json / .txt`);
 };
 /** The 초성 filter button (the virtual keyboard has a key with the same label). */
 const initialButton = (page, label) => page.locator('button[aria-pressed]').filter({ hasText: new RegExp(`^${label}$`) });
@@ -209,7 +234,7 @@ try {
 
   await step('A. agent not running at startup → preparing message → agent starts → same page recovers, name search works', async (note) => {
     await stopAgent();
-    const { context, page, tracker } = await openKiosk();
+    const { context, page, tracker } = await openKiosk({ scenario: 'A' });
     try {
       await until('preparing message shown', async () => (await alertText(page)).includes(STARTING));
       assert.equal((await bodyText(page)).includes(ADMIN), false, 'never the administrator message for an agent that is not running');
@@ -227,7 +252,7 @@ try {
 
   await step('B. agent running from the start → member list works immediately', async (note) => {
     await stopAgent(); await startAgent(enrolledCredential);
-    const { context, page, tracker } = await openKiosk();
+    const { context, page, tracker } = await openKiosk({ scenario: 'B' });
     try {
       await searchMember(page, note);
       assert.equal((await bodyText(page)).includes(STARTING), false, 'no preparing message');
@@ -238,7 +263,7 @@ try {
 
   await step('C. agent answers device_not_enrolled → administrator message, no retry loop', async (note) => {
     await stopAgent(); await startAgent(unenrolledCredential);
-    const { context, page, tracker } = await openKiosk();
+    const { context, page, tracker } = await openKiosk({ scenario: 'C' });
     try {
       await until('administrator message shown', async () => (await alertText(page)).includes(ADMIN));
       assert.equal((await bodyText(page)).includes(STARTING), false, 'not the preparing message');
@@ -252,7 +277,7 @@ try {
 
   await step('D. agent stops and the device session is lost, agent restarts → same page recovers', async (note) => {
     await stopAgent(); await startAgent(enrolledCredential);
-    const { context, page, tracker } = await openKiosk({ start: false, clock: true });
+    const { context, page, tracker } = await openKiosk({ clock: true, scenario: 'D' });
     try {
       await until('member list loaded with the agent up', async () => tracker.memberListOk >= 1);
       const loads = tracker.documentLoads;
@@ -263,8 +288,8 @@ try {
       const deviceUid = `kiosk:${deviceIds[0]}`;
       await verifier.auth.updateUser(deviceUid, { disabled: true });
       await page.clock.fastForward('02:00:00');
-      // A new Kiosk call on the same page (SPA): the history screen loads the member list.
-      await page.getByRole('button', { name: '이전 운동 기록 보기' }).click();
+      // A new Kiosk call on the same page (SPA): the production header's history link loads the member list.
+      await page.getByText('이전 운동기록', { exact: true }).click();
       await until('preparing message while the agent is down', async () => (await bodyText(page)).includes(STARTING));
       assert.equal((await bodyText(page)).includes(ADMIN), false, 'never the administrator message for an agent restart');
       note('agent down + device session lost: preparing message shown');

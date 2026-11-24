@@ -2,7 +2,7 @@ import { getApps, initializeApp } from "firebase/app";
 import { connectAuthEmulator, inMemoryPersistence, initializeAuth, signInWithCustomToken, signOut, type Auth } from "firebase/auth";
 import { firebaseEmulator, getFirebaseOptions } from "../../firebase/firebaseApp";
 import { createKioskRecommendationClient, isText, resolveKioskApiBaseUrl, type KioskDeviceIdentity, type KioskRecommendationClient } from "./kioskRecommendationClient";
-import { createAgentDeviceTokenSource, createKioskDeviceIdentity, resolveKioskDeviceAgentEndpoint, type KioskDeviceTokenSource } from "./kioskDeviceIdentityCore";
+import { createAgentDeviceTokenSource, createKioskDeviceIdentity, installKioskDeviceRecoveryTriggers, resolveKioskDeviceAgentEndpoint, type KioskDeviceTokenSource } from "./kioskDeviceIdentityCore";
 
 // Firebase-backed Kiosk device identity (browser). A separate named app keeps the Program Manager identity untouched.
 // In-memory persistence: no device refresh token is written to IndexedDB/localStorage; a reload re-authenticates.
@@ -39,6 +39,9 @@ export const createFirebaseKioskDeviceIdentity = (): KioskDeviceIdentity => {
       async signOut() { await signOut(getDeviceAuth()); },
     },
   });
+  // Focus, visibility and online events retry a failed device sign-in (startup race with the agent); the identity
+  // itself throttles them and keeps one attempt in flight.
+  if (typeof window !== "undefined" && typeof document !== "undefined") installKioskDeviceRecoveryTriggers(identity, { window, document });
   return identity;
 };
 

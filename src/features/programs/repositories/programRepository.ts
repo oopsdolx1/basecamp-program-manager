@@ -1,7 +1,7 @@
 import type { AppId, ProgramId } from "../../../types/brandedIds";
 import { mapProgramDocument } from "../mappers/programMapper";
 import { createFirebaseKioskDeviceIdentity } from "../../kiosk-recommendations/kioskFirebaseIdentity";
-import { KioskApiError, resolveKioskApiBaseUrl } from "../../kiosk-recommendations/kioskRecommendationClient";
+import { KioskApiError, kioskDeviceTokenUnavailable, resolveKioskApiBaseUrl } from "../../kiosk-recommendations/kioskRecommendationClient";
 import type { Program, ProgramFormValues } from "../types/program.types";
 import type { ProgramRepository } from "./programRepository.types";
 
@@ -9,8 +9,9 @@ const kioskPrograms = async (): Promise<Program[]> => {
   const env = import.meta.env as Record<string, string | undefined>;
   const baseUrl = resolveKioskApiBaseUrl(env.VITE_BASECAMP_API_BASE_URL, typeof window === "undefined" ? undefined : window.location.origin);
   if (!baseUrl) throw new KioskApiError("KIOSK_API_NOT_CONFIGURED", 0);
-  const token = await createFirebaseKioskDeviceIdentity().getIdToken();
-  if (!token) throw new KioskApiError("KIOSK_DEVICE_NOT_ENROLLED", 0);
+  const device = createFirebaseKioskDeviceIdentity();
+  const token = await device.getIdToken();
+  if (!token) throw kioskDeviceTokenUnavailable(device);
   const response = await fetch(`${baseUrl}/v1/kiosk/programs`, { headers: { authorization: `Bearer ${token}` } });
   const body = await response.json().catch(() => null) as { programs?: Array<Record<string, unknown>>; error?: { code?: string } } | null;
   if (!response.ok || !Array.isArray(body?.programs)) throw new KioskApiError(body?.error?.code ?? "INVALID_API_RESPONSE", response.status);

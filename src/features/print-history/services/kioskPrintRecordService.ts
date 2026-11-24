@@ -27,6 +27,7 @@ const MESSAGES: Record<string, string> = {
   KIOSK_SESSION_EXPIRED: "회원 선택 시간이 만료되었습니다. 처음 화면에서 회원을 다시 선택해 주세요.",
   PRINT_SCOPE_DENIED: "선택한 회원의 운동 기록이 아닙니다. 회원을 다시 선택해 주세요.",
   KIOSK_DEVICE_NOT_ENROLLED: "키오스크 기기 인증이 되어 있지 않아 출력할 수 없습니다.",
+  KIOSK_DEVICE_STARTING: "키오스크 서비스를 준비하고 있습니다. 잠시만 기다려 주세요.",
   KIOSK_DEVICE_NOT_REGISTERED: "등록되지 않았거나 사용이 중지된 키오스크입니다.",
   WORKOUT_SESSION_NOT_FOUND: "운동 세션을 찾지 못했습니다.",
   NETWORK_ERROR: "서버에 연결하지 못했습니다.",

@@ -1,5 +1,5 @@
 import { createFirebaseKioskDeviceIdentity } from "../features/kiosk-recommendations/kioskFirebaseIdentity";
-import { KioskApiError, resolveKioskApiBaseUrl } from "../features/kiosk-recommendations/kioskRecommendationClient";
+import { KioskApiError, kioskDeviceTokenUnavailable, resolveKioskApiBaseUrl } from "../features/kiosk-recommendations/kioskRecommendationClient";
 import {
   countRawSnapshotItems,
   createSharedRuntimeSnapshotStore,
@@ -80,8 +80,9 @@ const start = (): Promise<void> => {
     const env = import.meta.env as Record<string, string | undefined>;
     const baseUrl = resolveKioskApiBaseUrl(env.VITE_BASECAMP_API_BASE_URL, typeof window === "undefined" ? undefined : window.location.origin);
     if (!appId || !baseUrl) throw new Error("Kiosk API is required for Shared Runtime.");
-    const token = await createFirebaseKioskDeviceIdentity().getIdToken();
-    if (!token) throw new KioskApiError("KIOSK_DEVICE_NOT_ENROLLED", 0);
+    const device = createFirebaseKioskDeviceIdentity();
+    const token = await device.getIdToken();
+    if (!token) throw kioskDeviceTokenUnavailable(device);
     const response = await fetch(`${baseUrl}/v1/kiosk/shared-knowledge-runtime`, { headers: { authorization: `Bearer ${token}` } });
     const body = await response.json().catch(() => null) as { runtime?: unknown; error?: { code?: string } } | null;
     if (!response.ok || !body?.runtime) throw new KioskApiError(body?.error?.code ?? "INVALID_API_RESPONSE", response.status);
@@ -129,4 +130,8 @@ export const programManagerRuntime = Object.freeze({
   resolveHistory: select,
 });
 
-if (import.meta.env.MODE !== "test") void start();
+if (import.meta.env.MODE !== "test") {
+  void start();
+  // Startup race with the local agent: when the device identity recovers, load the runtime that failed at startup.
+  createFirebaseKioskDeviceIdentity().subscribe?.((state) => { if (state === "ready" && connectionStatus === "error") void start(); });
+}

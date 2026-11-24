@@ -37,6 +37,7 @@ export const previewErrorMessage = (caught: unknown): string => {
     if (MEMBER_SELECTION_CODES.has(caught.code)) return kioskErrorMessage("KIOSK_SESSION_MEMBER_CHANGED")!;
     if (SESSION_EXPIRED_CODES.has(caught.code)) return PREVIEW_SESSION_EXPIRED_MESSAGE;
     if (SESSION_UNVERIFIABLE_CODES.has(caught.code)) return PREVIEW_SESSION_UNVERIFIABLE_MESSAGE;
+    if (caught.code === "KIOSK_DEVICE_STARTING") return kioskErrorMessage("KIOSK_DEVICE_STARTING")!;
     if (DEVICE_AUTH_CODES.has(caught.code)) return kioskErrorMessage("KIOSK_DEVICE_NOT_ENROLLED")!;
     if (PREVIEW_SHARED_CODES.has(caught.code)) return kioskErrorMessage(caught.code)!;
     if (caught.status >= 500 || caught.code === "INTERNAL_ERROR" || caught.code === "INVALID_API_RESPONSE") return PREVIEW_SERVER_ERROR_MESSAGE;

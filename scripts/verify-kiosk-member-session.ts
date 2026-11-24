@@ -10,7 +10,7 @@ import { kioskMemberListErrorMessage } from "../src/features/kiosk-session/kiosk
 import { logKioskError } from "../src/features/kiosk-diagnostics/kioskErrorLog";
 import { createWorkoutSession } from "../src/features/workout-sessions/services/workoutSessionService";
 import type { CreateWorkoutSessionInput } from "../src/features/workout-sessions/domain/workoutSession.types";
-import { createAgentDeviceTokenSource, createKioskDeviceIdentity, resolveKioskDeviceAgentEndpoint } from "../src/features/kiosk-recommendations/kioskDeviceIdentityCore";
+import { KioskDeviceTransientError, createAgentDeviceTokenSource, createKioskDeviceIdentity, resolveKioskDeviceAgentEndpoint } from "../src/features/kiosk-recommendations/kioskDeviceIdentityCore";
 
 // Kiosk member-session lifecycle (memory only, generation-guarded) and the API-only workout-session save.
 type Deferred<T> = { promise: Promise<T>; resolve: (value: T) => void; reject: (error: unknown) => void };
@@ -216,7 +216,7 @@ await check("13. device identity: agent token → sign-in; expired/revoked refre
   signedIn = null; refreshFails = false; assert.equal(await allFailing.getIdToken(), null, "all sources failing → null, never an exception or bypass");
 });
 
-await check("14. agent endpoint is loopback-only; agent token source posts without credentials and never throws", async () => {
+await check("14. agent endpoint is loopback-only; agent token source posts without credentials; agent down is transient", async () => {
   assert.equal(resolveKioskDeviceAgentEndpoint(undefined), "http://127.0.0.1:43127");
   assert.equal(resolveKioskDeviceAgentEndpoint("http://localhost:43191"), "http://localhost:43191");
   for (const bad of ["https://agent.example.com", "http://10.0.0.5:43127", "http://127.0.0.1:43127/path", "javascript:alert(1)"]) assert.equal(resolveKioskDeviceAgentEndpoint(bad), null, bad);
@@ -225,8 +225,10 @@ await check("14. agent endpoint is loopback-only; agent token source posts witho
   assert.equal(await source(), "ct"); assert.equal(seen[0].credentials, "omit"); assert.equal(seen[0].method, "POST");
   const failing = createAgentDeviceTokenSource({ endpoint: "http://127.0.0.1:1", fetchImpl: (async () => new Response(JSON.stringify({ status: "failed", reason: "device_not_enrolled" }), { status: 409 })) as unknown as typeof fetch });
   assert.equal(await failing(), null);
+  // Agent not listening (Windows startup race) is transient: it throws so the identity retries instead of
+  // treating the device as not enrolled (scripts/verify-kiosk-device-recovery.ts covers the recovery).
   const down = createAgentDeviceTokenSource({ endpoint: "http://127.0.0.1:1", fetchImpl: (async () => { throw new TypeError("Failed to fetch"); }) as unknown as typeof fetch });
-  assert.equal(await down(), null);
+  await assert.rejects(down(), (error: unknown) => error instanceof KioskDeviceTransientError && error.reason === "agent_unreachable");
 });
 
 // --- Phase 3-E: one renewal policy for reads (history, preview), save and print record ---

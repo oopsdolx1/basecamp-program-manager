@@ -33,7 +33,24 @@ export class KioskApiError extends Error {
   }
 }
 
-export interface KioskDeviceIdentity { getIdToken(): Promise<string | null> }
+/**
+ * idle: not tried yet · ready: signed in · starting: the last attempt failed transiently (local agent not ready yet,
+ * timeout, …) and is retried automatically · not_enrolled: the agent answered that this device has no usable
+ * credential (administrator action needed).
+ */
+export type KioskDeviceAuthState = "idle" | "ready" | "starting" | "not_enrolled";
+
+export interface KioskDeviceIdentity {
+  getIdToken(): Promise<string | null>;
+  getState?(): KioskDeviceAuthState;
+  subscribe?(listener: (state: KioskDeviceAuthState) => void): () => void;
+  /** Recovery trigger: one throttled, single-flight sign-in attempt unless already signed in. */
+  recover?(): Promise<void>;
+}
+
+/** The device has no ID token. The code says why: still starting (retrying automatically) vs. no usable credential. */
+export const kioskDeviceTokenUnavailable = (device: KioskDeviceIdentity): KioskApiError =>
+  new KioskApiError(device.getState?.() === "starting" ? "KIOSK_DEVICE_STARTING" : "KIOSK_DEVICE_NOT_ENROLLED", 0);
 
 export interface KioskRecommendationClient {
   /** The selected member's active default Trainer recommendation, or null. */
@@ -76,7 +93,7 @@ const parseHandoff = (value: unknown): KioskHandoff | null => {
 export const createKioskRecommendationClient = ({ baseUrl, device, fetchImpl = globalThis.fetch.bind(globalThis) }: { baseUrl: string; device: KioskDeviceIdentity; fetchImpl?: typeof fetch }): KioskRecommendationClient => {
   const request = async (method: "GET" | "POST", path: string, body?: unknown): Promise<Record<string, unknown>> => {
     const token = await device.getIdToken();
-    if (!token) throw new KioskApiError("KIOSK_DEVICE_NOT_ENROLLED", 0);
+    if (!token) throw kioskDeviceTokenUnavailable(device);
     let response: Response;
     try {
       response = await fetchImpl(`${baseUrl}${path}`, { method, headers: { authorization: `Bearer ${token}`, ...(body ? { "content-type": "application/json" } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });

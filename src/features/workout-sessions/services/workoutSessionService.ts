@@ -19,6 +19,7 @@ export const createWorkoutSessionId = (date = new Date()): string =>
 
 const SAVE_ERROR_MESSAGES: Record<string, string> = {
   KIOSK_DEVICE_NOT_ENROLLED: "키오스크 기기 인증이 되어 있지 않아 운동 세션을 저장할 수 없습니다.",
+  KIOSK_DEVICE_STARTING: "키오스크 서비스를 준비하고 있습니다. 잠시만 기다려 주세요.",
   KIOSK_DEVICE_NOT_REGISTERED: "등록되지 않았거나 사용이 중지된 키오스크입니다. 운동 세션을 저장할 수 없습니다.",
   KIOSK_DEVICE_IDENTITY_REQUIRED: "키오스크 기기 인증이 필요합니다.",
   KIOSK_SESSION_MEMBER_CHANGED: "선택한 회원이 바뀌어 저장을 중단했습니다. 다시 시도해 주세요.",

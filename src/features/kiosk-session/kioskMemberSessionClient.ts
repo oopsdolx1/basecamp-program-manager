@@ -1,4 +1,4 @@
-import { KioskApiError, isText, type KioskDeviceIdentity } from "../kiosk-recommendations/kioskRecommendationClient";
+import { KioskApiError, isText, kioskDeviceTokenUnavailable, type KioskDeviceIdentity } from "../kiosk-recommendations/kioskRecommendationClient";
 import type { WorkoutSessionExerciseSnapshot, WorkoutSource } from "../workout-sessions/domain/workoutSession.types";
 import type { ProgramCategory } from "../programs/types/program.types";
 
@@ -53,7 +53,7 @@ const TOKEN_PATTERN = /^bks1_[A-Za-z0-9_-]{43}$/;
 export const createKioskMemberSessionClient = ({ baseUrl, device, fetchImpl = globalThis.fetch.bind(globalThis) }: { baseUrl: string; device: KioskDeviceIdentity; fetchImpl?: typeof fetch }): KioskMemberSessionClient => {
   const request = async (path: string, { body, session, keepalive, method = "POST" }: { body?: unknown; session?: string; keepalive?: boolean; method?: "GET" | "POST" }): Promise<Record<string, unknown>> => {
     const idToken = await device.getIdToken();
-    if (!idToken) throw new KioskApiError("KIOSK_DEVICE_NOT_ENROLLED", 0);
+    if (!idToken) throw kioskDeviceTokenUnavailable(device);
     let response: Response;
     try {
       response = await fetchImpl(`${baseUrl}${path}`, {

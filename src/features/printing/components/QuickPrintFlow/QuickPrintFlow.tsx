@@ -52,6 +52,7 @@ import { useKioskRecommendation } from "../../../kiosk-recommendations/useKioskR
 import { getDefaultKioskMemberSessionRuntime } from "../../../kiosk-session/defaultKioskMemberSession";
 import { useKioskSessionScope } from "../../../kiosk-session/kioskSessionScope";
 import { kioskMemberListErrorMessage } from "../../../kiosk-session/kioskErrorMessages";
+import { requestKioskDeviceRecovery, useKioskDeviceRecoveryEpoch } from "../../../kiosk-session/useKioskDeviceRecovery";
 import { KioskRecommendationCard } from "../../../kiosk-recommendations/KioskRecommendationCard";
 import { createMergedSnapshotBuilderHistory, createSnapshotBuilderHistory, snapshotBuilderService, type SnapshotBuilderExercise, type SnapshotBuilderHistory } from "../../services/snapshotBuilderService";
 import { createManualWorkoutBuilderHistory } from "../../services/manualWorkoutBuilderService";
@@ -382,6 +383,8 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
   // Trainer recommendation chosen on the Kiosk; the builder holds a copy, the original is never changed.
   const [recommendationSource, setRecommendationSource] = useState<RecommendedProgram | null>(null);
   const kioskRecommendationClient = useMemo(() => getDefaultKioskRecommendationClient(), []);
+  // Reloads the member list when the device identity recovers (agent started after the browser).
+  const deviceRecoveryEpoch = useKioskDeviceRecoveryEpoch();
   const kioskRecommendation = useKioskRecommendation(kioskRecommendationClient, selectedMember?.memberId ?? null);
   // Kiosk member session (memory only): follows the selected member; leaving the flow ends it.
   const kioskSessionRuntime = useMemo(() => getDefaultKioskMemberSessionRuntime(), []);
@@ -441,7 +444,7 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
     return () => {
       active = false;
     };
-  }, [memberProvider]);
+  }, [memberProvider, deviceRecoveryEpoch]);
 
   useEffect(() => {
     if (!selectedMember) {
@@ -665,8 +668,8 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
         <Box sx={{ ...centeredWorkflowSx(1160), display: "flex", flex: 1, flexDirection: "column", justifyContent: "center", minHeight: 0 }}>
           <Stack spacing={{ md: 3.5, xs: 2.5 }} sx={{ flex: "0 1 auto" }}>
             <Stack spacing={1}><Typography sx={{ fontSize: { md: 46, xs: 34 }, fontWeight: 900, lineHeight: 1.15 }}>회원 선택</Typography><Typography color="text.secondary" sx={{ fontSize: { md: 23, xs: 18 }, lineHeight: 1.5 }}>이름이나 전화번호로 회원을 찾아보세요.</Typography></Stack>
-            <Box sx={{ minHeight: 68 }}><KioskMemberKeyboard value={memberQuery} onChange={(value) => { setMemberQuery(value); setMemberInitial(null); }} /></Box>
-            <Stack spacing={1.5}><Typography sx={{ fontSize: { md: 21, xs: 18 }, fontWeight: 900 }}>초성 선택</Typography><Box sx={{ display: "grid", gap: { md: 1.5, xs: 1 }, gridTemplateColumns: { md: "repeat(8, minmax(0, 1fr))", xs: "repeat(4, minmax(0, 1fr))" } }}>{([...KOREAN_INITIALS.map((initial) => ({ value: initial, label: initial })), { value: "OTHER", label: "기타" }] as Array<{ value: MemberInitialFilter; label: string }>).map((option) => { const selected = !hasSearchQuery && memberInitial === option.value; return <Button key={option.value} aria-pressed={selected} color={selected ? "primary" : "inherit"} variant={selected ? "contained" : "outlined"} onClick={() => { setMemberInitial((current) => current === option.value ? null : option.value); setMemberQuery(""); }} sx={{ fontSize: { md: 24, xs: 20 }, fontWeight: 800, minHeight: { md: 70, xs: 62 }, p: 0 }}>{option.label}</Button>; })}</Box></Stack>
+            <Box sx={{ minHeight: 68 }}><KioskMemberKeyboard value={memberQuery} onChange={(value) => { setMemberQuery(value); setMemberInitial(null); if (memberStatus === "error") requestKioskDeviceRecovery(); }} /></Box>
+            <Stack spacing={1.5}><Typography sx={{ fontSize: { md: 21, xs: 18 }, fontWeight: 900 }}>초성 선택</Typography><Box sx={{ display: "grid", gap: { md: 1.5, xs: 1 }, gridTemplateColumns: { md: "repeat(8, minmax(0, 1fr))", xs: "repeat(4, minmax(0, 1fr))" } }}>{([...KOREAN_INITIALS.map((initial) => ({ value: initial, label: initial })), { value: "OTHER", label: "기타" }] as Array<{ value: MemberInitialFilter; label: string }>).map((option) => { const selected = !hasSearchQuery && memberInitial === option.value; return <Button key={option.value} aria-pressed={selected} color={selected ? "primary" : "inherit"} variant={selected ? "contained" : "outlined"} onClick={() => { setMemberInitial((current) => current === option.value ? null : option.value); setMemberQuery(""); if (memberStatus === "error") requestKioskDeviceRecovery(); }} sx={{ fontSize: { md: 24, xs: 20 }, fontWeight: 800, minHeight: { md: 70, xs: 62 }, p: 0 }}>{option.label}</Button>; })}</Box></Stack>
             {memberStatus === "loading" ? <LoadingState message="회원 목록을 불러오는 중입니다." /> : null}
             {memberStatus === "error" ? <ErrorState message={memberError} /> : null}
             {memberStatus === "ready" && members.length === 0 ? <EmptyState title="등록된 회원이 없습니다." description="회원을 등록한 뒤 다시 시도해 주세요." /> : null}

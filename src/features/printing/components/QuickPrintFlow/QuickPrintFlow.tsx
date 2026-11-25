@@ -32,7 +32,7 @@ import { useExerciseCatalog } from "../../../exercise-catalog";
 import { toCatalogOptions } from "../../../exercise-catalog/services/exerciseCatalogService";
 import { ExercisePicker } from "../../../programs/components/ExercisePicker/ExercisePicker";
 import type { MemberSelectionItem } from "../../../members";
-import { KOREAN_INITIALS, type MemberInitialFilter } from "../../../members/utils/koreanInitial";
+import { getKoreanInitial, KOREAN_INITIALS, type MemberInitialFilter } from "../../../members/utils/koreanInitial";
 import { getCategoryLabel, getDifficultyLabel } from "../../../programs/config/programOptions";
 import { usePrograms } from "../../../programs/hooks/usePrograms";
 import { hydrateProgramExerciseKnowledge, resolveProgramExerciseKnowledge } from "../../../../shared-knowledge/resolveProgramExercises";
@@ -79,6 +79,21 @@ interface QuickPrintFlowProps {
 }
 
 const stepLabels = ["회원 선택", "컨디션 확인", "프로그램 추천", "운동 구성", "출력"];
+const kioskInitialDebugEnabled = (): boolean => {
+  if (typeof window === "undefined") return false;
+  try {
+    return new URLSearchParams(window.location.search).get("kioskDebug") === "1"
+      || window.localStorage.getItem("basecamp:kiosk-debug") === "1";
+  } catch {
+    return false;
+  }
+};
+const maskMemberId = (memberId: string): string => `***${memberId.slice(-4)}`;
+const maskMemberName = (displayName: string): string => `${displayName.trim().slice(0, 1) || "?"}**`;
+const firstCodePoint = (displayName: string): string | null => {
+  const first = displayName.codePointAt(0);
+  return first === undefined ? null : `U+${first.toString(16).toUpperCase().padStart(4, "0")}`;
+};
 const welcomeCopyOptions = [
   { headline: "오늘도 시작해볼까요?", subtitle: "컨디션에 맞는 오늘의 운동을 바로 추천해드릴게요." },
   { headline: "오늘의 운동을 준비했어요.", subtitle: "간단한 선택만으로 오늘의 운동을 확인할 수 있습니다." },
@@ -399,6 +414,28 @@ export const QuickPrintFlow = ({ appId, memberProvider, recommendationProvider }
   const handoffKioskSession = useKioskSessionScope(kioskSessionRuntime);
   const hasSearchQuery = memberQuery.trim().length > 0;
   const filteredMembers = useMemo(() => filterQuickPrintMembers(members, memberQuery, memberInitial), [memberInitial, memberQuery, members]);
+  useEffect(() => {
+    if (!kioskInitialDebugEnabled() || (!memberInitial && !hasSearchQuery)) return;
+    const details = members.map((member) => {
+      const calculatedInitial = getKoreanInitial(member.displayName);
+      return {
+        memberId: maskMemberId(String(member.memberId)),
+        displayName: maskMemberName(member.displayName),
+        firstCodePoint: firstCodePoint(member.displayName),
+        calculatedInitial,
+        matched: memberInitial ? calculatedInitial === memberInitial : filteredMembers.some(({ memberId }) => memberId === member.memberId),
+      };
+    });
+    console.info("[KioskInitialDebug]", {
+      memberInitial,
+      memberQuery,
+      membersCount: members.length,
+      filteredCount: filteredMembers.length,
+      members: details,
+      jsxCardCount: filteredMembers.length,
+      renderedSample: filteredMembers.slice(0, 6).map((member) => ({ memberId: maskMemberId(String(member.memberId)), displayName: maskMemberName(member.displayName) })),
+    });
+  }, [filteredMembers, hasSearchQuery, memberInitial, memberQuery, members]);
   const rankedPrograms = useMemo(() => (recommendationTrace?.candidatePrograms ?? [])
     .map((candidate) => ({ candidate, program: runtimePrograms.find((program) => program.id === candidate.programId) }))
     .filter((item): item is { candidate: RecommendationTrace["candidatePrograms"][number]; program: Program } => Boolean(item.program))

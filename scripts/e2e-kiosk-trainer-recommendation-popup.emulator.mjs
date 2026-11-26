@@ -49,7 +49,7 @@ const [{ createEmulatorAdminTokenVerifier }, { createEmulatorFirestoreContext },
 const [{ createKioskDeviceEnrollment }, deviceHttp, { createKioskPrintRecorder }] = await Promise.all([load('server/kiosk/kioskDeviceEnrollment.js'), load('server/http/kioskDeviceAuthHttpAdapter.js'), load('server/kiosk/kioskPrintRecordHandler.js')]);
 const AGENT_PORT = 43192;
 const requestedScenario = process.argv.find((argument) => argument.startsWith('--scenario='))?.slice('--scenario='.length)?.toUpperCase() ?? null;
-if (requestedScenario && !/^[A-P]$/.test(requestedScenario)) throw new Error(`Unknown scenario selector: ${requestedScenario}`);
+if (requestedScenario && !/^[A-Q]$/.test(requestedScenario)) throw new Error(`Unknown scenario selector: ${requestedScenario}`);
 
 const prefix = `pm_e2e_${Date.now()}`;
 const resultsFile = path.join(PM_ROOT, 'outputs', 'e2e-results', `${prefix}.json`);
@@ -79,11 +79,11 @@ process.on('uncaughtException', (error) => console.error('[e2e] uncaughtExceptio
 process.on('beforeExit', (code) => console.log(`[e2e] beforeExit code=${code}`));
 process.on('exit', (code) => console.log(`[e2e] exit code=${code}`));
 const step = async (name, fn) => {
-  const scenario = name.match(/^([A-P])\./)?.[1];
+  const scenario = name.match(/^([A-Q])\./)?.[1];
   if (requestedScenario && scenario !== requestedScenario) { console.log(`SKIP ${name} (--scenario=${requestedScenario})`); return; }
   const started = Date.now(); console.log(`START ${name}`); try { await fn(); results.push({ name, ok: true, durationMs: Date.now() - started }); await persistResults(); console.log(`PASS ${name} (${Date.now() - started}ms)`); } catch (error) { results.push({ name, ok: false, durationMs: Date.now() - started, error: error?.stack ?? error?.message ?? String(error) }); await persistResults(); console.log(`FAIL ${name} — ${String(error?.message ?? error).split(String.fromCharCode(10))[0]}`); throw error; }
 };
-const EXPECTED_STEPS = requestedScenario ? 1 : 16;
+const EXPECTED_STEPS = requestedScenario ? 1 : 17;
 const kioskSessionsOf = async () => (await db.collection(`artifacts/${APP_ID}/private/data/kioskSessions`).where('deviceId', '==', deviceId).get()).docs.map((doc) => doc.data());
 const until = async (label, predicate, timeout = 15_000) => { const end = Date.now() + timeout; for (;;) { const value = await predicate(); if (value) return value; if (Date.now() > end) throw new Error(`timed out: ${label}`); await new Promise((resolve) => setTimeout(resolve, 250)); } };
 
@@ -321,10 +321,10 @@ try {
     assert.equal(await card.count(), 0, 'no popup on step 1');
     await continueWith('추천회원');
     await card.waitFor({ timeout: 20_000 });
-    assert.ok(await card.getByText('트레이너가 회원님을 위해 준비한 운동 프로그램입니다. 이 프로그램으로 진행하시겠습니까?').isVisible());
+    assert.ok(await card.getByText('트레이너가 준비한 프로그램입니다. 이 구성으로 진행하시겠습니까?').isVisible());
     assert.ok(await card.getByText('트레이너 하체 루틴').isVisible(), 'default program name shown');
     const rows = (await card.locator('li').allInnerTexts()).map((text) => text.replace(/\s+/g, ' ').trim());
-    assert.deepEqual(rows, ['01 스쿼트 무릎 정렬 4세트', '02 런지 3세트'], `ordered exercises with sets and memo: ${JSON.stringify(rows)}`);
+    assert.deepEqual(rows, ['01 스쿼트 무릎 정렬 4 SET', '02 런지 3 SET'], `ordered exercises with planned sets and memo: ${JSON.stringify(rows)}`);
     for (const hidden of ['트레이너 상체 루틴', '보관된 루틴', '다른 회원 루틴']) assert.equal(await page.getByText(hidden).count(), 0, `${hidden} hidden`);
     assert.equal(kioskRequests.some((url) => url.includes('/v1/kiosk/handoff')), false, 'no handoff read or close from the Kiosk');
     await until('a Kiosk member session for A', async () => (await kioskSessionsOf()).filter((item) => item.status === 'ACTIVE' && item.memberId === memberA).length === 1);
@@ -408,6 +408,29 @@ try {
       await card.getByText('다른 회원 루틴').waitFor({ timeout: 20_000 });
       await card.getByRole('button', { name: '다른 운동 선택' }).click();
       assert.equal(await button.innerText(), '프로그램 추천 받기', 'released after the lookup');
+    } finally { await page.unroute(`**${defaultRequest(memberB)}`); }
+    await leaveFlow();
+  });
+
+  await step('Q. Retry after a failed lookup reaches this member\'s popup exactly once', async () => {
+    let attempts = 0;
+    await page.route(`**${defaultRequest(memberB)}`, async (route) => {
+      attempts += 1;
+      if (attempts === 1) await route.abort(); else await route.continue();
+    });
+    try {
+      await begin(); await openMember('추가회원'); await continueWith('추가회원');
+      await page.getByRole('alert').filter({ hasText: '트레이너 추천 프로그램을 확인하지 못했습니다.' }).waitFor({ timeout: 15_000 });
+      assert.equal(await card.count(), 0, 'first failure never opens a popup');
+      assert.equal(await recommendButton().getAttribute('aria-busy'), 'false', 'the lookup no longer gates ordinary recommendation after failure');
+      await page.getByRole('button', { name: '다시 확인' }).click();
+      await page.getByRole('status').filter({ hasText: '트레이너 추천 프로그램을 확인하고 있습니다' }).waitFor({ timeout: 5_000 });
+      await card.getByText('다른 회원 루틴').waitFor({ timeout: 15_000 });
+      assert.equal(attempts, 2, 'one retry request only');
+      assert.equal(await card.count(), 1, 'successful retry opens one popup');
+      await card.getByRole('button', { name: '다른 운동 선택' }).click();
+      await card.waitFor({ state: 'hidden', timeout: 5_000 });
+      assert.equal(await card.count(), 0, 'declined retry popup does not repeat');
     } finally { await page.unroute(`**${defaultRequest(memberB)}`); }
     await leaveFlow();
   });
